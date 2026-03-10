@@ -1,0 +1,15 @@
+# ninja log v7
+83	1166	7945871608112814	CMakeFiles/omr.dir/src/main.cpp.o	a9ae3672eaf1fd66
+224	5103	7945871609522070	CMakeFiles/omr.dir/src/core/omr_bindings.cpp.o	898757a821a1ad1c
+192	7593	7945871609206403	CMakeFiles/omr.dir/src/core/omr_core.cpp.o	a0aab143afb5f2cf
+7654	12650	7945871683829498	C:/Kien/Mobile/orm/wasm-omr-mobile/web/wasm/omr.js	cde68d77dbc73807
+151	2946	7945927023015637	build.ninja	cd9aaabab3530b2e
+151	2946	7945927022900532	C:/Kien/Mobile/orm/wasm-omr-mobile/build/cmake_install.cmake	cd9aaabab3530b2e
+253	7652	7945871609819397	CMakeFiles/omr.dir/src/core/omr_warp.cpp.o	1b714bd35ecde445
+215	5415	7945927023015637	build.ninja	cd9aaabab3530b2e
+215	5415	7945927023015637	C:/Kien/Mobile/orm/wasm-omr-mobile/build/cmake_install.cmake	cd9aaabab3530b2e
+61	1492	7945927024751921	CMakeFiles/omr.dir/src/main.cpp.o	a9ae3672eaf1fd66
+224	9751	7945927026400042	CMakeFiles/omr.dir/src/core/omr_bindings.cpp.o	898757a821a1ad1c
+194	12686	7945927026092847	CMakeFiles/omr.dir/src/core/omr_core.cpp.o	a0aab143afb5f2cf
+258	12955	7945927026724421	CMakeFiles/omr.dir/src/core/omr_warp.cpp.o	1b714bd35ecde445
+12956	27778	7945927153695862	C:/Kien/Mobile/orm/wasm-omr-mobile/web/wasm/omr.js	cde68d77dbc73807

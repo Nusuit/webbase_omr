@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Kien/Mobile/orm/wasm-omr-mobile/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
