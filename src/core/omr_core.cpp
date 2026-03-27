@@ -1,4 +1,4 @@
-﻿#include "core/omr_core.h"
+#include "core/omr_core.h"
 #include "core/omr_warp.h"
 
 #include <algorithm>
@@ -6,192 +6,16 @@
 #include <cmath>
 #include <cstring>
 #include <vector>
+#include <string>
+
+#include <opencv2/opencv.hpp>
 
 namespace omr {
-namespace {
 
-constexpr int kBaseWidth  = 1700;
-constexpr int kBaseHeight = 2400;
-constexpr std::uint8_t kFrameThreshold = 120;  // for live viewfinder only
-constexpr double kFillThreshold    = 15.0;
-constexpr double kUncertainFillMax = 20.0;
-
-struct Region {
-  int x1;
-  int y1;
-  int x2;
-  int y2;
-  int rows;
-  int cols;
-};
-
-struct Block {
-  int question_start;
-  Region region;
-};
-
-constexpr Region kMssvRegion{78, 843, 456, 1515, 10, 6};
-constexpr Region kKeyRegion{519, 846, 711, 1515, 10, 3};
-constexpr std::array<Block, 6> kQuestionBlocks{{
-    {1, {880, 860, 1183, 1530, 10, 5}},
-    {11, {1249, 856, 1563, 1527, 10, 5}},
-    {21, {140, 1604, 447, 2311, 10, 5}},
-    {31, {515, 1597, 819, 2303, 10, 5}},
-    {41, {882, 1593, 1194, 2311, 10, 5}},
-    {51, {1251, 1585, 1568, 2292, 10, 5}},
-}};
-
-int ClampInt(int v, int min_v, int max_v) {
-  return std::max(min_v, std::min(max_v, v));
-}
-
-struct ScaledRect {
-  int x;
-  int y;
-  int w;
-  int h;
-};
-
-ScaledRect ScaleCell(const Region& region, int row, int col, int width, int height) {
-  const double sx = static_cast<double>(width)  / static_cast<double>(kBaseWidth);
-  const double sy = static_cast<double>(height) / static_cast<double>(kBaseHeight);
-
-  // Scale the block boundaries to the working image size
-  const int bx1 = static_cast<int>(std::round(region.x1 * sx));
-  const int by1 = static_cast<int>(std::round(region.y1 * sy));
-  const int bx2 = static_cast<int>(std::round(region.x2 * sx));
-  const int by2 = static_cast<int>(std::round(region.y2 * sy));
-
-  // Integer-division cell size (matches Android exactly):
-  //   cellW = blockW / cols  →  all cells same width, possible unused px at end
-  const int block_w = bx2 - bx1;
-  const int block_h = by2 - by1;
-  const int cell_w  = block_w / region.cols;
-  const int cell_h  = block_h / region.rows;
-
-  const int x = bx1 + col * cell_w;
-  const int y = by1 + row * cell_h;
-
-  const int safe_x  = ClampInt(x,          0, width  - 1);
-  const int safe_y  = ClampInt(y,          0, height - 1);
-  const int safe_x2 = ClampInt(x + cell_w, safe_x + 1, width);
-  const int safe_y2 = ClampInt(y + cell_h, safe_y + 1, height);
-
-  return ScaledRect{safe_x, safe_y, safe_x2 - safe_x, safe_y2 - safe_y};
-}
-
-// ── Grayscale helper ──────────────────────────────────────────────────────────
-inline std::uint8_t Rgb2Gray(std::uint8_t r, std::uint8_t g, std::uint8_t b) {
-  return static_cast<std::uint8_t>((299 * r + 587 * g + 114 * b) / 1000);
-}
-
-// ── Gaussian blur 5×5 (separable) on a grayscale plane ───────────────────────
-void GaussianBlur5Gray(const std::uint8_t* src, std::uint8_t* dst,
-                       int w, int h, std::vector<std::uint8_t>& tmp) {
-  static constexpr int kW[5] = {1, 4, 6, 4, 1};
-  tmp.assign(static_cast<std::size_t>(w * h), 0);
-  for (int y = 0; y < h; ++y)
-    for (int x = 0; x < w; ++x) {
-      int acc = 0;
-      for (int k = -2; k <= 2; ++k)
-        acc += src[y * w + std::max(0, std::min(x + k, w - 1))] * kW[k + 2];
-      tmp[static_cast<std::size_t>(y * w + x)] = static_cast<std::uint8_t>(acc / 16);
-    }
-  for (int y = 0; y < h; ++y)
-    for (int x = 0; x < w; ++x) {
-      int acc = 0;
-      for (int k = -2; k <= 2; ++k)
-        acc += tmp[static_cast<std::size_t>(std::max(0, std::min(y + k, h - 1)) * w + x)] * kW[k + 2];
-      dst[y * w + x] = static_cast<std::uint8_t>(acc / 16);
-    }
-}
-
-// ── Otsu threshold on grayscale ───────────────────────────────────────────────
-std::uint8_t OtsuThreshold(const std::uint8_t* gray, int n) {
-  long long hist[256] = {};
-  for (int i = 0; i < n; ++i) ++hist[gray[i]];
-  const double total = static_cast<double>(n);
-  double sumAll = 0.0;
-  for (int i = 0; i < 256; ++i) sumAll += i * static_cast<double>(hist[i]);
-  double sumB = 0.0, wB = 0.0, maxVar = 0.0;
-  std::uint8_t best = 128;
-  for (int t = 0; t < 256; ++t) {
-    wB += static_cast<double>(hist[t]);
-    if (wB == 0.0) continue;
-    const double wF = total - wB;
-    if (wF == 0.0) break;
-    sumB += t * static_cast<double>(hist[t]);
-    const double mB = sumB / wB;
-    const double mF = (sumAll - sumB) / wF;
-    const double var = wB * wF * (mB - mF) * (mB - mF);
-    if (var > maxVar) { maxVar = var; best = static_cast<std::uint8_t>(t); }
-  }
-  return best;
-}
-
-// ── Apply binary-INV to RGBA using pre-blurred grayscale ─────────────────────
-void ApplyBinaryInvRgba(std::uint8_t* rgba, const std::uint8_t* gray_blurred,
-                        int n, std::uint8_t thresh) {
-  for (int i = 0; i < n; ++i) {
-    const std::uint8_t v = (gray_blurred[i] < thresh) ? 255 : 0;
-    rgba[i * 4 + 0] = v; rgba[i * 4 + 1] = v;
-    rgba[i * 4 + 2] = v; rgba[i * 4 + 3] = 255;
-  }
-}
-
-// ── Fixed-threshold binary for frame mode (speed > accuracy) ─────────────────
-void ThresholdFrameFixed(std::uint8_t* rgba, int width, int height,
-                         std::uint8_t threshold) {
-  const int pixels = width * height;
-  for (int i = 0; i < pixels; ++i) {
-    const int idx        = i * 4;
-    const std::uint8_t g = Rgb2Gray(rgba[idx], rgba[idx+1], rgba[idx+2]);
-    const std::uint8_t v = (g < threshold) ? 0 : 255;
-    rgba[idx+0] = v; rgba[idx+1] = v; rgba[idx+2] = v; rgba[idx+3] = 255;
-  }
-}
-
-double WhiteRatioBinaryInv(const std::uint8_t* rgba, int width, const ScaledRect& rect) {
-  const int total = rect.w * rect.h;
-  if (total <= 0) {
-    return 0.0;
-  }
-
-  int white = 0;
-  for (int y = rect.y; y < rect.y + rect.h; ++y) {
-    const int row = y * width;
-    for (int x = rect.x; x < rect.x + rect.w; ++x) {
-      const int idx = (row + x) * 4;
-      if (rgba[idx] > 0) {
-        ++white;
-      }
-    }
-  }
-
-  return (static_cast<double>(white) / static_cast<double>(total)) * 100.0;
-}
-
-int DetectNumericColumn(const std::uint8_t* rgba, int width, int height, const Region& region, int col) {
-  int picked = -1;
-  for (int row = 0; row < region.rows; ++row) {
-    const ScaledRect cell = ScaleCell(region, row, col, width, height);
-    const double ratio = WhiteRatioBinaryInv(rgba, width, cell);
-    if (ratio >= kFillThreshold) {
-      if (picked != -1) {
-        return -1;
-      }
-      picked = row;
-    }
-  }
-  return picked;
-}
-
-}  // namespace
-
-// Stores the most recent 1700×2400 RGBA binary image for retrieval via CopyLastPreview.
 static std::vector<std::uint8_t> g_last_preview;
-// Stores the most recent 1700×2400 COLOR RGBA warped image (before binary) for preview overlay.
 static std::vector<std::uint8_t> g_last_warped;
+
+constexpr std::uint8_t kFrameThreshold = 120;  // for live viewfinder only
 
 Roi OmrCore::ClampRoi(int width, int height, const Roi& roi) {
   if (width <= 0 || height <= 0) {
@@ -249,116 +73,281 @@ FrameProcessResult OmrCore::ProcessRgbaFrame(std::uint8_t* rgba, int width, int 
   return result;
 }
 
+// Support structures for Stage 3 logic
+struct SearchArea {
+    std::string name;
+    int cols;
+    int q_offset; // Which question index to start this block from
+    cv::Rect rect;
+};
+
+struct Bubble {
+    int cx;
+    int cy;
+    double density;
+    cv::Mat ink;
+};
+
+struct RegionData {
+    std::string name;
+    int q_offset;
+    cv::Rect rect;
+    std::vector<int> expected_x;
+    std::vector<int> expected_y;
+    int R;
+    std::vector<Bubble> bubbles;
+};
+
 SheetProcessResult OmrCore::ProcessSheetRgba(std::uint8_t* rgba, int width, int height) const {
   SheetProcessResult out;
   if (!rgba || width <= 0 || height <= 0) { out.status = -1; return out; }
 
+  // 1. Perspective normalization
+  constexpr int kBaseWidth = 1700;
+  constexpr int kBaseHeight = 2400;
   const int base_bytes = kBaseWidth * kBaseHeight * 4;
-  const int base_n     = kBaseWidth * kBaseHeight;
 
-  // ── 1. Perspective normalization ───────────────────────────────────────────
-  // Detect 4 corner markers and warp to canonical 1700×2400 layout.
-  // Falls back to nearest-neighbour resize if detection fails.
-  static thread_local std::vector<std::uint8_t> s_normbuf;
-  s_normbuf.resize(static_cast<std::size_t>(base_bytes));
-
-  const bool normalized = NormalizeSheet(rgba, width, height, s_normbuf.data());
+  std::vector<std::uint8_t> s_normbuf(base_bytes);
+  bool normalized = NormalizeSheet(rgba, width, height, s_normbuf.data());
   if (!normalized) {
-    if (width == kBaseWidth && height == kBaseHeight) {
-      std::memcpy(s_normbuf.data(), rgba,
-                  static_cast<std::size_t>(base_bytes));
-    } else {
-      ResizeRgba(rgba, width, height,
-                 s_normbuf.data(), kBaseWidth, kBaseHeight);
-    }
+      if (width == kBaseWidth && height == kBaseHeight) {
+          std::memcpy(s_normbuf.data(), rgba, base_bytes);
+      } else {
+          ResizeRgba(rgba, width, height, s_normbuf.data(), kBaseWidth, kBaseHeight);
+      }
   }
 
-  // ── 2. Gaussian blur + Otsu threshold (adaptive, BINARY_INV) ──────────────
-  static thread_local std::vector<std::uint8_t> s_gray, s_blurred, s_blur_tmp;
-  s_gray.resize(static_cast<std::size_t>(base_n));
-  s_blurred.resize(static_cast<std::size_t>(base_n));
+  // Save color warped image for JS preview overlay before converting to binary
+  g_last_warped.assign(s_normbuf.begin(), s_normbuf.begin() + base_bytes);
 
-  for (int i = 0; i < base_n; ++i)
-    s_gray[static_cast<std::size_t>(i)] =
-        Rgb2Gray(s_normbuf[i*4], s_normbuf[i*4+1], s_normbuf[i*4+2]);
+  // 2. OpenCV Blur + Adaptive Threshold
+  cv::Mat paper_rgba(kBaseHeight, kBaseWidth, CV_8UC4, (void*)s_normbuf.data());
+  cv::Mat gray, blurred, binary;
+  cv::cvtColor(paper_rgba, gray, cv::COLOR_RGBA2GRAY);
+  cv::GaussianBlur(gray, blurred, cv::Size(5, 5), 0);
+  cv::adaptiveThreshold(blurred, binary, 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY_INV, 31, 5);
 
-  GaussianBlur5Gray(s_gray.data(), s_blurred.data(),
-                    kBaseWidth, kBaseHeight, s_blur_tmp);
+  // Set up visualization preview buffer
+  cv::Mat display;
+  cv::cvtColor(binary, display, cv::COLOR_GRAY2RGBA);
 
-  const std::uint8_t thresh = OtsuThreshold(s_blurred.data(), base_n);
+  // 3. Grid Analysis (Stage 3 Notebook Logic)
+  int ax[] = {481, 851, 1220};
+  int ay[] = {830, 1571, 2315};
+  int y_top_range[] = {ay[0] + 30, ay[1] - 40};
+  int y_bot_range[] = {ay[1] + 30, ay[2] - 40};
 
-  // Save color warped BEFORE binarization (for color overlay preview)
-  g_last_warped.assign(s_normbuf.begin(),
-                       s_normbuf.begin() + static_cast<std::ptrdiff_t>(base_bytes));
+  std::vector<SearchArea> search_areas = {
+      {"MSSV", 6, 0,  cv::Rect(ax[0]-440, y_top_range[0], 430, y_top_range[1]-y_top_range[0])},
+      {"KEY",  3, 0,  cv::Rect(ax[0]+15,  y_top_range[0], ax[1]-15-(ax[0]+15), y_top_range[1]-y_top_range[0])},
+      {"Q1",   5, 0,  cv::Rect(ax[1]+15,  y_top_range[0], ax[2]-15-(ax[1]+15), y_top_range[1]-y_top_range[0])},
+      {"Q2",   5, 10, cv::Rect(ax[2]+15,  y_top_range[0], 425, y_top_range[1]-y_top_range[0])},
+      {"Q3",   5, 20, cv::Rect(ax[0]-440, y_bot_range[0], 430, y_bot_range[1]-y_bot_range[0])},
+      {"Q4",   5, 30, cv::Rect(ax[0]+15,  y_bot_range[0], ax[1]-15-(ax[0]+15), y_bot_range[1]-y_bot_range[0])},
+      {"Q5",   5, 40, cv::Rect(ax[1]+15,  y_bot_range[0], ax[2]-15-(ax[1]+15), y_bot_range[1]-y_bot_range[0])},
+      {"Q6",   5, 50, cv::Rect(ax[2]+15,  y_bot_range[0], 425, y_bot_range[1]-y_bot_range[0])}
+  };
 
-  ApplyBinaryInvRgba(s_normbuf.data(), s_blurred.data(), base_n, thresh);
+  std::vector<RegionData> regions_data;
+  std::vector<double> all_grid_densities;
 
-  // Write binary preview back into caller's buffer for JS preview
-  if (width == kBaseWidth && height == kBaseHeight)
-    std::memcpy(rgba, s_normbuf.data(), static_cast<std::size_t>(base_bytes));
+  auto get_median = [](std::vector<int>& v) -> int {
+      if (v.empty()) return 0;
+      std::sort(v.begin(), v.end());
+      return v[v.size() / 2];
+  };
 
-  // Always store in global so CopyLastPreview can return it regardless of
-  // whether input dimensions matched the base size.
-  g_last_preview.assign(s_normbuf.begin(),
-                        s_normbuf.begin() + static_cast<std::ptrdiff_t>(base_bytes));
+  for (const auto& sa : search_areas) {
+      cv::Mat roi_bin = binary(sa.rect);
+      
+      std::vector<std::vector<cv::Point>> contours;
+      cv::findContours(roi_bin, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+      
+      struct ValidB { cv::Point center; int radius; };
+      std::vector<ValidB> valid_bubbles;
 
-  // ── 3. Grid analysis on the normalised + binarised image ──────────────────
-  const std::uint8_t* work = s_normbuf.data();
+      for (const auto& cnt : contours) {
+          cv::Rect bound = cv::boundingRect(cnt);
+          if (bound.width >= 25 && bound.width <= 55 && bound.height >= 25 && bound.height <= 55) {
+              double ar = (double)bound.width / bound.height;
+              if (ar >= 0.7 && ar <= 1.4) {
+                  double area_val = cv::contourArea(cnt);
+                  double peri = cv::arcLength(cnt, true);
+                  double circularity = peri > 0 ? (4 * CV_PI * area_val / (peri * peri)) : 0;
+                  if (circularity > 0.4) {
+                      valid_bubbles.push_back({
+                          cv::Point(bound.x + bound.width / 2, bound.y + bound.height / 2),
+                          std::max(bound.width, bound.height) / 2
+                      });
+                  }
+              }
+          }
+      }
 
-  out.mssv_valid = 1;
-  for (int col = 0; col < kMssvRegion.cols; ++col) {
-    const int digit = DetectNumericColumn(work, kBaseWidth, kBaseHeight,
-                                          kMssvRegion, col);
-    out.mssv_digits[col] = digit;
-    if (digit < 0) out.mssv_valid = 0;
+      if (valid_bubbles.size() < 5) continue;
+
+      std::vector<int> valid_x, valid_y;
+      for (const auto& b : valid_bubbles) {
+          valid_x.push_back(b.center.x);
+          valid_y.push_back(b.center.y);
+      }
+      std::sort(valid_x.begin(), valid_x.end());
+      std::sort(valid_y.begin(), valid_y.end());
+
+      int col_size = std::max(1, (int)valid_x.size() / sa.cols);
+      int row_size = std::max(1, (int)valid_y.size() / 10);
+
+      std::vector<int> min_x_group(valid_x.begin(), valid_x.begin() + col_size);
+      std::vector<int> max_x_group(valid_x.end() - col_size, valid_x.end());
+      int min_x = get_median(min_x_group);
+      int max_x = get_median(max_x_group);
+
+      std::vector<int> min_y_group(valid_y.begin(), valid_y.begin() + row_size);
+      std::vector<int> max_y_group(valid_y.end() - row_size, valid_y.end());
+      int min_y = get_median(min_y_group);
+      int max_y = get_median(max_y_group);
+
+      double step_x = sa.cols > 1 ? (double)(max_x - min_x) / (sa.cols - 1) : 0;
+      double step_y = (double)(max_y - min_y) / 9.0;
+
+      std::vector<int> expected_x(sa.cols);
+      for (int i = 0; i < sa.cols; i++) expected_x[i] = min_x + (int)(i * step_x);
+
+      std::vector<int> expected_y(10);
+      for (int i = 0; i < 10; i++) expected_y[i] = min_y + (int)(i * step_y);
+
+      std::vector<int> radii;
+      for (const auto& b : valid_bubbles) radii.push_back(b.radius);
+      int R = get_median(radii);
+
+      std::vector<Bubble> region_bubbles;
+      for (int cy : expected_y) {
+          for (int cx : expected_x) {
+              cv::Mat mask = cv::Mat::zeros(roi_bin.size(), CV_8UC1);
+              cv::circle(mask, cv::Point(cx, cy), R - 2, cv::Scalar(255), -1);
+              cv::Mat ink_pixels;
+              cv::bitwise_and(roi_bin, roi_bin, ink_pixels, mask);
+              double density = cv::countNonZero(ink_pixels) / (CV_PI * R * R);
+              region_bubbles.push_back({cx, cy, density, ink_pixels});
+              all_grid_densities.push_back(density);
+          }
+      }
+
+      regions_data.push_back({sa.name, sa.q_offset, sa.rect, expected_x, expected_y, R, region_bubbles});
   }
 
-  out.key_valid = 1;
-  for (int col = 0; col < kKeyRegion.cols; ++col) {
-    const int digit = DetectNumericColumn(work, kBaseWidth, kBaseHeight,
-                                          kKeyRegion, col);
-    out.key_digits[col] = digit;
-    if (digit < 0) out.key_valid = 0;
+  double global_avg_density = 0.5;
+  std::vector<double> confident_fills;
+  for (double d : all_grid_densities) { if (d > 0.35) confident_fills.push_back(d); }
+  if (!confident_fills.empty()) {
+      double sum = 0;
+      for (double d : confident_fills) sum += d;
+      global_avg_density = sum / confident_fills.size();
   }
 
+  std::vector<double> recent_history;
+  out.mssv_valid = 1; out.key_valid = 1;
   out.answer_masks.fill(0);
   out.suspicious.fill(0);
 
-  for (const Block& block : kQuestionBlocks) {
-    for (int row = 0; row < block.region.rows; ++row) {
-      const int q_idx = (block.question_start - 1) + row;
-      if (q_idx < 0 || q_idx >= static_cast<int>(out.answer_masks.size()))
-        continue;
+  for (const auto& region : regions_data) {
+      if (region.name == "MSSV" || region.name == "KEY") {
+          for (size_t col_idx = 0; col_idx < region.expected_x.size(); col_idx++) {
+              int cx = region.expected_x[col_idx];
+              std::vector<Bubble> col_b;
+              for (const auto& b : region.bubbles) if (b.cx == cx) col_b.push_back(b);
+              if (col_b.empty()) continue;
 
-      int    mask         = 0;
-      int    filled_count = 0;
-      double single_ratio = 0.0;
+              for (const auto& b : col_b) {
+                  cv::circle(display(region.rect), cv::Point(b.cx, b.cy), region.R, cv::Scalar(0, 0, 255, 255), 2);
+              }
 
-      for (int col = 0; col < block.region.cols; ++col) {
-        const ScaledRect cell = ScaleCell(block.region, row, col,
-                                          kBaseWidth, kBaseHeight);
-        const double ratio = WhiteRatioBinaryInv(work, kBaseWidth, cell);
-        if (ratio >= kFillThreshold) {
-          mask |= (1 << col);
-          ++filled_count;
-          if (filled_count == 1) single_ratio = ratio;
-        }
+              std::sort(col_b.begin(), col_b.end(), [](const Bubble& a, const Bubble& b){ return a.density > b.density; });
+              auto best = col_b[0];
+
+              if (best.density > 0.20 && best.density >= global_avg_density * 0.40) {
+                  // Color it green
+                  display(region.rect).setTo(cv::Scalar(0, 255, 0, 255), best.ink > 0);
+                  
+                  int best_row = -1;
+                  for (int r = 0; r < 10; r++) { if (region.expected_y[r] == best.cy) { best_row = r; break; } }
+                  
+                  if (region.name == "MSSV") out.mssv_digits[col_idx] = best_row;
+                  if (region.name == "KEY")  out.key_digits[col_idx] = best_row;
+              } else {
+                  if (region.name == "MSSV") { out.mssv_valid = 0; out.mssv_digits[col_idx] = -1; }
+                  if (region.name == "KEY")  { out.key_valid = 0; out.key_digits[col_idx] = -1; }
+              }
+          }
+      } else {
+          // Question Blocks
+          for (int r = 0; r < 10; r++) {
+              int cy = region.expected_y[r];
+              std::vector<Bubble> row_b;
+              for (const auto& b : region.bubbles) if (b.cy == cy) row_b.push_back(b);
+              if (row_b.empty()) continue;
+
+              for (const auto& b : row_b) {
+                  cv::circle(display(region.rect), cv::Point(b.cx, b.cy), region.R, cv::Scalar(0, 0, 255, 255), 2);
+              }
+
+              double max_d = 0;
+              for (const auto& b : row_b) if (b.density > max_d) max_d = b.density;
+
+              double ref_density = global_avg_density;
+              if (!recent_history.empty()) {
+                  double sum = 0; for (double d : recent_history) sum += d;
+                  ref_density = sum / recent_history.size();
+              }
+
+              if (max_d < 0.20 || max_d < ref_density * 0.55) {
+                  continue;
+              }
+
+              int q_index = region.q_offset + r;
+              int mask = 0;
+              int filled_count = 0;
+
+              for (size_t col_idx = 0; col_idx < region.expected_x.size(); col_idx++) {
+                  int cx = region.expected_x[col_idx];
+                  auto it = std::find_if(row_b.begin(), row_b.end(), [cx](const Bubble& b){ return b.cx==cx; });
+                  if (it != row_b.end()) {
+                      if (it->density > 0.20 && it->density >= max_d * 0.70 && it->density >= ref_density * 0.55) {
+                          display(region.rect).setTo(cv::Scalar(0, 255, 0, 255), it->ink > 0);
+                          mask |= (1 << col_idx);
+                          filled_count++;
+                      }
+                  }
+              }
+
+              if (q_index < 60) {
+                  out.answer_masks[q_index] = mask;
+                  if (filled_count > 1) out.suspicious[q_index] = 1;
+              }
+
+              if (max_d > global_avg_density * 0.60) {
+                  recent_history.push_back(max_d);
+                  if (recent_history.size() > 5) recent_history.erase(recent_history.begin());
+              }
+          }
       }
-
-      out.answer_masks[q_idx] = mask;
-      if (filled_count > 1)
-        out.suspicious[q_idx] = 1;
-      else if (filled_count == 1 && single_ratio <= kUncertainFillMax)
-        out.suspicious[q_idx] = 1;
-    }
   }
+
+  // Write processed preview buffer directly
+  std::memcpy(s_normbuf.data(), display.data, base_bytes);
+
+  // Return to JS caller via out ptr (if image dimension matches)
+  if (width == kBaseWidth && height == kBaseHeight) {
+      std::memcpy(rgba, s_normbuf.data(), base_bytes);
+  }
+  g_last_preview.assign(s_normbuf.begin(), s_normbuf.begin() + base_bytes);
 
   out.status = 0;
   return out;
 }
 
 int OmrCore::CopyLastPreview(std::uint8_t* dst, int dst_len) const {
-  constexpr int kPreviewBytes = kBaseWidth * kBaseHeight * 4;
+  constexpr int kPreviewBytes = 1700 * 2400 * 4;
   if (!dst || dst_len < kPreviewBytes) return -1;
   if (static_cast<int>(g_last_preview.size()) < kPreviewBytes) return -1;
   std::memcpy(dst, g_last_preview.data(), static_cast<std::size_t>(kPreviewBytes));
@@ -366,7 +355,7 @@ int OmrCore::CopyLastPreview(std::uint8_t* dst, int dst_len) const {
 }
 
 int OmrCore::CopyLastWarped(std::uint8_t* dst, int dst_len) const {
-  constexpr int kPreviewBytes = kBaseWidth * kBaseHeight * 4;
+  constexpr int kPreviewBytes = 1700 * 2400 * 4;
   if (!dst || dst_len < kPreviewBytes) return -1;
   if (static_cast<int>(g_last_warped.size()) < kPreviewBytes) return -1;
   std::memcpy(dst, g_last_warped.data(), static_cast<std::size_t>(kPreviewBytes));
@@ -374,4 +363,3 @@ int OmrCore::CopyLastWarped(std::uint8_t* dst, int dst_len) const {
 }
 
 }  // namespace omr
-

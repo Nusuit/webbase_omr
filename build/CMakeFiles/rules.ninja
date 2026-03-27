@@ -7,14 +7,14 @@
 
 # =============================================================================
 # Project: omr_wasm
-# Configurations: 
+# Configurations: Release
 # =============================================================================
 # =============================================================================
 
 #############################################
 # Rule for compiling CXX files.
 
-rule CXX_COMPILER__omr_unscanned_
+rule CXX_COMPILER__omr_unscanned_Release
   depfile = $DEP_FILE
   deps = gcc
   command = ${LAUNCHER}${CODE_CHECK}C:\Kien\Mobile\orm\emsdk\upstream\emscripten\em++.bat $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
@@ -24,7 +24,7 @@ rule CXX_COMPILER__omr_unscanned_
 #############################################
 # Rule for linking CXX executable.
 
-rule CXX_EXECUTABLE_LINKER__omr_
+rule CXX_EXECUTABLE_LINKER__omr_Release
   command = C:\WINDOWS\system32\cmd.exe /C "$PRE_LINK && C:\Kien\Mobile\orm\emsdk\upstream\emscripten\em++.bat $FLAGS $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD"
   description = Linking CXX executable $TARGET_FILE
   restat = $RESTAT

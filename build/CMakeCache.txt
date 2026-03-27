@@ -19,7 +19,7 @@ CMAKE_ADDR2LINE:FILEPATH=CMAKE_ADDR2LINE-NOTFOUND
 
 //Choose the type of build, options are: None Debug Release RelWithDebInfo
 // MinSizeRel ...
-CMAKE_BUILD_TYPE:STRING=
+CMAKE_BUILD_TYPE:STRING=Release
 
 //No help, variable specified on the command line.
 CMAKE_CROSSCOMPILING_EMULATOR:UNINITIALIZED=C:/Kien/Mobile/orm/emsdk/node/22.16.0_64bit/bin/node.exe
@@ -319,4 +319,6 @@ CMAKE_TAPI-ADVANCED:INTERNAL=1
 CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
 //If true, we are targeting Emscripten output.
 EMSCRIPTEN:INTERNAL=1
+//Details about finding OpenCV
+FIND_PACKAGE_MESSAGE_DETAILS_OpenCV:INTERNAL=[C:/Kien/Mobile/orm/opencv_wasm_build][v4.12.0()]
 

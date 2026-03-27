@@ -1,8 +1,11 @@
-﻿cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.20)
 project(omr_wasm LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(OpenCV_DIR "${CMAKE_SOURCE_DIR}/../opencv_wasm_build")
+find_package(OpenCV REQUIRED)
 
 add_executable(
   omr
@@ -12,7 +15,9 @@ add_executable(
   src/core/omr_warp.cpp
 )
 
-target_include_directories(omr PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_include_directories(omr PRIVATE "${CMAKE_SOURCE_DIR}/src" ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(omr PRIVATE ${OpenCV_LIBS})
+
 
 set_target_properties(omr PROPERTIES
   OUTPUT_NAME "omr"
