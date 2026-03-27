@@ -120,16 +120,89 @@ SheetProcessResult OmrCore::ProcessSheetRgba(std::uint8_t* rgba, int width, int 
   // Save color warped image for JS preview overlay before converting to binary
   g_last_warped.assign(s_normbuf.begin(), s_normbuf.begin() + base_bytes);
 
-  // 2. OpenCV Blur + Adaptive Threshold
+  // 2. Stage 2: Tight crop by corner markers (notebook's crop_by_markers)
+  //    The notebook maps the 4 corner registration squares → tight 1700x2400
+  //    so that ax/ay anchor points are valid. We must do the same.
+  {
+    cv::Mat paper(kBaseHeight, kBaseWidth, CV_8UC4, (void*)s_normbuf.data());
+    cv::Mat g2, th, cleaned;
+    cv::cvtColor(paper, g2, cv::COLOR_RGBA2GRAY);
+    cv::threshold(g2, th, 0, 255, cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
+    cv::morphologyEx(th, cleaned, cv::MORPH_OPEN, kernel);
+
+    std::vector<std::vector<cv::Point>> ctrs;
+    cv::findContours(cleaned, ctrs, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+    // Collect valid markers: area 1500-15000, aspect 0.8-1.2, fill > 0.7
+    // Additionally restrict to outer 20% zone of each side to avoid confusion with
+    // filled bubbles in the interior of the form.
+    const int zone_w = kBaseWidth  / 5;  // 340px
+    const int zone_h = kBaseHeight / 5;  // 480px
+    std::vector<cv::Point2f> markers;
+    for (const auto& c : ctrs) {
+      cv::Rect bound = cv::boundingRect(c);
+      double area = cv::contourArea(c);
+      double ar = (double)bound.width / bound.height;
+      if (area < 1500 || area > 15000) continue;
+      if (ar < 0.8 || ar > 1.2) continue;
+      if ((area / (double)(bound.width * bound.height)) < 0.7) continue;
+      float cx = bound.x + bound.width / 2.0f;
+      float cy = bound.y + bound.height / 2.0f;
+      // Must be in one of the 4 corner zones
+      bool in_left   = cx < zone_w;
+      bool in_right  = cx > kBaseWidth  - zone_w;
+      bool in_top    = cy < zone_h;
+      bool in_bottom = cy > kBaseHeight - zone_h;
+      if ((in_left || in_right) && (in_top || in_bottom)) {
+        markers.push_back(cv::Point2f(cx, cy));
+      }
+    }
+
+    if (markers.size() >= 4) {
+      // Sort by y then x to get [TL, TR, BR, BL]
+      std::sort(markers.begin(), markers.end(), [](const cv::Point2f& a, const cv::Point2f& b){
+        return a.y < b.y;
+      });
+      std::vector<cv::Point2f> top_row = {markers[0], markers[1]};
+      if (top_row[0].x > top_row[1].x) std::swap(top_row[0], top_row[1]);
+      std::vector<cv::Point2f> bot_row = {markers[markers.size()-2], markers[markers.size()-1]};
+      if (bot_row[0].x > bot_row[1].x) std::swap(bot_row[0], bot_row[1]);
+
+      cv::Point2f tl = top_row[0], tr = top_row[1], br = bot_row[1], bl = bot_row[0];
+
+      // Compute maxWidth/maxHeight (notebook's approach)
+      double widthA  = std::sqrt(std::pow(br.x-bl.x,2)+std::pow(br.y-bl.y,2));
+      double widthB  = std::sqrt(std::pow(tr.x-tl.x,2)+std::pow(tr.y-tl.y,2));
+      double heightA = std::sqrt(std::pow(tr.x-br.x,2)+std::pow(tr.y-br.y,2));
+      double heightB = std::sqrt(std::pow(tl.x-bl.x,2)+std::pow(tl.y-bl.y,2));
+      int maxW = std::max((int)widthA, (int)widthB);
+      int maxH = std::max((int)heightA, (int)heightB);
+      if (maxW > 100 && maxH > 100) {
+        std::vector<cv::Point2f> src_pts = {tl, tr, br, bl};
+        std::vector<cv::Point2f> dst_pts = {
+          {0.0f, 0.0f}, {(float)(maxW-1), 0.0f},
+          {(float)(maxW-1), (float)(maxH-1)}, {0.0f, (float)(maxH-1)}
+        };
+        cv::Mat M = cv::getPerspectiveTransform(src_pts, dst_pts);
+        cv::Mat cropped;
+        cv::warpPerspective(paper, cropped, M, cv::Size(maxW, maxH));
+        cv::Mat final_std;
+        cv::resize(cropped, final_std, cv::Size(kBaseWidth, kBaseHeight));
+        std::memcpy(s_normbuf.data(), final_std.data, static_cast<std::size_t>(base_bytes));
+      }
+    }
+  }
+
+  // 3. OpenCV Blur + Adaptive Threshold (on tightly cropped 1700x2400)
   cv::Mat paper_rgba(kBaseHeight, kBaseWidth, CV_8UC4, (void*)s_normbuf.data());
   cv::Mat gray, blurred, binary;
   cv::cvtColor(paper_rgba, gray, cv::COLOR_RGBA2GRAY);
   cv::GaussianBlur(gray, blurred, cv::Size(5, 5), 0);
   cv::adaptiveThreshold(blurred, binary, 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY_INV, 31, 5);
 
-  // Set up visualization preview buffer
-  cv::Mat display;
-  cv::cvtColor(binary, display, cv::COLOR_GRAY2RGBA);
+  // Set up visualization preview buffer exactly like Python (Color image overlaid)
+  cv::Mat display = paper_rgba.clone();
 
   // 3. Grid Analysis (Stage 3 Notebook Logic)
   int ax[] = {481, 851, 1220};
