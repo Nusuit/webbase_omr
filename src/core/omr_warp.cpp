@@ -477,7 +477,9 @@ bool FindPaperCorners(const std::uint8_t* gray, int w, int h,
   GaussianBlur5(gray, blurred.data(), w, h);
   GaussianBlur5(blurred.data(), tmp.data(), w, h);
 
-  const std::uint8_t thresh = OtsuThreshold(tmp.data(), n);
+  // Use fixed threshold instead of Otsu adaptive to ensure consistent detection
+  // across both student sheets and answer keys (which have different histograms)
+  const std::uint8_t thresh = 150;
   for (int i = 0; i < n; ++i) bin[i] = (tmp[i] >= thresh) ? 255 : 0;  // paper=white
 
   // MORPH_CLOSE ×4 (approximates Android's 9×9 kernel MorphClose)

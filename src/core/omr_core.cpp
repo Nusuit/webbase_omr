@@ -134,20 +134,19 @@ SheetProcessResult OmrCore::ProcessSheetRgba(std::uint8_t* rgba, int width, int 
     std::vector<std::vector<cv::Point>> ctrs;
     cv::findContours(cleaned, ctrs, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
-    // Collect valid markers: area 1500-25000, aspect 0.7-1.3, fill > 0.65
-    // Additionally restrict to outer 24% zone of each side to avoid confusion with
+    // Collect valid markers: area 1500-15000, aspect 0.8-1.2, fill > 0.7
+    // Additionally restrict to outer 20% zone of each side to avoid confusion with
     // filled bubbles in the interior of the form.
-    // Relaxed for answer keys: printed ink bleeds, markers may be larger/slightly off-zone.
-    const int zone_w = kBaseWidth  * 6 / 25;  // 408px (was 340px)
-    const int zone_h = kBaseHeight * 6 / 25;  // 576px (was 480px)
+    const int zone_w = kBaseWidth  / 5;  // 340px
+    const int zone_h = kBaseHeight / 5;  // 480px
     std::vector<cv::Point2f> markers;
     for (const auto& c : ctrs) {
       cv::Rect bound = cv::boundingRect(c);
       double area = cv::contourArea(c);
       double ar = (double)bound.width / bound.height;
-      if (area < 1500 || area > 25000) continue;  // relaxed upper bound for ink bleed
-      if (ar < 0.7 || ar > 1.3) continue;        // relaxed aspect ratio
-      if ((area / (double)(bound.width * bound.height)) < 0.65) continue;  // relaxed fill
+      if (area < 1500 || area > 15000) continue;
+      if (ar < 0.8 || ar > 1.2) continue;
+      if ((area / (double)(bound.width * bound.height)) < 0.7) continue;
       float cx = bound.x + bound.width / 2.0f;
       float cy = bound.y + bound.height / 2.0f;
       // Must be in one of the 4 corner zones
