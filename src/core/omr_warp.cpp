@@ -461,8 +461,11 @@ bool FindMarkerCorners(const std::uint8_t* gray, int w, int h,
   MorphOpen(bin.data(), tmp.data(), w, h);
   MorphOpen(bin.data(), tmp.data(), w, h);
 
-  // Reasonable marker size range: 50px – 1/4 of image
-  const auto blobs = FindBlobs(bin.data(), gray, w, h, 50, n / 4);
+  // Reasonable marker size range: 50px – 2000px on 800-wide downscaled image
+  // Upper bound rejects merged bubble regions on answer keys (area=300K+)
+  // Real markers are ~250-500px at this scale
+  const int max_marker_area = std::min(n / 4, 2000);
+  const auto blobs = FindBlobs(bin.data(), gray, w, h, 50, max_marker_area);
 
   // Filter: aspect 0.6-1.4, fill≥0.4, mean_gray<160 (must be dark)
   std::vector<BlobInfo> candidates;
