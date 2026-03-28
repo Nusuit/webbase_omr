@@ -742,10 +742,13 @@
   function compareAnswers(studentResult, keyResult, options = {}) {
     const resolveSuspicious = options.resolveSuspicious !== false;
     if (!studentResult?.answers || !keyResult?.answers) {
-      return { correctCount: 0, total: 60, score10: 0, resolvedSuspiciousCount: 0, resolvedAnswers: [] };
+      return { correctCount: 0, total: 0, score10: 0, resolvedSuspiciousCount: 0, resolvedAnswers: [] };
     }
 
     let correct = 0;
+
+    // Count how many questions the answer key actually has (mask > 0)
+    const totalQuestions = keyResult.answers.filter((a) => a.mask > 0).length || 60;
 
     // Mirror Android ScoringEngine:
     // - Compare student vs key per-question, count correct.
@@ -769,8 +772,8 @@
 
     return {
       correctCount: correct,
-      total: 60,
-      score10: Number(((correct / 60) * 10).toFixed(2)),
+      total: totalQuestions,
+      score10: Number(((correct / totalQuestions) * 10).toFixed(2)),
       resolvedSuspiciousCount,
       resolvedAnswers
     };
