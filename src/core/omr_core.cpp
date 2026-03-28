@@ -244,13 +244,15 @@ SheetProcessResult OmrCore::ProcessSheetRgba(std::uint8_t* rgba, int width, int 
 
       for (const auto& cnt : contours) {
           cv::Rect bound = cv::boundingRect(cnt);
-          if (bound.width >= 25 && bound.width <= 55 && bound.height >= 25 && bound.height <= 55) {
+          // Relaxed range: 15-80px to handle both pencil marks and printed ink circles
+          if (bound.width >= 15 && bound.width <= 80 && bound.height >= 15 && bound.height <= 80) {
               double ar = (double)bound.width / bound.height;
-              if (ar >= 0.7 && ar <= 1.4) {
+              if (ar >= 0.5 && ar <= 2.0) {
                   double area_val = cv::contourArea(cnt);
                   double peri = cv::arcLength(cnt, true);
+                  // Lowered circularity: 0.2 instead of 0.4 (printed circles have irregular edges from scan)
                   double circularity = peri > 0 ? (4 * CV_PI * area_val / (peri * peri)) : 0;
-                  if (circularity > 0.4) {
+                  if (circularity > 0.2) {
                       valid_bubbles.push_back({
                           cv::Point(bound.x + bound.width / 2, bound.y + bound.height / 2),
                           std::max(bound.width, bound.height) / 2
@@ -260,7 +262,8 @@ SheetProcessResult OmrCore::ProcessSheetRgba(std::uint8_t* rgba, int width, int 
           }
       }
 
-      if (valid_bubbles.size() < 5) continue;
+      // Lowered minimum: 3 instead of 5, allowing sparse answer key regions to pass
+      if (valid_bubbles.size() < 3) continue;
 
       std::vector<int> valid_x, valid_y;
       for (const auto& b : valid_bubbles) {
