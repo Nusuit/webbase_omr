@@ -117,8 +117,8 @@ SheetProcessResult OmrCore::ProcessSheetRgba(std::uint8_t* rgba, int width, int 
       }
   }
 
-  // Save color warped image for JS preview overlay before converting to binary
-  g_last_warped.assign(s_normbuf.begin(), s_normbuf.begin() + base_bytes);
+  // Save color warped image AFTER Stage 2 crop so preview matches Stage 3 input exactly.
+  // (moved down — see after Stage 2 block)
 
   // 2. Stage 2: Tight crop by corner markers (notebook's crop_by_markers)
   //    The notebook maps the 4 corner registration squares → tight 1700x2400
@@ -193,6 +193,9 @@ SheetProcessResult OmrCore::ProcessSheetRgba(std::uint8_t* rgba, int width, int 
       }
     }
   }
+
+  // Save color warped image AFTER Stage 2 crop so preview = exactly what Stage 3 analyzes
+  g_last_warped.assign(s_normbuf.begin(), s_normbuf.begin() + base_bytes);
 
   // 3. OpenCV Blur + Adaptive Threshold (on tightly cropped 1700x2400)
   cv::Mat paper_rgba(kBaseHeight, kBaseWidth, CV_8UC4, (void*)s_normbuf.data());
