@@ -274,34 +274,14 @@ self.onmessage = async (event) => {
       const { width, height, buffer } = msg.payload;
       const rgba = new Uint8ClampedArray(buffer);
 
-      // ── YOLO: detect paper bbox and mask out the desk ───────────────────────────
-      let processRgba = rgba;
-      let processW = width, processH = height;
-
-      try {
-        const imgData = new ImageData(rgba, width, height);
-        const box = await detectPaper(imgData);
-        if (box) {
-          const masked = maskImageOutsideBox(imgData, box);
-          processRgba = new Uint8ClampedArray(masked.data.buffer);
-          processW = width;
-          processH = height;
-        } else {
-          // Fallback if YOLO cannot detect paper
-          console.warn("[worker] YOLO failed (confidence too low), passing raw image to C++.");
-          processRgba = rgba;
-          processW = width;
-          processH = height;
-        }
-      } catch (yoloErr) {
-        // YOLO failed → report to UI so user can debug the Onnx/WebAssembly error
-        console.warn("[worker] YOLO paper detect failed:", yoloErr);
-        self.postMessage({
-          type: OMR_MSG.ERROR,
-          error: "Lỗi AI YOLO: " + (yoloErr.message || yoloErr.toString())
-        });
-        return; // Halt process
-      }
+      // ── Traditional OpenCV: pass raw image directly to C++ ─────────────────────
+      // C++ NormalizeSheet uses two-layer detection:
+      //   Layer 1: FindMarkerCorners (black registration squares) — most reliable
+      //   Layer 2: FindPaperCorners (white paper boundary) — fallback
+      // No YOLO masking needed — marker corner detection works on raw photos.
+      const processRgba = rgba;
+      const processW = width, processH = height;
+      console.log(`[worker] Passing raw image ${processW}x${processH} to C++ (marker corner detection)`);
 
       const { status, result, raw, preview, warpedPreview, previewWidth, previewHeight } =
         bridge.processSheet(processRgba, processW, processH);

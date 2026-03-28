@@ -618,35 +618,57 @@ bool NormalizeSheet(const std::uint8_t* src_rgba, int src_w, int src_h,
   ResizeRgba(src_rgba, src_w, src_h, rgba_small.data(), kAnalysisW, kAnalysisH);
   RgbaToGray(rgba_small.data(), gray_small.data(), kAnalysisW, kAnalysisH);
 
-  // 2. Find paper corners
+  // 2. Two-layer corner detection: marker corners first, paper corners as fallback
   Point2d corners_small[4];
-  if (FindPaperCorners(gray_small.data(), kAnalysisW, kAnalysisH, corners_small)) {
-    if (CornersLookValid(corners_small, kAnalysisW, kAnalysisH)) {
-      // 3. Map corners back to full original image scale
-      Point2d corners_full[4];
-      for (int i = 0; i < 4; ++i) {
-        corners_full[i].x = corners_small[i].x * src_w / kAnalysisW;
-        corners_full[i].y = corners_small[i].y * src_h / kAnalysisH;
-      }
-      printf("[NormalizeSheet] Corners valid, computing homography...\n");
+  bool found = false;
 
-      // 4. Compute Homography and Warp
-      double H[9], Hinv[9];
-      if (ComputeHomography(corners_full, kTargetW, kTargetH, H) && InvertHomography(H, Hinv)) {
-        printf("[NormalizeSheet] Using perspective warp (homography succeeded)\n");
-        WarpRgba(src_rgba, src_w, src_h, dst_rgba, kTargetW, kTargetH, Hinv);
-        return true;
-      } else {
-        printf("[NormalizeSheet] Homography computation failed!\n");
-      }
+  // Layer 1: FindMarkerCorners — detect the 4+ black registration squares
+  // More reliable than paper boundary when photo is tightly cropped
+  if (FindMarkerCorners(gray_small.data(), kAnalysisW, kAnalysisH, corners_small)) {
+    if (CornersLookValid(corners_small, kAnalysisW, kAnalysisH)) {
+      printf("[NormalizeSheet] Layer 1 (MarkerCorners) succeeded\n");
+      found = true;
     } else {
-      printf("[NormalizeSheet] Corners validation failed!\n");
+      printf("[NormalizeSheet] Layer 1 (MarkerCorners) corners invalid\n");
     }
   } else {
-    printf("[NormalizeSheet] FindPaperCorners failed!\n");
+    printf("[NormalizeSheet] Layer 1 (MarkerCorners) failed\n");
   }
 
-  // Fallback: if corner detection or homography fails, resize normally
+  // Layer 2 fallback: FindPaperCorners — detect white paper boundary
+  if (!found) {
+    if (FindPaperCorners(gray_small.data(), kAnalysisW, kAnalysisH, corners_small)) {
+      if (CornersLookValid(corners_small, kAnalysisW, kAnalysisH)) {
+        printf("[NormalizeSheet] Layer 2 (PaperCorners) succeeded\n");
+        found = true;
+      } else {
+        printf("[NormalizeSheet] Layer 2 (PaperCorners) corners invalid\n");
+      }
+    } else {
+      printf("[NormalizeSheet] Layer 2 (PaperCorners) failed\n");
+    }
+  }
+
+  if (found) {
+    // 3. Map corners back to full original image scale
+    Point2d corners_full[4];
+    for (int i = 0; i < 4; ++i) {
+      corners_full[i].x = corners_small[i].x * src_w / kAnalysisW;
+      corners_full[i].y = corners_small[i].y * src_h / kAnalysisH;
+    }
+
+    // 4. Compute Homography and Warp
+    double H[9], Hinv[9];
+    if (ComputeHomography(corners_full, kTargetW, kTargetH, H) && InvertHomography(H, Hinv)) {
+      printf("[NormalizeSheet] Perspective warp succeeded\n");
+      WarpRgba(src_rgba, src_w, src_h, dst_rgba, kTargetW, kTargetH, Hinv);
+      return true;
+    } else {
+      printf("[NormalizeSheet] Homography computation failed!\n");
+    }
+  }
+
+  // Fallback: if all corner detection fails, resize normally
   printf("[NormalizeSheet] Using fallback: simple resize\n");
   ResizeRgba(src_rgba, src_w, src_h, dst_rgba, kTargetW, kTargetH);
   return true;
