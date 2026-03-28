@@ -116,10 +116,20 @@ std::uint8_t OtsuThreshold(const std::uint8_t* gray, int n) {
 
 // ─── Adaptive Otsu: handles both bright (student) and dark (answer key) images ──
 std::uint8_t AdaptiveOtsuThreshold(const std::uint8_t* gray, int n) {
+  // Calculate histogram mean to detect image brightness
+  long long hist[256] = {};
+  long long sum = 0;
+  for (int i = 0; i < n; ++i) {
+    ++hist[gray[i]];
+    sum += gray[i];
+  }
+  double mean = static_cast<double>(sum) / n;
+
   std::uint8_t thresh = OtsuThreshold(gray, n);
   bool was_equalized = false;
 
   // If Otsu is too low (dark image like answer key), equalize histogram and retry
+  std::uint8_t thresh_before = thresh;
   if (thresh < 130) {
     was_equalized = true;
     std::vector<std::uint8_t> equalized(n);
@@ -129,8 +139,9 @@ std::uint8_t AdaptiveOtsuThreshold(const std::uint8_t* gray, int n) {
     thresh = static_cast<std::uint8_t>(thresh * 0.6);
   }
 
-  // Debug output
-  printf("[FindPaperCorners] Otsu threshold: %d%s\n", thresh, was_equalized ? " (equalized)" : "");
+  // Debug output with histogram info
+  printf("[AdaptiveOtsu] Image brightness: mean=%d, Otsu=%d -> %d%s\n",
+         static_cast<int>(mean), thresh_before, thresh, was_equalized ? " (equalized)" : "");
 
   return thresh;
 }
@@ -528,8 +539,9 @@ bool FindPaperCorners(const std::uint8_t* gray, int w, int h,
 
   // Find largest blob (= the paper)
   const auto blobs = FindBlobs(bin.data(), nullptr, w, h, n / 20, n);
+  printf("[FindPaperCorners] Found %zu blobs\n", blobs.size());
   if (blobs.empty()) {
-    printf("[FindPaperCorners] No white blobs found!\n");
+    printf("[FindPaperCorners] No white blobs found! Threshold was %d\n", thresh);
     return false;
   }
 
@@ -538,6 +550,9 @@ bool FindPaperCorners(const std::uint8_t* gray, int w, int h,
       [](const BlobInfo& a, const BlobInfo& b) {
         return a.pixel_count < b.pixel_count;
       });
+
+  printf("[FindPaperCorners] Largest blob: %d pixels, bbox=(%d,%d)-(%d,%d)\n",
+         largest.pixel_count, largest.x1, largest.y1, largest.x2, largest.y2);
 
   // Diagonal extremes ONLY within the largest blob's bounding box pixels.
   // Re-scan bin in that bbox to find TL/TR/BR/BL corners.
@@ -583,10 +598,12 @@ void ResizeRgba(const std::uint8_t* src, int sw, int sh,
 // perspective homography to map back to 1700x2400 cleanly.
 bool NormalizeSheet(const std::uint8_t* src_rgba, int src_w, int src_h,
                     std::uint8_t* dst_rgba) {
+  printf("[NormalizeSheet] Input: %dx%d -> %dx%d\n", src_w, src_h, kTargetW, kTargetH);
   if (!src_rgba || src_w <= 0 || src_h <= 0 || !dst_rgba) return false;
 
   // If already exactly TargetW x TargetH, copy directly
   if (src_w == kTargetW && src_h == kTargetH) {
+    printf("[NormalizeSheet] Using memcpy fast path (already target size)\n");
     std::memcpy(dst_rgba, src_rgba, static_cast<std::size_t>(kTargetW * kTargetH * 4));
     return true;
   }
@@ -611,17 +628,26 @@ bool NormalizeSheet(const std::uint8_t* src_rgba, int src_w, int src_h,
         corners_full[i].x = corners_small[i].x * src_w / kAnalysisW;
         corners_full[i].y = corners_small[i].y * src_h / kAnalysisH;
       }
+      printf("[NormalizeSheet] Corners valid, computing homography...\n");
 
       // 4. Compute Homography and Warp
       double H[9], Hinv[9];
       if (ComputeHomography(corners_full, kTargetW, kTargetH, H) && InvertHomography(H, Hinv)) {
+        printf("[NormalizeSheet] Using perspective warp (homography succeeded)\n");
         WarpRgba(src_rgba, src_w, src_h, dst_rgba, kTargetW, kTargetH, Hinv);
         return true;
+      } else {
+        printf("[NormalizeSheet] Homography computation failed!\n");
       }
+    } else {
+      printf("[NormalizeSheet] Corners validation failed!\n");
     }
+  } else {
+    printf("[NormalizeSheet] FindPaperCorners failed!\n");
   }
 
   // Fallback: if corner detection or homography fails, resize normally
+  printf("[NormalizeSheet] Using fallback: simple resize\n");
   ResizeRgba(src_rgba, src_w, src_h, dst_rgba, kTargetW, kTargetH);
   return true;
 }

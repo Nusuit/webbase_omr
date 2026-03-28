@@ -118,11 +118,17 @@ async function detectPaper(imageData) {
     candidates.push([x1, y1, x2, y2, conf]);
   }
 
+  console.log(`[YOLO] Raw candidates before NMS: ${candidates.length}`);
   const kept = nms(candidates, IOU_THRESHOLD);
-  if (!kept.length) return null;
+  console.log(`[YOLO] After NMS: ${kept.length}`);
+  if (!kept.length) {
+    console.log(`[YOLO] No detections passed NMS!`);
+    return null;
+  }
 
   const [bx1, by1, bx2, by2] = kept[0];
   const conf = kept[0][4];
+  console.log(`[YOLO] Top detection: conf=${conf.toFixed(3)}, bbox_area=${((bx2-bx1)*(by2-by1)).toFixed(0)}, letterbox_coords=(${bx1.toFixed(0)},${by1.toFixed(0)})-(${bx2.toFixed(0)},${by2.toFixed(0)})`);
   // Map from letterbox coords → original image coords
   const origX1 = (bx1 - padX) / scale;
   const origY1 = (by1 - padY) / scale;
@@ -159,21 +165,25 @@ async function detectPaper(imageData) {
  */
 function maskImageOutsideBox(imageData, box) {
   const { x1, y1, x2, y2 } = box;
-  
+  const boxW = x2 - x1, boxH = y2 - y1;
+  const boxArea = boxW * boxH;
+  const imgArea = imageData.width * imageData.height;
+  console.log(`[Masking] Box: (${x1},${y1})-(${x2},${y2}), size=${boxW}x${boxH}, area_ratio=${(boxArea/imgArea*100).toFixed(1)}%`);
+
   const canvas = new OffscreenCanvas(imageData.width, imageData.height);
   const ctx = canvas.getContext("2d");
-  
+
   // Fill background with black (so desk noise vanishes completely)
   ctx.fillStyle = "#000000";
   ctx.fillRect(0, 0, imageData.width, imageData.height);
-  
+
   // Put the original imageData into a temp canvas
   const tempCanvas = new OffscreenCanvas(imageData.width, imageData.height);
   tempCanvas.getContext("2d").putImageData(imageData, 0, 0);
-  
+
   // Cut a window to reveal only the YOLO-detected paper
-  ctx.drawImage(tempCanvas, x1, y1, (x2 - x1), (y2 - y1), x1, y1, (x2 - x1), (y2 - y1));
-  
+  ctx.drawImage(tempCanvas, x1, y1, boxW, boxH, x1, y1, boxW, boxH);
+
   return ctx.getImageData(0, 0, imageData.width, imageData.height);
 }
 
