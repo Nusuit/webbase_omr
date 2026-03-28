@@ -531,53 +531,38 @@ void ResizeRgba(const std::uint8_t* src, int sw, int sh,
   }
 }
 
-// ─── Sheet corner detection: two-layer approach (port of Android NormalizePaper)
-// Layer 1 (primary):  find 4 black corner markers (findMarkerCorners)
-// Layer 2 (fallback): find paper outline via largest white blob (findPaperCorners)
+// ─── NormalizeSheet ────────────────────────────────────────────────────────────
+//
+// NOTE: Paper boundary and corner-marker detection have been moved to the
+//       JavaScript layer (worker.js) using the YOLOv8n ONNX model
+//       (web/models/paper_detect.onnx) via onnxruntime-web.
+//       The JS pre-crops the paper to 1700×2400 BEFORE calling omr_process_sheet,
+//       so this function now only needs to:
+//         (a) accept an already-cropped 1700×2400 image → copy as-is, OR
+//         (b) accept full-resolution input as fallback → nearest-neighbour resize.
+//
+// The following detection logic is COMMENTED OUT (replaced by YOLO in JS):
+//
+// /* Two-layer blob/corner detection (FindMarkerCorners + FindPaperCorners) */
+// bool NormalizeSheet_OLD(...) {
+//   constexpr int kAnalysisW = 800;
+//   ... DownscaleGray / RgbaToGray ...
+//   FindMarkerCorners → quadrant-based blob assignment
+//   FindPaperCorners  → largest-white-blob diagonal extremes
+//   ComputeHomography + InvertHomography + WarpRgba
+// }
 bool NormalizeSheet(const std::uint8_t* src_rgba, int src_w, int src_h,
                     std::uint8_t* dst_rgba) {
   if (!src_rgba || src_w <= 0 || src_h <= 0 || !dst_rgba) return false;
 
-  // ── Step 1: Downscale for analysis (800 px wide) ──────────────────────────
-  constexpr int kAnalysisW = 800;
-  const int ds_w = kAnalysisW;
-  const int ds_h = std::max(1, src_h * kAnalysisW / src_w);
-  const int ds_n  = ds_w * ds_h;
-
-  std::vector<std::uint8_t> gray_full(static_cast<std::size_t>(src_w * src_h));
-  RgbaToGray(src_rgba, gray_full.data(), src_w, src_h);
-
-  std::vector<std::uint8_t> gray_ds(static_cast<std::size_t>(ds_n));
-  DownscaleGray(gray_full.data(), src_w, src_h, gray_ds.data(), ds_w, ds_h);
-  gray_full.clear();
-
-  // ── Step 2: Try Layer 1 — marker corners ──────────────────────────────────
-  Point2d corners[4];
-  bool found = FindMarkerCorners(gray_ds.data(), ds_w, ds_h, corners);
-
-  // ── Step 3: Fallback → Layer 2 — paper outline corners ───────────────────
-  if (!found) {
-    found = FindPaperCorners(gray_ds.data(), ds_w, ds_h, corners);
+  // If JS already cropped to 1700×2400- just copy directly (fast path).
+  if (src_w == kTargetW && src_h == kTargetH) {
+    std::memcpy(dst_rgba, src_rgba, static_cast<std::size_t>(kTargetW * kTargetH * 4));
+    return true;
   }
 
-  if (!found) return false;
-
-  // ── Step 4: Scale corners back to source resolution ───────────────────────
-  const double sx = static_cast<double>(src_w) / ds_w;
-  const double sy = static_cast<double>(src_h) / ds_h;
-  for (int i = 0; i < 4; ++i) {
-    corners[i].x *= sx;
-    corners[i].y *= sy;
-  }
-
-  if (!CornersLookValid(corners, src_w, src_h)) return false;
-
-  // ── Step 5: Perspective warp to canonical 1700×2400 ──────────────────────
-  double H[9], Hinv[9];
-  if (!ComputeHomography(corners, kTargetW, kTargetH, H)) return false;
-  if (!InvertHomography(H, Hinv)) return false;
-
-  WarpRgba(src_rgba, src_w, src_h, dst_rgba, kTargetW, kTargetH, Hinv);
+  // Fallback: resize via nearest-neighbour (JS crop may have failed).
+  ResizeRgba(src_rgba, src_w, src_h, dst_rgba, kTargetW, kTargetH);
   return true;
 }
 
