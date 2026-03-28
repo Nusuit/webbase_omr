@@ -22,6 +22,7 @@ async function ensureYolo() {
   if (yoloSession) return yoloSession;
   // Point to self-hosted WASM binaries (avoids CDN CSP issues on Vercel)
   ort.env.wasm.wasmPaths = "/wasm/";
+  ort.env.wasm.numThreads = 1; // Force non-threaded WASM because threaded files (.wasm) are absent
   yoloSession = await ort.InferenceSession.create("../models/paper_detect.onnx", {
     executionProviders: ["wasm"]
   });
@@ -269,10 +270,21 @@ self.onmessage = async (event) => {
           processRgba = new Uint8ClampedArray(cropped.data.buffer);
           processW = 1700;
           processH = 2400;
+        } else {
+          self.postMessage({
+            type: OMR_MSG.ERROR,
+            error: "Lỗi AI YOLO: Không tìm thấy tờ giấy (Confidence < 0.25)!"
+          });
+          return;
         }
       } catch (yoloErr) {
-        // YOLO failed → fall through to WASM with original image (graceful degrade)
-        console.warn("[worker] YOLO paper detect failed, using raw image:", yoloErr);
+        // YOLO failed → report to UI so user can debug the Onnx/WebAssembly error
+        console.warn("[worker] YOLO paper detect failed:", yoloErr);
+        self.postMessage({
+          type: OMR_MSG.ERROR,
+          error: "Lỗi AI YOLO: " + (yoloErr.message || yoloErr.toString())
+        });
+        return; // Halt process
       }
 
       const { status, result, raw, preview, warpedPreview, previewWidth, previewHeight } =
