@@ -117,15 +117,20 @@ std::uint8_t OtsuThreshold(const std::uint8_t* gray, int n) {
 // ─── Adaptive Otsu: handles both bright (student) and dark (answer key) images ──
 std::uint8_t AdaptiveOtsuThreshold(const std::uint8_t* gray, int n) {
   std::uint8_t thresh = OtsuThreshold(gray, n);
+  bool was_equalized = false;
 
   // If Otsu is too low (dark image like answer key), equalize histogram and retry
   if (thresh < 130) {
+    was_equalized = true;
     std::vector<std::uint8_t> equalized(n);
     HistogramEqualize(gray, equalized.data(), n);
     thresh = OtsuThreshold(equalized.data(), n);
     // Scale back to original histogram range (roughly)
     thresh = static_cast<std::uint8_t>(thresh * 0.6);
   }
+
+  // Debug output
+  printf("[FindPaperCorners] Otsu threshold: %d%s\n", thresh, was_equalized ? " (equalized)" : "");
 
   return thresh;
 }
@@ -523,7 +528,10 @@ bool FindPaperCorners(const std::uint8_t* gray, int w, int h,
 
   // Find largest blob (= the paper)
   const auto blobs = FindBlobs(bin.data(), nullptr, w, h, n / 20, n);
-  if (blobs.empty()) return false;
+  if (blobs.empty()) {
+    printf("[FindPaperCorners] No white blobs found!\n");
+    return false;
+  }
 
   const BlobInfo& largest = *std::max_element(
       blobs.begin(), blobs.end(),
@@ -548,6 +556,8 @@ bool FindPaperCorners(const std::uint8_t* gray, int w, int h,
     }
 
   out[0] = tl; out[1] = tr; out[2] = br; out[3] = bl;
+  printf("[FindPaperCorners] Success! Corners: TL(%.1f,%.1f) TR(%.1f,%.1f) BR(%.1f,%.1f) BL(%.1f,%.1f)\n",
+         tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y);
   return true;
 }
 

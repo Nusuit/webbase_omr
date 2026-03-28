@@ -122,6 +122,7 @@ async function detectPaper(imageData) {
   if (!kept.length) return null;
 
   const [bx1, by1, bx2, by2] = kept[0];
+  const conf = kept[0][4];
   // Map from letterbox coords → original image coords
   const origX1 = (bx1 - padX) / scale;
   const origY1 = (by1 - padY) / scale;
@@ -138,12 +139,15 @@ async function detectPaper(imageData) {
   const y2_exp = origY2 + origH * padPct;
 
   const W = imageData.width, H = imageData.height;
-  return {
+  const bbox = {
     x1: Math.max(0, Math.round(x1_exp)),
     y1: Math.max(0, Math.round(y1_exp)),
     x2: Math.min(W - 1, Math.round(x2_exp)),
     y2: Math.min(H - 1, Math.round(y2_exp))
   };
+
+  console.log(`[YOLO] Confidence: ${conf.toFixed(3)}, Bbox: (${bbox.x1},${bbox.y1}) to (${bbox.x2},${bbox.y2}), Image: ${W}x${H}`);
+  return bbox;
 }
 
 /**
