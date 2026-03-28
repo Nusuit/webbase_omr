@@ -11,7 +11,8 @@ let yoloSession = null;
 
 const YOLO_INPUT_SIZE = 1280;          // model input: 1280×1280
 const PAPER_CLASS_ID = 0;             // "paper" is class 0
-const CONF_THRESHOLD = 0.60;          // Raised from 0.25 to reject unreliable detections on answer keys (conf=0.508)
+const CONF_THRESHOLD = 0.84;          // Only accept confident detections like student sheets (0.84+)
+                                      // Answer keys (0.508) fall back to raw image + adaptive histogram
 const IOU_THRESHOLD  = 0.45;
 const ROI_RATIO = { x: 0.25, y: 0.25, w: 0.5, h: 0.5 };
 
