@@ -137,35 +137,30 @@ async function detectPaper(imageData) {
 }
 
 /**
- * Crops the paper region from full ImageData and resizes to 1700×2400.
- * To perfectly bypass C++ Stage 2 homography, we must map the (0,0) and (1700,2400)
- * coordinates to the **CENTERS** of the 4 corner markers, not their outer edges.
- * Since YOLO tightly bounds the outer edges, we shrink the crop box slightly (by ~1.5%)
- * so its corners align with the marker centers.
+ * Masks out everything outside the YOLO detection box.
+ * Instead of extracting a tightly stretched 1700x2400 (which ruins 3D perspective homography),
+ * we return the original full-size photo, but with the entire desk/background blacked out.
+ * This forces C++ Stage 1 (NormalizeSheet) to effortlessly find the 4 precise corners
+ * of the tilted paper paper without distraction, and apply a mathematically perfect homography.
  */
-function cropAndResize(imageData, box) {
+function maskImageOutsideBox(imageData, box) {
   const { x1, y1, x2, y2 } = box;
-  const bw = x2 - x1, bh = y2 - y1;
   
-  // Physical marker size offset: ~1.5% of paper width reaches the marker center
-  const marginX = Math.round(bw * 0.015);
-  // Physical squarish marker means same pixel margin roughly for Y
-  const marginY = Math.round(bw * 0.015);
-
-  const cropX = Math.max(0, x1 + marginX);
-  const cropY = Math.max(0, y1 + marginY);
-  const cropW = Math.max(1, bw - marginX * 2);
-  const cropH = Math.max(1, bh - marginY * 2);
-
-  const srcCanvas = new OffscreenCanvas(imageData.width, imageData.height);
-  srcCanvas.getContext("2d").putImageData(imageData, 0, 0);
-
-  const dstCanvas = new OffscreenCanvas(1700, 2400);
-  const ctx = dstCanvas.getContext("2d");
+  const canvas = new OffscreenCanvas(imageData.width, imageData.height);
+  const ctx = canvas.getContext("2d");
   
-  // Draw the slightly-shrunk region spanning the marker centers
-  ctx.drawImage(srcCanvas, cropX, cropY, cropW, cropH, 0, 0, 1700, 2400);
-  return dstCanvas.getContext("2d").getImageData(0, 0, 1700, 2400);
+  // Fill background with black (so desk noise vanishes completely)
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(0, 0, imageData.width, imageData.height);
+  
+  // Put the original imageData into a temp canvas
+  const tempCanvas = new OffscreenCanvas(imageData.width, imageData.height);
+  tempCanvas.getContext("2d").putImageData(imageData, 0, 0);
+  
+  // Cut a window to reveal only the YOLO-detected paper
+  ctx.drawImage(tempCanvas, x1, y1, (x2 - x1), (y2 - y1), x1, y1, (x2 - x1), (y2 - y1));
+  
+  return ctx.getImageData(0, 0, imageData.width, imageData.height);
 }
 
 // ─── Answer decoding (unchanged) ─────────────────────────────────────────────
@@ -254,7 +249,7 @@ self.onmessage = async (event) => {
       const { width, height, buffer } = msg.payload;
       const rgba = new Uint8ClampedArray(buffer);
 
-      // ── YOLO: detect paper bbox and pre-crop to 1700×2400 ─────────────────
+      // ── YOLO: detect paper bbox and mask out the desk ───────────────────────────
       let processRgba = rgba;
       let processW = width, processH = height;
 
@@ -262,16 +257,16 @@ self.onmessage = async (event) => {
         const imgData = new ImageData(rgba, width, height);
         const box = await detectPaper(imgData);
         if (box) {
-          const cropped = cropAndResize(imgData, box);
-          processRgba = new Uint8ClampedArray(cropped.data.buffer);
-          processW = 1700;
-          processH = 2400;
+          const masked = maskImageOutsideBox(imgData, box);
+          processRgba = new Uint8ClampedArray(masked.data.buffer);
+          processW = width;
+          processH = height;
         } else {
-          self.postMessage({
-            type: OMR_MSG.ERROR,
-            error: "Lỗi AI YOLO: Không tìm thấy tờ giấy (Confidence < 0.25)!"
-          });
-          return;
+          // Fallback if YOLO cannot detect paper
+          console.warn("[worker] YOLO failed (confidence too low), passing raw image to C++.");
+          processRgba = rgba;
+          processW = width;
+          processH = height;
         }
       } catch (yoloErr) {
         // YOLO failed → report to UI so user can debug the Onnx/WebAssembly error
