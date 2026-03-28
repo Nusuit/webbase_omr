@@ -1,8 +1,8 @@
 importScripts(
-  "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort.min.js",
-  "./worker-protocol.js?v=20260328-yolo1",
-  "./wasm-bridge.js?v=20260328-yolo1",
-  "/wasm/omr.js?v=20260328-yolo1"
+  "../js/ort.min.js",
+  "./worker-protocol.js?v=20260328-yolo2",
+  "./wasm-bridge.js?v=20260328-yolo2",
+  "/wasm/omr.js?v=20260328-yolo2"
 );
 
 const bridge = new WasmBridge();
@@ -20,7 +20,8 @@ const ROI_RATIO = { x: 0.25, y: 0.25, w: 0.5, h: 0.5 };
 /** Load model once, cached globally. */
 async function ensureYolo() {
   if (yoloSession) return yoloSession;
-  ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/";
+  // Point to self-hosted WASM binaries (avoids CDN CSP issues on Vercel)
+  ort.env.wasm.wasmPaths = "/wasm/";
   yoloSession = await ort.InferenceSession.create("../models/paper_detect.onnx", {
     executionProviders: ["wasm"]
   });
