@@ -137,20 +137,25 @@ async function detectPaper(imageData) {
 }
 
 /**
- * Crops the paper region from full ImageData and resizes to 1700×2400,
- * but adds a pure WHITE border around the YOLO box.
- * This guarantees OpenCV Stage 2 can isolate the marker centers perfectly,
- * resolving the center-to-edge offset discrepancy without compiling C/C++.
+ * Crops the paper region from full ImageData and resizes to 1700×2400.
+ * To perfectly bypass C++ Stage 2 homography, we must map the (0,0) and (1700,2400)
+ * coordinates to the **CENTERS** of the 4 corner markers, not their outer edges.
+ * Since YOLO tightly bounds the outer edges, we shrink the crop box slightly (by ~1.5%)
+ * so its corners align with the marker centers.
  */
 function cropAndResize(imageData, box) {
   const { x1, y1, x2, y2 } = box;
   const bw = x2 - x1, bh = y2 - y1;
   
-  // 3% white padding to prevent markers from touching image boundaries
-  const padX = Math.round(bw * 0.03);
-  const padY = Math.round(bh * 0.03);
-  const paddedW = bw + padX * 2;
-  const paddedH = bh + padY * 2;
+  // Physical marker size offset: ~1.5% of paper width reaches the marker center
+  const marginX = Math.round(bw * 0.015);
+  // Physical squarish marker means same pixel margin roughly for Y
+  const marginY = Math.round(bw * 0.015);
+
+  const cropX = Math.max(0, x1 + marginX);
+  const cropY = Math.max(0, y1 + marginY);
+  const cropW = Math.max(1, bw - marginX * 2);
+  const cropH = Math.max(1, bh - marginY * 2);
 
   const srcCanvas = new OffscreenCanvas(imageData.width, imageData.height);
   srcCanvas.getContext("2d").putImageData(imageData, 0, 0);
@@ -158,17 +163,8 @@ function cropAndResize(imageData, box) {
   const dstCanvas = new OffscreenCanvas(1700, 2400);
   const ctx = dstCanvas.getContext("2d");
   
-  // Fill with pure white background
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, 1700, 2400);
-  
-  // Draw YOLO crop centered with padding factored in
-  const drawX = (padX / paddedW) * 1700;
-  const drawY = (padY / paddedH) * 2400;
-  const drawW = (bw / paddedW) * 1700;
-  const drawH = (bh / paddedH) * 2400;
-  
-  ctx.drawImage(srcCanvas, x1, y1, bw, bh, drawX, drawY, drawW, drawH);
+  // Draw the slightly-shrunk region spanning the marker centers
+  ctx.drawImage(srcCanvas, cropX, cropY, cropW, cropH, 0, 0, 1700, 2400);
   return dstCanvas.getContext("2d").getImageData(0, 0, 1700, 2400);
 }
 
