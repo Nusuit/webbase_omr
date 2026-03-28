@@ -533,35 +533,50 @@ void ResizeRgba(const std::uint8_t* src, int sw, int sh,
 
 // ─── NormalizeSheet ────────────────────────────────────────────────────────────
 //
-// NOTE: Paper boundary and corner-marker detection have been moved to the
-//       JavaScript layer (worker.js) using the YOLOv8n ONNX model
-//       (web/models/paper_detect.onnx) via onnxruntime-web.
-//       The JS pre-crops the paper to 1700×2400 BEFORE calling omr_process_sheet,
-//       so this function now only needs to:
-//         (a) accept an already-cropped 1700×2400 image → copy as-is, OR
-//         (b) accept full-resolution input as fallback → nearest-neighbour resize.
-//
-// The following detection logic is COMMENTED OUT (replaced by YOLO in JS):
-//
-// /* Two-layer blob/corner detection (FindMarkerCorners + FindPaperCorners) */
-// bool NormalizeSheet_OLD(...) {
-//   constexpr int kAnalysisW = 800;
-//   ... DownscaleGray / RgbaToGray ...
-//   FindMarkerCorners → quadrant-based blob assignment
-//   FindPaperCorners  → largest-white-blob diagonal extremes
-//   ComputeHomography + InvertHomography + WarpRgba
-// }
+// Uses YOLO-cropped output (which preserves aspect ratio and includes paper)
+// to accurately find paper corners via Computer Vision, then applies precise
+// perspective homography to map back to 1700x2400 cleanly.
 bool NormalizeSheet(const std::uint8_t* src_rgba, int src_w, int src_h,
                     std::uint8_t* dst_rgba) {
   if (!src_rgba || src_w <= 0 || src_h <= 0 || !dst_rgba) return false;
 
-  // If JS already cropped to 1700×2400- just copy directly (fast path).
+  // If already exactly TargetW x TargetH, copy directly
   if (src_w == kTargetW && src_h == kTargetH) {
     std::memcpy(dst_rgba, src_rgba, static_cast<std::size_t>(kTargetW * kTargetH * 4));
     return true;
   }
 
-  // Fallback: resize via nearest-neighbour (JS crop may have failed).
+  // 1. Prepare small analysis image for speed
+  constexpr int kAnalysisW = 800;
+  const int kAnalysisH = src_h * kAnalysisW / src_w;
+  const int n = kAnalysisW * kAnalysisH;
+  std::vector<std::uint8_t> gray_small(n);
+  std::vector<std::uint8_t> rgba_small(n * 4);
+
+  ResizeRgba(src_rgba, src_w, src_h, rgba_small.data(), kAnalysisW, kAnalysisH);
+  RgbaToGray(rgba_small.data(), gray_small.data(), kAnalysisW, kAnalysisH);
+
+  // 2. Find paper corners
+  Point2d corners_small[4];
+  if (FindPaperCorners(gray_small.data(), kAnalysisW, kAnalysisH, corners_small)) {
+    if (CornersLookValid(corners_small, kAnalysisW, kAnalysisH)) {
+      // 3. Map corners back to full original image scale
+      Point2d corners_full[4];
+      for (int i = 0; i < 4; ++i) {
+        corners_full[i].x = corners_small[i].x * src_w / kAnalysisW;
+        corners_full[i].y = corners_small[i].y * src_h / kAnalysisH;
+      }
+
+      // 4. Compute Homography and Warp
+      double H[9], Hinv[9];
+      if (ComputeHomography(corners_full, kTargetW, kTargetH, H) && InvertHomography(H, Hinv)) {
+        WarpRgba(src_rgba, src_w, src_h, dst_rgba, kTargetW, kTargetH, Hinv);
+        return true;
+      }
+    }
+  }
+
+  // Fallback: if corner detection or homography fails, resize normally
   ResizeRgba(src_rgba, src_w, src_h, dst_rgba, kTargetW, kTargetH);
   return true;
 }

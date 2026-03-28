@@ -136,17 +136,17 @@ async function detectPaper(imageData) {
 }
 
 /**
- * Crops the paper region from full ImageData and resizes to 1700×2400.
- * Returns a new ImageData (1700×2400).
+ * Crops the paper region from full ImageData.
+ * Returns a new ImageData containing precisely the cropped region.
  */
 function cropAndResize(imageData, box) {
   const { x1, y1, x2, y2 } = box;
   const bw = x2 - x1, bh = y2 - y1;
   const srcCanvas = new OffscreenCanvas(imageData.width, imageData.height);
   srcCanvas.getContext("2d").putImageData(imageData, 0, 0);
-  const dstCanvas = new OffscreenCanvas(1700, 2400);
-  dstCanvas.getContext("2d").drawImage(srcCanvas, x1, y1, bw, bh, 0, 0, 1700, 2400);
-  return dstCanvas.getContext("2d").getImageData(0, 0, 1700, 2400);
+  const dstCanvas = new OffscreenCanvas(bw, bh);
+  dstCanvas.getContext("2d").drawImage(srcCanvas, x1, y1, bw, bh, 0, 0, bw, bh);
+  return dstCanvas.getContext("2d").getImageData(0, 0, bw, bh);
 }
 
 // ─── Answer decoding (unchanged) ─────────────────────────────────────────────
@@ -235,7 +235,7 @@ self.onmessage = async (event) => {
       const { width, height, buffer } = msg.payload;
       const rgba = new Uint8ClampedArray(buffer);
 
-      // ── YOLO: detect paper bbox and pre-crop to 1700×2400 ─────────────────
+      // ── YOLO: detect paper bbox and pre-crop without stretching ─────────────
       let processRgba = rgba;
       let processW = width, processH = height;
 
@@ -243,10 +243,18 @@ self.onmessage = async (event) => {
         const imgData = new ImageData(rgba, width, height);
         const box = await detectPaper(imgData);
         if (box) {
+          // Add 3% padding to ensure paper corners are well within the image
+          const padX = Math.round((box.x2 - box.x1) * 0.03);
+          const padY = Math.round((box.y2 - box.y1) * 0.03);
+          box.x1 = Math.max(0, box.x1 - padX);
+          box.y1 = Math.max(0, box.y1 - padY);
+          box.x2 = Math.min(width - 1, box.x2 + padX);
+          box.y2 = Math.min(height - 1, box.y2 + padY);
+
           const cropped = cropAndResize(imgData, box);
           processRgba = new Uint8ClampedArray(cropped.data.buffer);
-          processW = 1700;
-          processH = 2400;
+          processW = cropped.width;
+          processH = cropped.height;
         }
       } catch (yoloErr) {
         // YOLO failed → fall through to WASM with original image (graceful degrade)
