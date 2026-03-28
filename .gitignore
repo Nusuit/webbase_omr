@@ -1,0 +1,45 @@
+# Claude Code
+.claude/
+
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+*.dylib
+
+# WASM build output (rebuild from source)
+web/wasm/*.wasm
+web/wasm/*.js
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Node/NPM
+node_modules/
+npm-debug.log
+package-lock.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
+.DS_Store
+
+# CVAT (training data - rebuild from labels)
+final/labels.cache

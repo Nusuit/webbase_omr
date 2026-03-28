@@ -127,12 +127,22 @@ async function detectPaper(imageData) {
   const origY1 = (by1 - padY) / scale;
   const origX2 = (bx2 - padX) / scale;
   const origY2 = (by2 - padY) / scale;
+
+  // Expand bbox by 7% to ensure corner markers at edges aren't clipped during masking
+  const origW = origX2 - origX1;
+  const origH = origY2 - origY1;
+  const padPct = 0.07;
+  const x1_exp = origX1 - origW * padPct;
+  const y1_exp = origY1 - origH * padPct;
+  const x2_exp = origX2 + origW * padPct;
+  const y2_exp = origY2 + origH * padPct;
+
   const W = imageData.width, H = imageData.height;
   return {
-    x1: Math.max(0, Math.round(origX1)),
-    y1: Math.max(0, Math.round(origY1)),
-    x2: Math.min(W - 1, Math.round(origX2)),
-    y2: Math.min(H - 1, Math.round(origY2))
+    x1: Math.max(0, Math.round(x1_exp)),
+    y1: Math.max(0, Math.round(y1_exp)),
+    x2: Math.min(W - 1, Math.round(x2_exp)),
+    y2: Math.min(H - 1, Math.round(y2_exp))
   };
 }
 
