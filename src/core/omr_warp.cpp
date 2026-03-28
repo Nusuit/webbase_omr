@@ -68,6 +68,23 @@ void GaussianBlur5(const std::uint8_t* src, std::uint8_t* dst, int w, int h) {
   }
 }
 
+// ─── Histogram Equalization (for adaptive threshold) ──────────────────────────
+void HistogramEqualize(const std::uint8_t* src, std::uint8_t* dst, int n) {
+  long long hist[256] = {};
+  for (int i = 0; i < n; ++i) ++hist[src[i]];
+
+  // Compute CDF
+  std::uint8_t lut[256];
+  long long cdf = 0;
+  for (int i = 0; i < 256; ++i) {
+    cdf += hist[i];
+    lut[i] = static_cast<std::uint8_t>(cdf * 255 / n);
+  }
+
+  // Apply LUT
+  for (int i = 0; i < n; ++i) dst[i] = lut[src[i]];
+}
+
 // ─── Otsu threshold ───────────────────────────────────────────────────────────
 std::uint8_t OtsuThreshold(const std::uint8_t* gray, int n) {
   long long hist[256] = {};
@@ -95,6 +112,22 @@ std::uint8_t OtsuThreshold(const std::uint8_t* gray, int n) {
     }
   }
   return best;
+}
+
+// ─── Adaptive Otsu: handles both bright (student) and dark (answer key) images ──
+std::uint8_t AdaptiveOtsuThreshold(const std::uint8_t* gray, int n) {
+  std::uint8_t thresh = OtsuThreshold(gray, n);
+
+  // If Otsu is too low (dark image like answer key), equalize histogram and retry
+  if (thresh < 130) {
+    std::vector<std::uint8_t> equalized(n);
+    HistogramEqualize(gray, equalized.data(), n);
+    thresh = OtsuThreshold(equalized.data(), n);
+    // Scale back to original histogram range (roughly)
+    thresh = static_cast<std::uint8_t>(thresh * 0.6);
+  }
+
+  return thresh;
 }
 
 // ─── Binary INV: dark pixels (< thresh) → 255, light → 0 ────────────────────
@@ -477,9 +510,9 @@ bool FindPaperCorners(const std::uint8_t* gray, int w, int h,
   GaussianBlur5(gray, blurred.data(), w, h);
   GaussianBlur5(blurred.data(), tmp.data(), w, h);
 
-  // Use fixed threshold instead of Otsu adaptive to ensure consistent detection
-  // across both student sheets and answer keys (which have different histograms)
-  const std::uint8_t thresh = 150;
+  // Adaptive Otsu: if image is dark (answer key), equalize histogram first
+  // This ensures consistent corner detection across both student sheets and answer keys
+  const std::uint8_t thresh = AdaptiveOtsuThreshold(tmp.data(), n);
   for (int i = 0; i < n; ++i) bin[i] = (tmp[i] >= thresh) ? 255 : 0;  // paper=white
 
   // MORPH_CLOSE ×4 (approximates Android's 9×9 kernel MorphClose)
