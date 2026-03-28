@@ -467,7 +467,9 @@ bool FindMarkerCorners(const std::uint8_t* gray, int w, int h,
   const int max_marker_area = std::min(n / 4, 2000);
   const auto blobs = FindBlobs(bin.data(), gray, w, h, 50, max_marker_area);
 
-  // Filter: aspect 0.6-1.4, fill≥0.4, mean_gray<160 (must be dark)
+  // Filter: aspect 0.7-1.4, fill≥0.85, mean_gray<80 (must be very dark, solid square)
+  // Real registration markers: fill=0.92-1.00, gray=28-57
+  // Noise blobs (text/headers): fill=0.44-0.56, gray=134-141 — rejected
   std::vector<BlobInfo> candidates;
   candidates.reserve(blobs.size());
   for (const auto& b : blobs) {
@@ -475,9 +477,9 @@ bool FindMarkerCorners(const std::uint8_t* gray, int w, int h,
     const int bh = b.y2 - b.y1 + 1;
     const double ar   = static_cast<double>(bw) / bh;
     const double fill = static_cast<double>(b.pixel_count) / (bw * bh);
-    if (ar < 0.6 || ar > 1.4) continue;
-    if (fill < 0.4) continue;
-    if (b.mean_gray > 160.0) continue;
+    if (ar < 0.7 || ar > 1.4) continue;
+    if (fill < 0.85) continue;
+    if (b.mean_gray > 80.0) continue;
     candidates.push_back(b);
   }
 
