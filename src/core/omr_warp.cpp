@@ -627,12 +627,8 @@ bool NormalizeSheet(const std::uint8_t* src_rgba, int src_w, int src_h,
   printf("[NormalizeSheet] Input: %dx%d -> %dx%d\n", src_w, src_h, kTargetW, kTargetH);
   if (!src_rgba || src_w <= 0 || src_h <= 0 || !dst_rgba) return false;
 
-  // If already exactly TargetW x TargetH, copy directly
-  if (src_w == kTargetW && src_h == kTargetH) {
-    printf("[NormalizeSheet] Using memcpy fast path (already target size)\n");
-    std::memcpy(dst_rgba, src_rgba, static_cast<std::size_t>(kTargetW * kTargetH * 4));
-    return true;
-  }
+  // No fast path — always run corner detection even if input is already 1700x2400.
+  // Photos may arrive pre-resized but still need perspective correction.
 
   // 1. Prepare small analysis image for speed
   constexpr int kAnalysisW = 800;
