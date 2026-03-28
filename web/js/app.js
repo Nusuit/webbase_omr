@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
   const OMR_MSG = {
     INIT: "omr/init",
     READY: "omr/ready",
@@ -1458,7 +1458,19 @@
       ui.reviewStudentImg.src = keyOverlayUrl || keyPreviewUrl || "";
       ui.reviewKeyImg.src = keyPreviewUrl || "";
     } else {
-      const studentUrl = await buildAnnotatedPreview(row, keyResult?.answers);
+      let activeRow = row;
+      // Re-run worker to get the real warped Blob instead of falling back to original camera photo
+      if (!row.warpedBlob && (row.sourceBlob || row.payload?.blob)) {
+        try {
+           const reprocess = await runSheetProcess(row.sourceBlob || row.payload.blob);
+           if (reprocess.warpedPreview) {
+             const warpedBlob = await blobFromRgba(reprocess.warpedPreview, 1700, 2400);
+             activeRow = { ...row, warpedBlob };
+           }
+        } catch(e) { console.warn("Re-process warped blur failed", e); }
+      }
+      
+      const studentUrl = await buildAnnotatedPreview(activeRow, keyResult?.answers);
       ui.reviewStudentLabel.textContent = "Bài làm học sinh";
       ui.reviewKeyLabel.textContent = "Đáp án chuẩn";
       ui.reviewStudentImg.src = studentUrl || "";

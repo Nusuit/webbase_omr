@@ -136,17 +136,39 @@ async function detectPaper(imageData) {
 }
 
 /**
- * Crops the paper region from full ImageData.
- * Returns a new ImageData containing precisely the cropped region.
+ * Crops the paper region from full ImageData and resizes to 1700×2400,
+ * but adds a pure WHITE border around the YOLO box.
+ * This guarantees OpenCV Stage 2 can isolate the marker centers perfectly,
+ * resolving the center-to-edge offset discrepancy without compiling C/C++.
  */
 function cropAndResize(imageData, box) {
   const { x1, y1, x2, y2 } = box;
   const bw = x2 - x1, bh = y2 - y1;
+  
+  // 3% white padding to prevent markers from touching image boundaries
+  const padX = Math.round(bw * 0.03);
+  const padY = Math.round(bh * 0.03);
+  const paddedW = bw + padX * 2;
+  const paddedH = bh + padY * 2;
+
   const srcCanvas = new OffscreenCanvas(imageData.width, imageData.height);
   srcCanvas.getContext("2d").putImageData(imageData, 0, 0);
-  const dstCanvas = new OffscreenCanvas(bw, bh);
-  dstCanvas.getContext("2d").drawImage(srcCanvas, x1, y1, bw, bh, 0, 0, bw, bh);
-  return dstCanvas.getContext("2d").getImageData(0, 0, bw, bh);
+
+  const dstCanvas = new OffscreenCanvas(1700, 2400);
+  const ctx = dstCanvas.getContext("2d");
+  
+  // Fill with pure white background
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, 1700, 2400);
+  
+  // Draw YOLO crop centered with padding factored in
+  const drawX = (padX / paddedW) * 1700;
+  const drawY = (padY / paddedH) * 2400;
+  const drawW = (bw / paddedW) * 1700;
+  const drawH = (bh / paddedH) * 2400;
+  
+  ctx.drawImage(srcCanvas, x1, y1, bw, bh, drawX, drawY, drawW, drawH);
+  return dstCanvas.getContext("2d").getImageData(0, 0, 1700, 2400);
 }
 
 // ─── Answer decoding (unchanged) ─────────────────────────────────────────────
@@ -235,7 +257,7 @@ self.onmessage = async (event) => {
       const { width, height, buffer } = msg.payload;
       const rgba = new Uint8ClampedArray(buffer);
 
-      // ── YOLO: detect paper bbox and pre-crop without stretching ─────────────
+      // ── YOLO: detect paper bbox and pre-crop to 1700×2400 ─────────────────
       let processRgba = rgba;
       let processW = width, processH = height;
 
@@ -243,18 +265,10 @@ self.onmessage = async (event) => {
         const imgData = new ImageData(rgba, width, height);
         const box = await detectPaper(imgData);
         if (box) {
-          // Add 3% padding to ensure paper corners are well within the image
-          const padX = Math.round((box.x2 - box.x1) * 0.03);
-          const padY = Math.round((box.y2 - box.y1) * 0.03);
-          box.x1 = Math.max(0, box.x1 - padX);
-          box.y1 = Math.max(0, box.y1 - padY);
-          box.x2 = Math.min(width - 1, box.x2 + padX);
-          box.y2 = Math.min(height - 1, box.y2 + padY);
-
           const cropped = cropAndResize(imgData, box);
           processRgba = new Uint8ClampedArray(cropped.data.buffer);
-          processW = cropped.width;
-          processH = cropped.height;
+          processW = 1700;
+          processH = 2400;
         }
       } catch (yoloErr) {
         // YOLO failed → fall through to WASM with original image (graceful degrade)
