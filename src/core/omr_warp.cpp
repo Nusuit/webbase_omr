@@ -491,24 +491,32 @@ bool FindMarkerCorners(const std::uint8_t* gray, int w, int h,
     return false;
   }
 
-  // Sort by area descending, take top 20
+  // Sort by area descending
   std::sort(candidates.begin(), candidates.end(),
             [](const BlobInfo& a, const BlobInfo& b) {
               return a.pixel_count > b.pixel_count;
             });
 
-  // Debug: print top candidates
-  int dbg_count = std::min(static_cast<int>(candidates.size()), 10);
-  for (int i = 0; i < dbg_count; ++i) {
-    const auto& b = candidates[i];
-    const int bw = b.x2 - b.x1 + 1, bh = b.y2 - b.y1 + 1;
-    printf("[FindMarkerCorners]   #%d: area=%d, pos=(%.0f,%.0f), size=%dx%d, ar=%.2f, fill=%.2f, gray=%.0f\n",
-           i, b.pixel_count, b.cx, b.cy, bw, bh,
-           static_cast<double>(bw)/bh,
-           static_cast<double>(b.pixel_count)/(bw*bh),
-           b.mean_gray);
+  // Only keep blobs with area >= 50% of the largest blob's area.
+  // This separates the 6 big corner markers from the 9 small inner grid markers.
+  // E.g. big=184-219, small=79-99 → threshold=110 → small rejected.
+  const int area_threshold = candidates[0].pixel_count / 2;
+  std::vector<BlobInfo> big_markers;
+  for (const auto& b : candidates) {
+    if (b.pixel_count >= area_threshold) big_markers.push_back(b);
   }
 
+  // Debug: print kept markers
+  printf("[FindMarkerCorners] Area threshold: %d (50%% of largest=%d), kept %zu of %zu\n",
+         area_threshold, candidates[0].pixel_count, big_markers.size(), candidates.size());
+  for (int i = 0; i < static_cast<int>(big_markers.size()); ++i) {
+    const auto& b = big_markers[i];
+    const int bw = b.x2 - b.x1 + 1, bh = b.y2 - b.y1 + 1;
+    printf("[FindMarkerCorners]   #%d: area=%d, pos=(%.0f,%.0f), size=%dx%d, gray=%.0f\n",
+           i, b.pixel_count, b.cx, b.cy, bw, bh, b.mean_gray);
+  }
+
+  candidates = std::move(big_markers);
   if (candidates.size() > 20) candidates.resize(20);
 
   // Centroid of candidates
