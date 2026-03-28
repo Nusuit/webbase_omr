@@ -478,13 +478,32 @@ bool FindMarkerCorners(const std::uint8_t* gray, int w, int h,
     candidates.push_back(b);
   }
 
-  if (static_cast<int>(candidates.size()) < 4) return false;
+  printf("[FindMarkerCorners] Total blobs: %zu, After filter: %zu (thresh=%d)\n",
+         blobs.size(), candidates.size(), thresh);
+
+  if (static_cast<int>(candidates.size()) < 4) {
+    printf("[FindMarkerCorners] Not enough candidates (<4)\n");
+    return false;
+  }
 
   // Sort by area descending, take top 20
   std::sort(candidates.begin(), candidates.end(),
             [](const BlobInfo& a, const BlobInfo& b) {
               return a.pixel_count > b.pixel_count;
             });
+
+  // Debug: print top candidates
+  int dbg_count = std::min(static_cast<int>(candidates.size()), 10);
+  for (int i = 0; i < dbg_count; ++i) {
+    const auto& b = candidates[i];
+    const int bw = b.x2 - b.x1 + 1, bh = b.y2 - b.y1 + 1;
+    printf("[FindMarkerCorners]   #%d: area=%d, pos=(%.0f,%.0f), size=%dx%d, ar=%.2f, fill=%.2f, gray=%.0f\n",
+           i, b.pixel_count, b.cx, b.cy, bw, bh,
+           static_cast<double>(bw)/bh,
+           static_cast<double>(b.pixel_count)/(bw*bh),
+           b.mean_gray);
+  }
+
   if (candidates.size() > 20) candidates.resize(20);
 
   // Centroid of candidates
@@ -492,6 +511,7 @@ bool FindMarkerCorners(const std::uint8_t* gray, int w, int h,
   for (const auto& b : candidates) { cx += b.cx; cy += b.cy; }
   cx /= candidates.size();
   cy /= candidates.size();
+  printf("[FindMarkerCorners] Centroid: (%.1f, %.1f)\n", cx, cy);
 
   // Assign to quadrants; pick farthest from centroid in each quadrant
   BlobInfo const* quad[4] = {nullptr, nullptr, nullptr, nullptr};
@@ -512,6 +532,9 @@ bool FindMarkerCorners(const std::uint8_t* gray, int w, int h,
   out[1] = {quad[1]->cx, quad[1]->cy};  // TR
   out[2] = {quad[2]->cx, quad[2]->cy};  // BR
   out[3] = {quad[3]->cx, quad[3]->cy};  // BL
+
+  printf("[FindMarkerCorners] Result: TL(%.1f,%.1f) TR(%.1f,%.1f) BR(%.1f,%.1f) BL(%.1f,%.1f)\n",
+         out[0].x, out[0].y, out[1].x, out[1].y, out[2].x, out[2].y, out[3].x, out[3].y);
   return true;
 }
 
