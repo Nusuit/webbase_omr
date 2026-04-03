@@ -1,0 +1,10 @@
+path: C:/Kien/Mobile/orm/wasm-omr-mobile/full_label_yolo
+train: train.txt
+val: val.txt
+
+nc: 4
+names:
+  0: marker_corners
+  1: id_keycode
+  2: questions_1_20
+  3: questions_21_60

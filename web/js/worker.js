@@ -9,11 +9,12 @@ const bridge = new WasmBridge();
 let ready = false;
 let yoloSession = null;
 
-const YOLO_INPUT_SIZE = 1280;          // model input: 1280×1280
-const PAPER_CLASS_ID = 0;             // "paper" is class 0
-const CONF_THRESHOLD = 0.84;          // Only accept confident detections like student sheets (0.84+)
-                                      // Answer keys (0.508) fall back to raw image + adaptive histogram
-const IOU_THRESHOLD  = 0.45;
+const YOLO_INPUT_SIZE = 640;           // v2 model trained at 640×640 (CPU-friendly, regions are large)
+
+// v2 model classes: 0=marker_corners, 1=id_keycode, 2=questions_1_20, 3=questions_21_60
+const MARKER_CLASS_ID   = 0;          // use marker_corners bbox to crop paper region
+const CONF_THRESHOLD    = 0.50;       // v2 model is trained on real-world shots; 0.5 is sufficient
+const IOU_THRESHOLD     = 0.45;
 const ROI_RATIO = { x: 0.25, y: 0.25, w: 0.5, h: 0.5 };
 
 // ─── YOLO utilities ───────────────────────────────────────────────────────────
@@ -85,75 +86,68 @@ function nms(boxes, iouThresh) {
 }
 
 /**
- * Run YOLO on an ImageData. Returns the best "paper" box as
- * { x1, y1, x2, y2 } in ORIGINAL image coordinates, or null.
+ * Run YOLO v2 model on an ImageData.
+ * Detects all 4 classes; returns the marker_corners (class 0) bbox in original
+ * image coordinates as { x1, y1, x2, y2 }, or null if not found.
+ * The marker_corners box is used to crop+mask the paper region before C++ processing.
  */
-async function detectPaper(imageData) {
+async function detectMarkerRegion(imageData) {
   const session = await ensureYolo();
   const { data: lbData, scale, padX, padY } = letterboxImageData(imageData, YOLO_INPUT_SIZE);
   const tensorData = imageDataToTensor(lbData, YOLO_INPUT_SIZE);
   const inputTensor = new ort.Tensor("float32", tensorData, [1, 3, YOLO_INPUT_SIZE, YOLO_INPUT_SIZE]);
   const feeds = { [session.inputNames[0]]: inputTensor };
   const results = await session.run(feeds);
-  const output = results[session.outputNames[0]].data; // shape [1, 5, N] or [1, N, 5]
 
-  // YOLOv8 output shape is [1, nc+4, num_anchors]; rows = [cx,cy,w,h, cls_scores...]
-  // Iterate anchors
+  // YOLOv8 output: [1, 4+nc, num_anchors]
   const raw = results[session.outputNames[0]];
-  const [, rows, cols] = raw.dims.length === 3
-    ? [raw.dims[0], raw.dims[1], raw.dims[2]]
-    : [1, raw.dims[1], raw.dims[2]]; // [1, 5, 33600] → transpose
-
+  const numAnchors = raw.dims[2];
   const data2 = raw.data;
+  const NC = 4; // marker_corners, id_keycode, questions_1_20, questions_21_60
+
   const candidates = [];
-  // YOLOv8 exports as [1, 4+nc, num_anchors]
-  const numAnchors = cols;
   for (let i = 0; i < numAnchors; i++) {
-    const cx  = data2[0 * numAnchors + i];
-    const cy  = data2[1 * numAnchors + i];
-    const bw  = data2[2 * numAnchors + i];
-    const bh  = data2[3 * numAnchors + i];
-    const conf = data2[(4 + PAPER_CLASS_ID) * numAnchors + i];
+    const cx = data2[0 * numAnchors + i];
+    const cy = data2[1 * numAnchors + i];
+    const bw = data2[2 * numAnchors + i];
+    const bh = data2[3 * numAnchors + i];
+    const conf = data2[(4 + MARKER_CLASS_ID) * numAnchors + i];
     if (conf < CONF_THRESHOLD) continue;
     const x1 = cx - bw / 2, y1 = cy - bh / 2, x2 = cx + bw / 2, y2 = cy + bh / 2;
     candidates.push([x1, y1, x2, y2, conf]);
   }
 
-  console.log(`[YOLO] Raw candidates before NMS: ${candidates.length}`);
+  console.log(`[YOLOv2] marker_corners candidates before NMS: ${candidates.length}`);
   const kept = nms(candidates, IOU_THRESHOLD);
-  console.log(`[YOLO] After NMS: ${kept.length}`);
+  console.log(`[YOLOv2] After NMS: ${kept.length}`);
   if (!kept.length) {
-    console.log(`[YOLO] No detections passed NMS!`);
+    console.log(`[YOLOv2] No marker_corners detected — falling back to raw image`);
     return null;
   }
 
   const [bx1, by1, bx2, by2] = kept[0];
   const conf = kept[0][4];
-  console.log(`[YOLO] Top detection: conf=${conf.toFixed(3)}, bbox_area=${((bx2-bx1)*(by2-by1)).toFixed(0)}, letterbox_coords=(${bx1.toFixed(0)},${by1.toFixed(0)})-(${bx2.toFixed(0)},${by2.toFixed(0)})`);
-  // Map from letterbox coords → original image coords
+  console.log(`[YOLOv2] marker_corners conf=${conf.toFixed(3)}, letterbox=(${bx1.toFixed(0)},${by1.toFixed(0)})-(${bx2.toFixed(0)},${by2.toFixed(0)})`);
+
+  // Map letterbox → original image coords
   const origX1 = (bx1 - padX) / scale;
   const origY1 = (by1 - padY) / scale;
   const origX2 = (bx2 - padX) / scale;
   const origY2 = (by2 - padY) / scale;
 
-  // Expand bbox by 12% to ensure corner markers at edges aren't clipped during masking
+  // Expand by 12% so corner markers at the edges aren't clipped
   const origW = origX2 - origX1;
   const origH = origY2 - origY1;
   const padPct = 0.12;
-  const x1_exp = origX1 - origW * padPct;
-  const y1_exp = origY1 - origH * padPct;
-  const x2_exp = origX2 + origW * padPct;
-  const y2_exp = origY2 + origH * padPct;
-
   const W = imageData.width, H = imageData.height;
   const bbox = {
-    x1: Math.max(0, Math.round(x1_exp)),
-    y1: Math.max(0, Math.round(y1_exp)),
-    x2: Math.min(W - 1, Math.round(x2_exp)),
-    y2: Math.min(H - 1, Math.round(y2_exp))
+    x1: Math.max(0, Math.round(origX1 - origW * padPct)),
+    y1: Math.max(0, Math.round(origY1 - origH * padPct)),
+    x2: Math.min(W - 1, Math.round(origX2 + origW * padPct)),
+    y2: Math.min(H - 1, Math.round(origY2 + origH * padPct))
   };
 
-  console.log(`[YOLO] Confidence: ${conf.toFixed(3)}, Bbox: (${bbox.x1},${bbox.y1}) to (${bbox.x2},${bbox.y2}), Image: ${W}x${H}`);
+  console.log(`[YOLOv2] Final bbox: (${bbox.x1},${bbox.y1})-(${bbox.x2},${bbox.y2}), Image: ${W}x${H}`);
   return bbox;
 }
 
@@ -274,14 +268,20 @@ self.onmessage = async (event) => {
       const { width, height, buffer } = msg.payload;
       const rgba = new Uint8ClampedArray(buffer);
 
-      // ── Traditional OpenCV: pass raw image directly to C++ ─────────────────────
-      // C++ NormalizeSheet uses two-layer detection:
-      //   Layer 1: FindMarkerCorners (black registration squares) — most reliable
-      //   Layer 2: FindPaperCorners (white paper boundary) — fallback
-      // No YOLO masking needed — marker corner detection works on raw photos.
-      const processRgba = rgba;
-      const processW = width, processH = height;
-      console.log(`[worker] Passing raw image ${processW}x${processH} to C++ (marker corner detection)`);
+      // ── v2: YOLO marker_corners → mask → C++ ──────────────────────────────────
+      // Run YOLOv8n (trained on 4-class OMR data) to locate the marker_corners region,
+      // mask the background, then hand the clean image to C++ NormalizeSheet.
+      // Falls back to raw image if YOLO doesn't fire (same behaviour as staging).
+      const imageData = new ImageData(rgba, width, height);
+      const markerBox = await detectMarkerRegion(imageData);
+      let processRgba = rgba, processW = width, processH = height;
+      if (markerBox) {
+        const masked = maskImageOutsideBox(imageData, markerBox);
+        processRgba = new Uint8ClampedArray(masked.data);
+        console.log(`[worker] YOLO masked image ${processW}x${processH} → C++ (marker_corners crop)`);
+      } else {
+        console.log(`[worker] YOLO miss — passing raw image ${processW}x${processH} to C++`);
+      }
 
       const { status, result, raw, preview, warpedPreview, previewWidth, previewHeight } =
         bridge.processSheet(processRgba, processW, processH);
