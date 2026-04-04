@@ -1,3 +1,4 @@
+// METHOD: Traditional OpenCV (staging) — no YOLO masking in PROCESS_SHEET
 importScripts(
   "../js/ort.min.js",
   "./worker-protocol.js?v=20260328-yolo2",
@@ -238,6 +239,7 @@ self.onmessage = async (event) => {
 
   if (msg.type === OMR_MSG.INIT) {
     try {
+      console.log("[worker] METHOD: Traditional OpenCV (staging) — YOLO model loaded but NOT used in sheet processing");
       await bridge.init();
       // Eagerly load YOLO model so first scan is fast
       await ensureYolo().catch(() => {});  // non-fatal if offline
