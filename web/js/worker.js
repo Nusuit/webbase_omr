@@ -279,20 +279,36 @@ self.onmessage = async (event) => {
       //   Layer 1: FindMarkerCorners (black registration squares) — most reliable
       //   Layer 2: FindPaperCorners (white paper boundary) — fallback
       // No YOLO masking needed — marker corner detection works on raw photos.
+      const wasmMemBefore = bridge.module ? bridge.module.HEAPU8.byteLength : 0;
+      const t_worker_start = performance.now();
+
       const processRgba = rgba;
       const processW = width, processH = height;
       console.log(`[worker] Passing raw image ${processW}x${processH} to C++ (marker corner detection)`);
 
+      const t_cpp_start = performance.now();
       const { status, result, raw, preview, warpedPreview, previewWidth, previewHeight } =
         bridge.processSheet(processRgba, processW, processH);
+      const t_cpp_end = performance.now();
+
+      const wasmMemAfter = bridge.module ? bridge.module.HEAPU8.byteLength : 0;
       const parsed = parseSheetRaw(raw);
+
+      const perf = {
+        yolo_ms:         0,
+        yolo_detected:   false,
+        cpp_ms:          t_cpp_end - t_cpp_start,
+        worker_total_ms: t_cpp_end - t_worker_start,
+        wasm_heap_before: wasmMemBefore,
+        wasm_heap_after:  wasmMemAfter,
+      };
 
       const transfers = [result.buffer];
       if (preview) transfers.push(preview.buffer);
       if (warpedPreview) transfers.push(warpedPreview.buffer);
 
       self.postMessage(
-        { type: OMR_MSG.SHEET_RESULT, payload: { status, width, height, buffer: result.buffer, preview: preview ? preview.buffer : null, warpedPreview: warpedPreview ? warpedPreview.buffer : null, previewWidth, previewHeight, result: parsed } },
+        { type: OMR_MSG.SHEET_RESULT, payload: { status, width, height, buffer: result.buffer, preview: preview ? preview.buffer : null, warpedPreview: warpedPreview ? warpedPreview.buffer : null, previewWidth, previewHeight, result: parsed, perf } },
         transfers
       );
     } catch (err) {

@@ -156,6 +156,24 @@
     keyCacheBuilt: false
   };
 
+  // ── Performance instrumentation (research comparison) ────────────────────
+  window.__perfLog = [];
+  window.__perfSummary = function () {
+    const log = window.__perfLog;
+    if (!log.length) { console.log("[PERF] No data yet"); return; }
+    const n = log.length;
+    const avg = k => (log.reduce((s, e) => s + (e[k] ?? 0), 0) / n).toFixed(1);
+    const mn  = k => Math.min(...log.map(e => e[k] ?? Infinity)).toFixed(1);
+    const mx  = k => Math.max(...log.map(e => e[k] ?? -Infinity)).toFixed(1);
+    const out = { branch: log[0]?.branch, n };
+    ["e2e_ms","yolo_ms","cpp_ms","worker_total_ms","overhead_ms"].forEach(k => {
+      out[k] = { avg: avg(k), min: mn(k), max: mx(k) };
+    });
+    console.table(out);
+    return log;
+  };
+  // ── End performance instrumentation ──────────────────────────────────────
+
   // Clean up legacy modal-tab DOM if browser serves an older cached template.
   function removeLegacyReviewTabs() {
     ["reviewTabStudentBtn", "reviewTabKeyBtn", "reviewStudentPane", "reviewKeyPane"].forEach((id) => {
@@ -1070,6 +1088,11 @@
 
     const frame = ctx.getImageData(0, 0, w, h);
 
+    // ── PERF: E2E start ───────────────────────────────────────────────────
+    const t0 = performance.now();
+    const heapBefore = performance.memory?.usedJSHeapSize ?? null;
+    // ─────────────────────────────────────────────────────────────────────
+
     const payload = await new Promise((resolve, reject) => {
       state.pendingSheetResolver = { resolve, reject };
       worker.postMessage(
@@ -1084,6 +1107,31 @@
         [frame.data.buffer]
       );
     });
+
+    // ── PERF: E2E end ─────────────────────────────────────────────────────
+    const e2e_ms = performance.now() - t0;
+    const heapAfter = performance.memory?.usedJSHeapSize ?? null;
+    const wp = payload.perf ?? {};
+    const entry = {
+      branch: window.location.hostname.includes("staging") ? "staging" : "v2-yolo",
+      timestamp: new Date().toISOString(),
+      input_w: w,
+      input_h: h,
+      e2e_ms:          +e2e_ms.toFixed(2),
+      yolo_ms:         +(wp.yolo_ms ?? 0).toFixed(2),
+      yolo_detected:   wp.yolo_detected ?? false,
+      cpp_ms:          +(wp.cpp_ms ?? 0).toFixed(2),
+      worker_total_ms: +(wp.worker_total_ms ?? 0).toFixed(2),
+      overhead_ms:     +(e2e_ms - (wp.worker_total_ms ?? 0)).toFixed(2),
+      wasm_heap_before: wp.wasm_heap_before ?? null,
+      wasm_heap_after:  wp.wasm_heap_after ?? null,
+      js_heap_before:  heapBefore,
+      js_heap_after:   heapAfter,
+      omr_status:      payload.status ?? null,
+    };
+    console.log("[PERF]", JSON.stringify(entry));
+    window.__perfLog.push(entry);
+    // ─────────────────────────────────────────────────────────────────────
 
     return {
       ...payload,
