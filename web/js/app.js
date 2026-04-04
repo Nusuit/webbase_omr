@@ -1113,7 +1113,7 @@
     const heapAfter = performance.memory?.usedJSHeapSize ?? null;
     const wp = payload.perf ?? {};
     const entry = {
-      branch: window.location.hostname.includes("staging") ? "staging" : "v2-yolo",
+      branch: "staging",
       timestamp: new Date().toISOString(),
       input_w: w,
       input_h: h,
