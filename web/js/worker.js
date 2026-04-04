@@ -272,8 +272,14 @@ self.onmessage = async (event) => {
       // Run YOLOv8n (trained on 4-class OMR data) to locate the marker_corners region,
       // mask the background, then hand the clean image to C++ NormalizeSheet.
       // Falls back to raw image if YOLO doesn't fire (same behaviour as staging).
+      const wasmMemBefore = bridge.module ? bridge.module.HEAPU8.byteLength : 0;
+      const t_worker_start = performance.now();
+
       const imageData = new ImageData(rgba, width, height);
+      const t_yolo_start = performance.now();
       const markerBox = await detectMarkerRegion(imageData);
+      const t_yolo_end = performance.now();
+
       let processRgba = rgba, processW = width, processH = height;
       if (markerBox) {
         const masked = maskImageOutsideBox(imageData, markerBox);
@@ -283,16 +289,29 @@ self.onmessage = async (event) => {
         console.log(`[worker] YOLO miss — passing raw image ${processW}x${processH} to C++`);
       }
 
+      const t_cpp_start = performance.now();
       const { status, result, raw, preview, warpedPreview, previewWidth, previewHeight } =
         bridge.processSheet(processRgba, processW, processH);
+      const t_cpp_end = performance.now();
+
+      const wasmMemAfter = bridge.module ? bridge.module.HEAPU8.byteLength : 0;
       const parsed = parseSheetRaw(raw);
+
+      const perf = {
+        yolo_ms:         t_yolo_end - t_yolo_start,
+        yolo_detected:   markerBox !== null,
+        cpp_ms:          t_cpp_end - t_cpp_start,
+        worker_total_ms: t_cpp_end - t_worker_start,
+        wasm_heap_before: wasmMemBefore,
+        wasm_heap_after:  wasmMemAfter,
+      };
 
       const transfers = [result.buffer];
       if (preview) transfers.push(preview.buffer);
       if (warpedPreview) transfers.push(warpedPreview.buffer);
 
       self.postMessage(
-        { type: OMR_MSG.SHEET_RESULT, payload: { status, width, height, buffer: result.buffer, preview: preview ? preview.buffer : null, warpedPreview: warpedPreview ? warpedPreview.buffer : null, previewWidth, previewHeight, result: parsed } },
+        { type: OMR_MSG.SHEET_RESULT, payload: { status, width, height, buffer: result.buffer, preview: preview ? preview.buffer : null, warpedPreview: warpedPreview ? warpedPreview.buffer : null, previewWidth, previewHeight, result: parsed, perf } },
         transfers
       );
     } catch (err) {
