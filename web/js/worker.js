@@ -29,6 +29,9 @@ async function ensureYolo() {
   ort.env.wasm.wasmPaths = "/wasm/";
   ort.env.wasm.numThreads = 1;
 
+  // Probe WebGPU availability in this Worker scope before attempting
+  console.log("[YOLO] navigator.gpu in Worker:", typeof self.navigator?.gpu, !!self.navigator?.gpu);
+
   // Try WebGPU: offloads YOLO to GPU, freeing CPU entirely for C++ OpenCV
   try {
     yoloSession = await ort.InferenceSession.create("../models/paper_detect.onnx", {
