@@ -1,3 +1,16 @@
+// Polyfill: Chrome removed GPUAdapter.requestAdapterInfo() (now a plain property).
+// ORT 1.18.0 still calls it as a function — patch it before loading ORT.
+if (typeof self.navigator?.gpu !== "undefined") {
+  const _origRequestAdapter = self.navigator.gpu.requestAdapter.bind(self.navigator.gpu);
+  self.navigator.gpu.requestAdapter = async (...args) => {
+    const adapter = await _origRequestAdapter(...args);
+    if (adapter && typeof adapter.requestAdapterInfo === "undefined") {
+      adapter.requestAdapterInfo = async () => adapter.info ?? {};
+    }
+    return adapter;
+  };
+}
+
 importScripts(
   "../js/ort.min.js",
   "./worker-protocol.js?v=20260328-yolo2",
