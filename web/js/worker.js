@@ -20,14 +20,32 @@ const ROI_RATIO = { x: 0.25, y: 0.25, w: 0.5, h: 0.5 };
 // ─── YOLO utilities ───────────────────────────────────────────────────────────
 
 /** Load model once, cached globally. */
+/** Load model once, cached globally.
+ * Tries WebGPU first (GPU runs YOLO, CPU stays free for C++ WASM pipeline — no memory bandwidth contention).
+ * Falls back to WASM if WebGPU is unavailable (e.g. old browser, no GPU). */
 async function ensureYolo() {
   if (yoloSession) return yoloSession;
-  // Point to self-hosted WASM binaries (avoids CDN CSP issues on Vercel)
+  // Always configure WASM paths/threads in case fallback is needed
   ort.env.wasm.wasmPaths = "/wasm/";
-  ort.env.wasm.numThreads = 1; // Force non-threaded WASM because threaded files (.wasm) are absent
+  ort.env.wasm.numThreads = 1;
+
+  // Try WebGPU: offloads YOLO to GPU, freeing CPU entirely for C++ OpenCV
+  try {
+    yoloSession = await ort.InferenceSession.create("../models/paper_detect.onnx", {
+      executionProviders: ["webgpu"]
+    });
+    console.log("[YOLO] Backend: WebGPU (GPU handles YOLO, CPU free for C++)");
+    return yoloSession;
+  } catch (e) {
+    console.warn("[YOLO] WebGPU unavailable, falling back to WASM:", e.message);
+    yoloSession = null;
+  }
+
+  // Fallback: WASM (same CPU as C++ — contention possible, but functional)
   yoloSession = await ort.InferenceSession.create("../models/paper_detect.onnx", {
     executionProviders: ["wasm"]
   });
+  console.log("[YOLO] Backend: WASM (fallback)");
   return yoloSession;
 }
 
