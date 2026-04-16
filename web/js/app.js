@@ -1129,6 +1129,8 @@
       js_heap_after:   heapAfter,
       omr_status:      payload.status ?? null,
     };
+    const sheetIndex = window.__perfLog.length;
+    console.log(`[PERF] sheet=${sheetIndex} e2e=${entry.e2e_ms}ms yolo=${entry.yolo_ms}ms cpp=${entry.cpp_ms}ms`);
     console.log("[PERF]", JSON.stringify(entry));
     window.__perfLog.push(entry);
     // ─────────────────────────────────────────────────────────────────────
