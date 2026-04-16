@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fitsSystemWindows="true">
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@color/primary"
+            android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar" />
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- Folder Selection Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                app:cardElevation="2dp">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <!-- Assignment row -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Bài làm học viên:"
+                        android:textSize="12sp"
+                        android:textColor="@color/on_surface_variant"/>
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="horizontal" android:gravity="center_vertical">
+                        <TextView android:id="@+id/tvAssignmentFolder"
+                            android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_weight="1" android:text="0 Bài làm"
+                            android:textSize="13sp" android:textColor="@color/on_surface"
+                            android:paddingVertical="4dp" android:paddingEnd="8dp"
+                            android:padding="6dp"
+                            android:background="?attr/selectableItemBackground"/>
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnPickAssignment"
+                            android:layout_width="wrap_content" android:layout_height="36dp"
+                            android:text="Thêm ảnh"
+                            style="@style/Widget.Material3.Button.OutlinedButton"/>
+                    </LinearLayout>
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnClearAssignment"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Xóa tất cả"
+                        android:textSize="11sp"
+                        android:visibility="gone"
+                        style="@style/Widget.Material3.Button.TextButton"/>
+
+                    <View android:layout_width="match_parent" android:layout_height="1dp"
+                        android:background="#E0E0E0" android:layout_marginVertical="6dp"/>
+
+                    <!-- Answer key row -->
+                    <TextView
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Đáp án (answer key):"
+                        android:textSize="12sp" android:textColor="@color/on_surface_variant"/>
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="horizontal" android:gravity="center_vertical">
+                        <TextView android:id="@+id/tvAnswerKeyFolder"
+                            android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_weight="1" android:text="0 Đáp án"
+                            android:textSize="13sp" android:textColor="@color/on_surface"
+                            android:paddingVertical="4dp" android:paddingEnd="8dp"
+                            android:padding="6dp"
+                            android:background="?attr/selectableItemBackground"/>
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnPickAnswerKey"
+                            android:layout_width="wrap_content" android:layout_height="36dp"
+                            android:text="Thêm ảnh"
+                            style="@style/Widget.Material3.Button.OutlinedButton"/>
+                    </LinearLayout>
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnClearAnswerKey"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Xóa tất cả"
+                        android:textSize="11sp"
+                        android:visibility="gone"
+                        style="@style/Widget.Material3.Button.TextButton"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Scan Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnScan"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Bắt đầu chấm"
+                android:textSize="16sp"
+                android:layout_marginBottom="12dp"
+                style="@style/Widget.Material3.Button"/>
+
+            <!-- Stats Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                app:cardElevation="2dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical" android:padding="16dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Thống kê" android:textSize="16sp" android:textStyle="bold"
+                        android:textColor="@color/primary" android:layout_marginBottom="8dp"/>
+                    <TextView android:id="@+id/tvStats" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:textSize="14sp" android:text="—"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Suspicious Alert -->
+            <TextView
+                android:id="@+id/tvSuspiciousAlert"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="12dp"
+                android:textSize="14sp"
+                android:textColor="#F57C00"
+                android:background="#FFF3E0"
+                android:layout_marginBottom="8dp"
+                android:visibility="gone"/>
+
+            <!-- Action buttons -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:layout_marginBottom="12dp">
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSuspicious"
+                    android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:text="⚠ Review Suspicious"
+                    android:layout_marginEnd="8dp" android:visibility="gone"
+                    style="@style/Widget.Material3.Button.OutlinedButton"/>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnExportPdf"
+                    android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:text="📄 Export PDF"
+                    android:enabled="false"
+                    style="@style/Widget.Material3.Button.OutlinedButton"/>
+            </LinearLayout>
+
+            <!-- Kết quả header -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Kết quả"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="@color/on_surface"
+                android:layout_marginBottom="8dp"/>
+
+            <!-- Tabs: Bài làm | Đáp án -->
+            <com.google.android.material.tabs.TabLayout
+                android:id="@+id/tabResults"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"/>
+
+            <!-- Tab 0: Bài làm học viên -->
+            <TextView
+                android:id="@+id/tvStudentEmpty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Chưa có kết quả nào.\nHãy chọn ảnh và nhấn Bắt đầu chấm."
+                android:textSize="14sp"
+                android:textColor="@color/on_surface_variant"
+                android:gravity="center"
+                android:paddingVertical="32dp"
+                android:visibility="gone"/>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvStudents"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false"
+                android:clipToPadding="false"
+                android:paddingBottom="16dp"/>
+
+            <!-- Tab 1: Đáp án -->
+            <TextView
+                android:id="@+id/tvAnswerKeyEmpty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Chưa có đáp án nào được tạo.\nHãy thêm ảnh đáp án và nhấn Bắt đầu chấm.\nĐáp án sẽ tự động được tạo ra sau khi chấm."
+                android:textSize="14sp"
+                android:textColor="@color/on_surface_variant"
+                android:gravity="center"
+                android:paddingVertical="32dp"
+                android:visibility="gone"/>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvAnswerKeys"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:nestedScrollingEnabled="false"
+                android:clipToPadding="false"
+                android:paddingBottom="16dp"/>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</LinearLayout>

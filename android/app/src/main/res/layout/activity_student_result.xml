@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fitsSystemWindows="true">
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@color/primary"
+            android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar"/>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <!-- Header info -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:background="@color/surface">
+        <TextView android:id="@+id/tvStudentHeader" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="14sp" android:textColor="@color/on_surface_variant"/>
+        <TextView android:id="@+id/tvStudentScore" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="20sp" android:textStyle="bold" android:textColor="@color/primary" android:layout_marginTop="4dp"/>
+        <TextView
+            android:id="@+id/tvSuspiciousWarning"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:textColor="#F57C00"
+            android:background="#FFF3E0"
+            android:padding="8dp"
+            android:layout_marginTop="8dp"
+            android:visibility="gone"/>
+
+        <!-- Banner khi không đọc được mã đề -->
+        <LinearLayout
+            android:id="@+id/bannerMissingExamCode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="#FFEBEE"
+            android:padding="8dp"
+            android:layout_marginTop="8dp"
+            android:visibility="gone"
+            android:gravity="center_vertical">
+            <TextView
+                android:id="@+id/tvBannerMessage"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="❌ Không đọc được mã đề — học viên có thể chưa tô hoặc tô không rõ. Cần nhập mã đề để chấm điểm."
+                android:textSize="12sp"
+                android:textColor="#B71C1C"/>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnEnterExamCode"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:text="Nhập mã đề"
+                android:textSize="12sp"
+                app:cornerRadius="4dp"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:textColor="#B71C1C"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Split Preview: Left = Student, Right = Answer Key -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="260dp"
+        android:orientation="horizontal"
+        android:background="#000000"
+        android:padding="2dp">
+
+        <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:layout_marginEnd="1dp">
+            <TextView android:layout_width="match_parent" android:layout_height="20dp" android:text="Bài làm học viên" android:textSize="11sp" android:textColor="#FFFFFF" android:gravity="center" android:background="@color/primary"/>
+            <com.gradesnap.omr.ZoomableImageView
+                android:id="@+id/imgStudent"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="#1A1A1A"/>
+        </LinearLayout>
+
+        <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="match_parent" android:layout_height="20dp" android:text="Đáp án chuẩn" android:textSize="11sp" android:textColor="#FFFFFF" android:gravity="center" android:background="@color/success"/>
+            <com.gradesnap.omr.ZoomableImageView
+                android:id="@+id/imgAnswerKey"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="#1A1A1A"/>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Answer detail list (tap to edit) -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Nhấn vào câu để sửa đáp án thủ công ✏"
+        android:textSize="12sp"
+        android:textColor="@color/on_surface_variant"
+        android:gravity="center"
+        android:padding="6dp"
+        android:background="@color/surface"/>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvAnswerDetail"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="8dp"/>
+
+</LinearLayout>

@@ -1,0 +1,159 @@
+{
+  "image_size": {
+    "width": 1700,
+    "height": 2400,
+    "note": "Normalized paper size"
+  },
+  "regions": {
+    "mssv": {
+      "label": "MSSV",
+      "box": {
+        "x1": 78,
+        "y1": 860,
+        "x2": 456,
+        "y2": 1530
+      },
+      "grid": {
+        "rows": 10,
+        "cols": 6,
+        "cell_width": 63.0,
+        "cell_height": 67.0
+      },
+      "type": "numeric",
+      "digits": 6
+    },
+    "key": {
+      "label": "KEY CODE",
+      "box": {
+        "x1": 519,
+        "y1": 860,
+        "x2": 711,
+        "y2": 1530
+      },
+      "grid": {
+        "rows": 10,
+        "cols": 3,
+        "cell_width": 64.0,
+        "cell_height": 67.0
+      },
+      "type": "numeric",
+      "digits": 3
+    },
+    "questions": {
+      "label": "QUESTIONS",
+      "type": "multiple_choice",
+      "options": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "total_questions": 60,
+      "blocks": [
+        {
+          "label": "Q1-10",
+          "question_start": 1,
+          "question_end": 10,
+          "box": {
+            "x1": 880,
+            "y1": 860,
+            "x2": 1183,
+            "y2": 1530
+          },
+          "grid": {
+            "rows": 10,
+            "cols": 5,
+            "cell_width": 60.6,
+            "cell_height": 67.0
+          }
+        },
+        {
+          "label": "Q11-20",
+          "question_start": 11,
+          "question_end": 20,
+          "box": {
+            "x1": 1249,
+            "y1": 856,
+            "x2": 1563,
+            "y2": 1527
+          },
+          "grid": {
+            "rows": 10,
+            "cols": 5,
+            "cell_width": 62.8,
+            "cell_height": 67.1
+          }
+        },
+        {
+          "label": "Q21-30",
+          "question_start": 21,
+          "question_end": 30,
+          "box": {
+            "x1": 140,
+            "y1": 1604,
+            "x2": 447,
+            "y2": 2311
+          },
+          "grid": {
+            "rows": 10,
+            "cols": 5,
+            "cell_width": 61.4,
+            "cell_height": 70.7
+          }
+        },
+        {
+          "label": "Q31-40",
+          "question_start": 31,
+          "question_end": 40,
+          "box": {
+            "x1": 515,
+            "y1": 1597,
+            "x2": 819,
+            "y2": 2303
+          },
+          "grid": {
+            "rows": 10,
+            "cols": 5,
+            "cell_width": 60.8,
+            "cell_height": 70.6
+          }
+        },
+        {
+          "label": "Q41-50",
+          "question_start": 41,
+          "question_end": 50,
+          "box": {
+            "x1": 882,
+            "y1": 1593,
+            "x2": 1194,
+            "y2": 2311
+          },
+          "grid": {
+            "rows": 10,
+            "cols": 5,
+            "cell_width": 62.4,
+            "cell_height": 71.8
+          }
+        },
+        {
+          "label": "Q51-60",
+          "question_start": 51,
+          "question_end": 60,
+          "box": {
+            "x1": 1251,
+            "y1": 1585,
+            "x2": 1568,
+            "y2": 2292
+          },
+          "grid": {
+            "rows": 10,
+            "cols": 5,
+            "cell_width": 63.4,
+            "cell_height": 70.7
+          }
+        }
+      ]
+    }
+  }
+}

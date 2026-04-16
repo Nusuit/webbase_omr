@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GradeSnap</string>
+    <string name="btn_camera">Chụp ảnh</string>
+    <string name="btn_gallery">Chọn từ thư viện</string>
+    <string name="processing">Đang xử lý phiếu...</string>
+    <string name="error_opencv">Lỗi khởi tạo OpenCV</string>
+    <string name="results_title">Kết quả chấm bài</string>
+    <string name="permission_denied">Cần cấp quyền để sử dụng tính năng này</string>
+    <string name="create_exam">Tạo kỳ thi mới</string>
+    <string name="batch_scan">Batch Scan</string>
+    <string name="export_pdf">Export PDF</string>
+    <string name="review_suspicious">Review Suspicious</string>
+</resources>

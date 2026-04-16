@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="File CSV hoặc Excel với 2 cột:"
+        android:textSize="14sp"
+        android:textColor="#555555"
+        android:layout_marginBottom="12dp"/>
+
+    <!-- Table header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#1565C0">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="MSSV"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp"/>
+
+        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="#FFFFFF"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:text="Họ và Tên"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp"/>
+    </LinearLayout>
+
+    <!-- Row 1 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#FFFFFF">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="215893"
+            android:textSize="13sp"
+            android:textColor="#222222"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp"/>
+
+        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="#DDDDDD"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:text="Phan Văn C"
+            android:textSize="13sp"
+            android:textColor="#222222"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp"/>
+    </LinearLayout>
+
+    <!-- Row divider -->
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEEEEE"/>
+
+    <!-- Row 2 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#F9F9F9">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="236871"
+            android:textSize="13sp"
+            android:textColor="#222222"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp"/>
+
+        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="#DDDDDD"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:text="Nguyễn Văn A"
+            android:textSize="13sp"
+            android:textColor="#222222"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp"/>
+    </LinearLayout>
+
+    <!-- Row divider -->
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEEEEE"/>
+
+    <!-- Row 3 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#FFFFFF">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="22520709"
+            android:textSize="13sp"
+            android:textColor="#222222"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp"/>
+
+        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="#DDDDDD"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:text="Nguyễn Văn B"
+            android:textSize="13sp"
+            android:textColor="#222222"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp"/>
+    </LinearLayout>
+
+    <!-- Bottom border -->
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#DDDDDD"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="• Hỗ trợ: .csv, .txt, .xlsx\n• Dòng đầu tiên là tiêu đề (MSSV, Họ tên) — tự động nhận diện\n• Phân tách bởi dấu phẩy, tab, hoặc chấm phẩy (CSV/TXT)\n• XLSX: đọc từ sheet đầu tiên, cột A = MSSV, cột B = Họ tên (hoặc ngược lại)"
+        android:textSize="12sp"
+        android:textColor="#777777"
+        android:layout_marginTop="12dp"/>
+
+</LinearLayout>

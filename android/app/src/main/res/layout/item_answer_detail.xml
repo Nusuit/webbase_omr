@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="16dp"
+    android:paddingEnd="4dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp"
+    android:background="?attr/selectableItemBackground">
+
+    <!-- Status icon: ✓ ✗ ⚠ ✏ -->
+    <TextView
+        android:id="@+id/tvQStatus"
+        android:layout_width="28dp"
+        android:layout_height="wrap_content"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginEnd="6dp"/>
+
+    <!-- Q number -->
+    <TextView
+        android:id="@+id/tvQNum"
+        android:layout_width="68dp"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:textColor="@color/on_surface"/>
+
+    <!-- Student answer -->
+    <TextView
+        android:id="@+id/tvStudentAns"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textSize="14sp"
+        android:textColor="@color/on_surface"/>
+
+    <!-- Correct answer -->
+    <TextView
+        android:id="@+id/tvCorrectAns"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textSize="14sp"
+        android:textColor="@color/on_surface_variant"/>
+
+    <!-- Explicit edit button -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnEditQuestion"
+        android:layout_width="wrap_content"
+        android:layout_height="36dp"
+        android:text="Sửa"
+        android:textSize="12sp"
+        android:minWidth="0dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        style="@style/Widget.Material3.Button.OutlinedButton"/>
+
+</LinearLayout>
