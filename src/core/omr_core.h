@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <array>
 #include <cstdint>
@@ -28,6 +28,7 @@ struct SheetProcessResult {
   std::array<int, 3> key_digits{{-1, -1, -1}};
   std::array<int, 60> answer_masks{};
   std::array<int, 60> suspicious{};
+  std::array<int, 300> bubble_densities{};
 };
 
 class OmrCore {
@@ -41,6 +42,7 @@ class OmrCore {
   // Copies the 1700×2400 COLOR-WARPED RGBA image (before binarization) from the
   // last ProcessSheetRgba call. Used for the annotated preview overlay.
   int CopyLastWarped(std::uint8_t* dst, int dst_len) const;
+  void ClearPreviews();
 
  private:
   static Roi ClampRoi(int width, int height, const Roi& roi);

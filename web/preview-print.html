@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OMR Analysis Print Preview</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --ink: #101828;
+      --muted: #667085;
+      --line: #d0d5dd;
+      --primary: #0f766e;
+      --primary-dark: #115e59;
+      --warn: #b54708;
+      --error: #b42318;
+      --ok-bg: #ecfdf3;
+      --warn-bg: #fffaeb;
+      --font: "Inter", "Segoe UI", Arial, sans-serif;
+      --mono: "Fira Code", Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font);
+    }
+
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 22px;
+      background: rgba(255, 255, 255, 0.94);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(10px);
+    }
+
+    .title-block h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.2;
+    }
+
+    .title-block p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .btn,
+    .file-button {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 12px;
+      background: #fff;
+      color: var(--ink);
+      cursor: pointer;
+      font-weight: 650;
+      font-size: 13px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn.primary,
+    .file-button.primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .btn.primary:hover,
+    .file-button.primary:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    input[type="file"] { display: none; }
+
+    main {
+      width: min(1440px, 100%);
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .status-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(150px, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .metric {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      min-width: 0;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 15px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .dropzone {
+      min-height: 180px;
+      border: 2px dashed #98a2b3;
+      border-radius: 10px;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      padding: 24px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .dropzone.dragging {
+      border-color: var(--primary);
+      background: #f0fdfa;
+    }
+
+    .dropzone strong {
+      color: var(--ink);
+      font-size: 18px;
+    }
+
+    .notice {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border: 1px solid #fedf89;
+      border-radius: 8px;
+      background: var(--warn-bg);
+      color: var(--warn);
+      font-size: 13px;
+      display: none;
+    }
+
+    .report {
+      display: none;
+    }
+
+    .report.ready {
+      display: block;
+    }
+
+    .report-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 18px 0;
+    }
+
+    .report-head h2 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.15;
+    }
+
+    .report-head p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .step-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .step-card,
+    .result-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .step-card.full,
+    .result-card.full {
+      grid-column: 1 / -1;
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: #f9fafb;
+    }
+
+    .card-head h3 {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.25;
+    }
+
+    .card-head small {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .canvas-wrap {
+      padding: 12px;
+      background: #111827;
+      min-height: 220px;
+      display: grid;
+      place-items: center;
+    }
+
+    canvas {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      background: #fff;
+    }
+
+    .figure-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      padding: 14px;
+      background: #fff;
+    }
+
+    .figure-item {
+      min-width: 0;
+    }
+
+    .figure-title {
+      margin: 0 0 8px;
+      color: #101828;
+      font-size: 14px;
+      font-weight: 750;
+      text-align: center;
+    }
+
+    .figure-canvas {
+      min-height: 280px;
+      padding: 8px;
+      background: #fff;
+      border: 1px solid var(--line);
+      display: grid;
+      place-items: center;
+    }
+
+    .result-layout {
+      display: grid;
+      grid-template-columns: minmax(300px, 420px) 1fr;
+      gap: 16px;
+      padding: 14px;
+    }
+
+    .summary-table,
+    .answer-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .summary-table td,
+    .answer-table td,
+    .answer-table th {
+      border: 1px solid var(--line);
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .answer-table th {
+      background: #f2f4f7;
+      font-weight: 750;
+    }
+
+    .answer-table td:nth-child(1) {
+      width: 56px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .answer-table td:nth-child(3) {
+      width: 90px;
+      color: var(--muted);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 750;
+      background: var(--ok-bg);
+      color: #027a48;
+    }
+
+    .badge.warn {
+      background: var(--warn-bg);
+      color: var(--warn);
+    }
+
+    .log-box {
+      margin: 0;
+      padding: 14px;
+      overflow: auto;
+      max-height: 320px;
+      background: #0b1220;
+      color: #b7f7d4;
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+
+    .empty-state {
+      display: grid;
+      gap: 12px;
+    }
+
+    @media (max-width: 900px) {
+      .app-header,
+      .report-head {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .controls {
+        width: 100%;
+      }
+
+      .status-strip,
+      .step-grid,
+      .figure-strip,
+      .result-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .step-card.full,
+      .result-card.full {
+        grid-column: auto;
+      }
+    }
+
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 10mm;
+      }
+
+      body {
+        background: #fff;
+        color: #000;
+      }
+
+      .app-header,
+      .dropzone,
+      .notice,
+      .no-print {
+        display: none !important;
+      }
+
+      main {
+        width: 100%;
+        padding: 0;
+      }
+
+      .report {
+        display: block !important;
+      }
+
+      .report-head {
+        padding: 0 0 8px;
+      }
+
+      .status-strip {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        margin-bottom: 10px;
+      }
+
+      .metric,
+      .step-card,
+      .result-card {
+        border-color: #9ca3af;
+        box-shadow: none;
+      }
+
+      .step-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .step-card,
+      .result-card {
+        margin-bottom: 10px;
+      }
+
+      .canvas-wrap {
+        padding: 6px;
+        background: #fff;
+        min-height: 0;
+      }
+
+      .figure-strip {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 8px;
+      }
+
+      .figure-canvas {
+        min-height: 0;
+        padding: 4px;
+        border-color: #9ca3af;
+      }
+
+      .step-card canvas {
+        max-height: 255mm;
+        object-fit: contain;
+      }
+
+      .log-box {
+        max-height: none;
+        background: #fff;
+        color: #111827;
+        border-top: 1px solid #9ca3af;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="title-block">
+      <h1>OMR Analysis Print Preview</h1>
+      <p>Upload một ảnh, xem các bước xử lý bên trong pipeline và in báo cáo.</p>
+    </div>
+    <div class="controls">
+      <label class="file-button primary">
+        Chọn ảnh
+        <input id="imageInput" type="file" accept="image/*" />
+      </label>
+      <button id="processBtn" class="btn primary" disabled>Phân tích</button>
+      <button id="printBtn" class="btn" disabled>In báo cáo</button>
+      <button id="downloadBtn" class="btn" disabled>Tải ảnh preview</button>
+      <a class="btn" href="./index.html">Benchmark</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="status-strip">
+      <div class="metric">
+        <span>Trạng thái</span>
+        <strong id="statusText">Đang khởi tạo worker...</strong>
+      </div>
+      <div class="metric">
+        <span>File</span>
+        <strong id="fileMetric">Chưa chọn ảnh</strong>
+      </div>
+      <div class="metric">
+        <span>Kích thước ảnh</span>
+        <strong id="sizeMetric">-</strong>
+      </div>
+      <div class="metric">
+        <span>Thời gian xử lý</span>
+        <strong id="timeMetric">-</strong>
+      </div>
+    </section>
+
+    <section id="dropzone" class="dropzone">
+      <strong>Kéo thả hoặc chọn một ảnh phiếu OMR</strong>
+      <span>Trang này chỉ nhận một ảnh mỗi lần. Không cần ảnh key.</span>
+      <label class="file-button primary">
+        Chọn ảnh từ máy
+        <input id="dropInput" type="file" accept="image/*" />
+      </label>
+    </section>
+
+    <div id="notice" class="notice"></div>
+
+    <section id="report" class="report" aria-live="polite">
+      <div class="report-head">
+        <div>
+          <h2>Báo cáo phân tích ảnh OMR</h2>
+          <p id="reportMeta">-</p>
+        </div>
+        <span id="resultBadge" class="badge">Chưa có kết quả</span>
+      </div>
+
+      <div class="step-grid">
+        <article class="step-card full">
+          <div class="card-head">
+            <div>
+              <h3>1. Ảnh đầu vào</h3>
+              <small>Ảnh gốc được đưa vào pipeline.</small>
+            </div>
+            <button class="btn no-print" data-download="originalCanvas">Tải PNG</button>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="originalCanvas"></canvas>
+          </div>
+        </article>
+
+        <article class="step-card full">
+          <div class="card-head">
+            <div>
+              <h3>2. Stage 1 - Downscale + Otsu</h3>
+              <small>Các bước giống nhánh NormalizeSheet: ảnh xám downscale, Gaussian blur 5x5, rồi Otsu BINARY_INV.</small>
+            </div>
+          </div>
+          <div class="figure-strip">
+            <div class="figure-item">
+              <p class="figure-title">Downscaled gray</p>
+              <div class="figure-canvas"><canvas id="grayCanvas"></canvas></div>
+            </div>
+            <div class="figure-item">
+              <p class="figure-title">GaussianBlur 5x5</p>
+              <div class="figure-canvas"><canvas id="blurCanvas"></canvas></div>
+            </div>
+            <div class="figure-item">
+              <p class="figure-title">Otsu binary inv</p>
+              <div class="figure-canvas"><canvas id="otsuCanvas"></canvas></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="step-card full">
+          <div class="card-head">
+            <div>
+              <h3>3. Stage 2 - Warp + chuẩn hóa phiếu</h3>
+              <small>Ảnh sau khi tìm marker/paper corner và warp/crop về khung chuẩn 1700x2400.</small>
+            </div>
+            <button class="btn no-print" data-download="warpedCanvas">Tải PNG</button>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="warpedCanvas"></canvas>
+          </div>
+        </article>
+
+        <article class="step-card full">
+          <div class="card-head">
+            <div>
+              <h3>4. Stage 3 - Tiền xử lý trên phiếu chuẩn</h3>
+              <small>Ảnh gray/blur/adaptive threshold chạy trên phiếu đã chuẩn hóa, sát với bước đọc bọt trong C++.</small>
+            </div>
+          </div>
+          <div class="figure-strip">
+            <div class="figure-item">
+              <p class="figure-title">Warped gray</p>
+              <div class="figure-canvas"><canvas id="warpedGrayCanvas"></canvas></div>
+            </div>
+            <div class="figure-item">
+              <p class="figure-title">Warped blur</p>
+              <div class="figure-canvas"><canvas id="warpedBlurCanvas"></canvas></div>
+            </div>
+            <div class="figure-item">
+              <p class="figure-title">Adaptive binary inv</p>
+              <div class="figure-canvas"><canvas id="adaptiveCanvas"></canvas></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="step-card full">
+          <div class="card-head">
+            <div>
+              <h3>5. Stage 4 - Lưới vùng đọc cố định</h3>
+              <small>Các block MSSV, mã đề và câu 1-60 theo tọa độ hard-code trong `omr_core.cpp`.</small>
+            </div>
+            <button class="btn no-print" data-download="blockOverlayCanvas">Tải PNG</button>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="blockOverlayCanvas"></canvas>
+          </div>
+        </article>
+
+        <article class="step-card full">
+          <div class="card-head">
+            <div>
+              <h3>6. Stage 5 - Khoanh vùng bọt đã tô</h3>
+              <small>Preview từ C++: vòng đỏ là vùng lấy mẫu, mực được chọn được tô xanh.</small>
+            </div>
+            <button class="btn no-print" data-download="annotatedCanvas">Tải PNG</button>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="annotatedCanvas"></canvas>
+          </div>
+        </article>
+
+        <article class="step-card full">
+          <div class="card-head">
+            <div>
+              <h3>7. Stage 6 - Mật độ bọt trên ảnh phiếu</h3>
+              <small>Vẽ trực tiếp density từng bọt lên phiếu chuẩn: xanh là lựa chọn được nhận dạng, vàng là vùng nghi ngờ.</small>
+            </div>
+            <button class="btn no-print" data-download="densityOverlayCanvas">Tải PNG</button>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="densityOverlayCanvas"></canvas>
+          </div>
+        </article>
+
+        <article class="step-card full">
+          <div class="card-head">
+            <div>
+              <h3>8. Heatmap dạng ma trận</h3>
+              <small>Mỗi ô là một lựa chọn A-E của câu 1-60; màu đậm nghĩa là tỉ lệ mực cao.</small>
+            </div>
+            <button class="btn no-print" data-download="heatmapCanvas">Tải PNG</button>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="heatmapCanvas"></canvas>
+          </div>
+        </article>
+
+        <article class="result-card full">
+          <div class="card-head">
+            <div>
+              <h3>9. Kết quả đọc phiếu</h3>
+              <small>Bảng nhỏ để đối chiếu nhanh sau khi đã xem các ảnh pipeline.</small>
+            </div>
+          </div>
+          <div class="result-layout">
+            <table class="summary-table">
+              <tbody id="summaryBody"></tbody>
+            </table>
+            <div id="answerTableWrap"></div>
+          </div>
+        </article>
+
+        <article class="result-card full">
+          <div class="card-head">
+            <div>
+              <h3>10. Log và thông số pipeline</h3>
+              <small>Thông tin thời gian, WASM heap và các log nội bộ trả về từ worker.</small>
+            </div>
+          </div>
+          <pre id="logBox" class="log-box"></pre>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <script src="./js/worker-protocol.js?v=preview-print-3"></script>
+  <script src="./js/preview-print.js?v=preview-print-3"></script>
+</body>
+</html>

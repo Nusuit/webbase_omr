@@ -1,4 +1,4 @@
-﻿#include "core/omr_bindings.h"
+#include "core/omr_bindings.h"
 
 #include "core/omr_core.h"
 
@@ -38,7 +38,7 @@ OmrFrameResult omr_process_frame_v2(
 }
 
 int omr_process_sheet(std::uint8_t* rgba, int width, int height, int* out_values, int out_len) {
-  if (!out_values || out_len < 132) {
+  if (!out_values || out_len < 432) {
     return -2;
   }
 
@@ -61,6 +61,10 @@ int omr_process_sheet(std::uint8_t* rgba, int width, int height, int* out_values
     out_values[72 + i] = result.suspicious[i];
   }
 
+  for (int i = 0; i < 300; ++i) {
+    out_values[132 + i] = result.bubble_densities[i];
+  }
+
   return result.status;
 }
 
@@ -70,6 +74,10 @@ int omr_get_last_preview(std::uint8_t* dst, int dst_len) {
 
 int omr_get_last_warped(std::uint8_t* dst, int dst_len) {
   return g_core.CopyLastWarped(dst, dst_len);
+}
+
+void omr_clear_previews() {
+  g_core.ClearPreviews();
 }
 
 }

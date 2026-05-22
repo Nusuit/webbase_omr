@@ -3341,3 +3341,171 @@ events:
         - "/"
       CMAKE_FIND_ROOT_PATH: "C:/Kien/Mobile/orm/emsdk/upstream/emscripten/cache/sysroot;C:/Kien/Mobile/orm/emsdk/upstream/emscripten/cache/sysroot"
 ...
+
+---
+events:
+  -
+    kind: "find-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.3/Modules/Platform/Emscripten.cmake:6 (find_file)"
+      - "C:/Program Files/CMake/share/cmake-4.3/Modules/CMakeSystemSpecificInformation.cmake:32 (include)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "file"
+    variable: "_EMSCRIPTEN_PLATFORM_MODULE"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "Platform/Emscripten.cmake"
+    candidate_directories:
+      - "C:/Kien/Mobile/orm/emsdk/upstream/emscripten/cmake/Modules/"
+    found: "C:/Kien/Mobile/orm/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake"
+    search_context:
+      ENV{PATH}:
+        - "C:\\Kien\\Mobile\\orm\\emsdk"
+        - "C:\\Kien\\Mobile\\orm\\emsdk\\upstream\\emscripten"
+        - "C:\\Kien\\tools\\flutter\\bin"
+        - "C:\\Users\\Anh Kien\\bin"
+        - "C:\\Program Files\\Git\\mingw64\\bin"
+        - "C:\\Program Files\\Git\\usr\\local\\bin"
+        - "C:\\Program Files\\Git\\usr\\bin"
+        - "C:\\Program Files\\Git\\usr\\bin"
+        - "C:\\Program Files\\Git\\mingw64\\bin"
+        - "C:\\Program Files\\Git\\usr\\bin"
+        - "C:\\Users\\Anh Kien\\bin"
+        - "C:\\Kien\\Mobile\\orm\\wasm-omr-mobile\\.venv\\Scripts"
+        - "C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.17.10-hotspot\\bin"
+        - "C:\\OracleInstall\\dbhome_1\\bin"
+        - "C:\\WINDOWS\\system32"
+        - "C:\\WINDOWS"
+        - "C:\\WINDOWS\\System32\\Wbem"
+        - "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0"
+        - "C:\\WINDOWS\\System32\\OpenSSH"
+        - "C:\\Program Files\\Git\\cmd"
+        - "C:\\Program Files\\Microsoft VS Code\\bin"
+        - "C:\\Program Files\\cursor\\resources\\app\\bin"
+        - "C:\\Program Files\\Docker\\Docker\\resources\\bin"
+        - "C:\\Program Files\\nodejs"
+        - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Program Files (x86)\\cloudflared"
+        - "C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit"
+        - "C:\\Program Files (x86)\\Microsoft SQL Server\\160\\Tools\\Binn"
+        - "C:\\Program Files\\Microsoft SQL Server\\160\\Tools\\Binn"
+        - "C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\170\\Tools\\Binn"
+        - "C:\\Program Files\\Microsoft SQL Server\\160\\DTS\\Binn"
+        - "C:\\Program Files\\Microsoft SQL Server\\170\\Tools\\Binn"
+        - "%USERPROFILE%\\.local\\bin"
+        - "C:\\Program Files\\Microsoft SQL Server\\130\\DTS\\Binn"
+        - "C:\\Program Files\\Microsoft SQL Server\\140\\DTS\\Binn"
+        - "C:\\Program Files\\Microsoft SQL Server\\150\\DTS\\Binn"
+        - "C:\\Program Files\\Microsoft SQL Server\\170\\DTS\\Binn"
+        - "C:\\Program Files (x86)\\Microsoft SQL Server\\170\\Tools\\Binn"
+        - "C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\180\\Tools\\Binn"
+        - "C:\\Program Files\\MySQL\\MySQL Shell 8.0\\bin"
+        - "C:\\Kien\\tools\\flutter\\bin"
+        - "C:\\Users\\Anh Kien\\AppData\\Local\\Programs\\Python\\Python312\\Scripts"
+        - "C:\\Users\\Anh Kien\\AppData\\Local\\Programs\\Python\\Python312"
+        - "C:\\Users\\Anh Kien\\AppData\\Local\\Programs\\Python\\Launcher"
+        - "C:\\Users\\Anh Kien\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\Anh Kien\\AppData\\Local\\Python\\bin"
+        - "C:\\Users\\Anh Kien\\AppData\\Local\\Programs\\Antigravity\\bin"
+        - "C:\\Users\\Anh Kien\\AppData\\Roaming\\npm"
+        - "C:\\Users\\Anh Kien\\AppData\\Local\\Microsoft\\WinGet\\Links"
+        - "C:\\Program Files\\Git\\usr\\bin\\vendor_perl"
+        - "C:\\Program Files\\Git\\usr\\bin\\core_perl"
+        - "C:\\Android\\Sdk\\platform-tools"
+      CMAKE_INSTALL_PREFIX: "C:/Kien/Mobile/orm/emsdk/upstream/emscripten/cache/sysroot"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/"
+      CMAKE_FIND_ROOT_PATH: "C:/Kien/Mobile/orm/emsdk/upstream/emscripten/cache/sysroot"
+...
+
+---
+events:
+  -
+    kind: "find-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.3/Modules/Platform/Emscripten.cmake:6 (find_file)"
+      - "C:/Program Files/CMake/share/cmake-4.3/Modules/CMakeSystemSpecificInformation.cmake:32 (include)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "file"
+    variable: "_EMSCRIPTEN_PLATFORM_MODULE"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "Platform/Emscripten.cmake"
+    candidate_directories:
+      - "C:/Kien/Mobile/orm/emsdk/upstream/emscripten/cmake/Modules/"
+    found: "C:/Kien/Mobile/orm/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake"
+    search_context:
+      ENV{PATH}:
+        - "C:\\Kien\\Mobile\\orm\\emsdk"
+        - "C:\\Kien\\Mobile\\orm\\emsdk\\upstream\\emscripten"
+        - "C:\\Kien\\tools\\flutter\\bin"
+        - "C:\\Users\\Anh Kien\\bin"
+        - "C:\\Program Files\\Git\\mingw64\\bin"
+        - "C:\\Program Files\\Git\\usr\\local\\bin"
+        - "C:\\Program Files\\Git\\usr\\bin"
+        - "C:\\Program Files\\Git\\usr\\bin"
+        - "C:\\Program Files\\Git\\mingw64\\bin"
+        - "C:\\Program Files\\Git\\usr\\bin"
+        - "C:\\Users\\Anh Kien\\bin"
+        - "C:\\Kien\\Mobile\\orm\\wasm-omr-mobile\\.venv\\Scripts"
+        - "C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.17.10-hotspot\\bin"
+        - "C:\\OracleInstall\\dbhome_1\\bin"
+        - "C:\\WINDOWS\\system32"
+        - "C:\\WINDOWS"
+        - "C:\\WINDOWS\\System32\\Wbem"
+        - "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0"
+        - "C:\\WINDOWS\\System32\\OpenSSH"
+        - "C:\\Program Files\\Git\\cmd"
+        - "C:\\Program Files\\Microsoft VS Code\\bin"
+        - "C:\\Program Files\\cursor\\resources\\app\\bin"
+        - "C:\\Program Files\\Docker\\Docker\\resources\\bin"
+        - "C:\\Program Files\\nodejs"
+        - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Program Files (x86)\\cloudflared"
+        - "C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit"
+        - "C:\\Program Files (x86)\\Microsoft SQL Server\\160\\Tools\\Binn"
+        - "C:\\Program Files\\Microsoft SQL Server\\160\\Tools\\Binn"
+        - "C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\170\\Tools\\Binn"
+        - "C:\\Program Files\\Microsoft SQL Server\\160\\DTS\\Binn"
+        - "C:\\Program Files\\Microsoft SQL Server\\170\\Tools\\Binn"
+        - "%USERPROFILE%\\.local\\bin"
+        - "C:\\Program Files\\Microsoft SQL Server\\130\\DTS\\Binn"
+        - "C:\\Program Files\\Microsoft SQL Server\\140\\DTS\\Binn"
+        - "C:\\Program Files\\Microsoft SQL Server\\150\\DTS\\Binn"
+        - "C:\\Program Files\\Microsoft SQL Server\\170\\DTS\\Binn"
+        - "C:\\Program Files (x86)\\Microsoft SQL Server\\170\\Tools\\Binn"
+        - "C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\180\\Tools\\Binn"
+        - "C:\\Program Files\\MySQL\\MySQL Shell 8.0\\bin"
+        - "C:\\Kien\\tools\\flutter\\bin"
+        - "C:\\Users\\Anh Kien\\AppData\\Local\\Programs\\Python\\Python312\\Scripts"
+        - "C:\\Users\\Anh Kien\\AppData\\Local\\Programs\\Python\\Python312"
+        - "C:\\Users\\Anh Kien\\AppData\\Local\\Programs\\Python\\Launcher"
+        - "C:\\Users\\Anh Kien\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\Anh Kien\\AppData\\Local\\Python\\bin"
+        - "C:\\Users\\Anh Kien\\AppData\\Local\\Programs\\Antigravity\\bin"
+        - "C:\\Users\\Anh Kien\\AppData\\Roaming\\npm"
+        - "C:\\Users\\Anh Kien\\AppData\\Local\\Microsoft\\WinGet\\Links"
+        - "C:\\Program Files\\Git\\usr\\bin\\vendor_perl"
+        - "C:\\Program Files\\Git\\usr\\bin\\core_perl"
+        - "C:\\Android\\Sdk\\platform-tools"
+      CMAKE_INSTALL_PREFIX: "C:/Kien/Mobile/orm/emsdk/upstream/emscripten/cache/sysroot"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/"
+      CMAKE_FIND_ROOT_PATH: "C:/Kien/Mobile/orm/emsdk/upstream/emscripten/cache/sysroot"
+...

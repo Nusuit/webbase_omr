@@ -1,4 +1,4 @@
-﻿class WasmBridge {
+class WasmBridge {
   constructor() {
     this.module = null;
     this.ptr = 0;
@@ -15,7 +15,14 @@
     if (this.module) return;
     this.module = await OmrModule({
       // Worker runs under /js, but wasm output is in /wasm.
-      locateFile: (file) => (file.endsWith(".wasm") ? `../wasm/${file}` : file)
+      locateFile: (file) => (file.endsWith(".wasm") ? `../wasm/${file}` : file),
+      print: (text) => {
+        if (typeof self.onCppLog === "function") {
+          self.onCppLog(text);
+        } else {
+          console.log(text);
+        }
+      }
     });
   }
 
@@ -91,7 +98,7 @@
 
   processSheet(rgba, width, height) {
     const bytes = rgba.length;
-    const resultInts = 132;
+    const resultInts = 432;
     const previewWidth = 1700;
     const previewHeight = 2400;
     const previewBytes = previewWidth * previewHeight * 4;
@@ -129,6 +136,12 @@
     if (warpedCopied > 0) {
       warpedPreview = new Uint8ClampedArray(previewBytes);
       warpedPreview.set(this.module.HEAPU8.subarray(this.warpedPtr, this.warpedPtr + previewBytes));
+    }
+    
+    // Explicitly free the C++ static vector memory back to the WASM heap pool
+    // to prevent uncontrolled memory growth fragmenting across N=100 sequences
+    if (typeof this.module._omr_clear_previews === "function") {
+      this.module._omr_clear_previews();
     }
 
     return {

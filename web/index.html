@@ -1,583 +1,368 @@
-﻿<!doctype html>
-<html lang="vi">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>GradeSnap Web OMR</title>
-    <style>
-      :root {
-        --primary: #1976d2;
-        --primary-dark: #1565c0;
-        --accent: #42a5f5;
-        --bg: #f3f4f6;
-        --surface: #ffffff;
-        --text: #212121;
-        --muted: #757575;
-        --line: #d8dde6;
-        --danger: #d32f2f;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>OMR Benchmark: CV vs YOLO</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel-bg: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --border: #334155;
+      --accent: #10b981;
+      --warn: #f59e0b;
+      --font-mono: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    #isolation-bar {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 5px 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      background: #0a0f1e;
+      border-bottom: 1px solid var(--border);
+    }
+    #isolation-bar .iso-label { color: var(--text-muted); }
+    #isolation-bar .iso-ok   { color: var(--accent); font-weight: 700; }
+    #isolation-bar .iso-fail { color: #ef4444; font-weight: 700; }
+    #isolation-bar .iso-warn { color: var(--warn); font-weight: 700; }
+    
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Inter", "Segoe UI", Tahoma, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    header {
+      background: rgba(30, 41, 59, 0.8);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      z-index: 10;
+    }
+
+    h1 { margin: 0; font-size: 20px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;}
+    
+    .controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      background: var(--panel-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .btn:hover:not(:disabled) { background: var(--border); }
+    .btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .btn.primary:hover:not(:disabled) { background: var(--primary-hover); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .input-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--panel-bg);
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .input-group input[type="number"] {
+      width: 60px;
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-weight: bold;
+      outline: none;
+    }
+
+    .main-content {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      gap: 1px;
+      background: var(--border);
+    }
+
+    .panel {
+      flex: 1;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .panel-header {
+      padding: 16px;
+      background: var(--panel-bg);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    
+    .panel-title { font-size: 18px; font-weight: 600; margin: 0 0 8px 0; color: #fff; }
+    
+    .platform-info {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .panel-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      gap: 16px;
+      overflow-y: auto;
+    }
+
+    .visual-preview {
+      width: 100%;
+      height: 280px;
+      background: #000;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+      object-fit: contain;
+    }
+
+    .log-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 200px;
+    }
+
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .log-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+    
+    .log-area {
+      flex: 1;
+      background: #000;
+      color: #10b981;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      white-space: pre-wrap;
+      word-break: break-all;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.8);
+    }
+
+    input[type="file"] { display: none; }
+    
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      display: inline-block; background: var(--warn);
+    }
+    .status-dot.ready { background: var(--accent); }
+    .status-dot.error { background: #ef4444; }
+
+  </style>
+</head>
+<body>
+  <!-- Cross-Origin isolation diagnostics bar — shown before anything else so
+       user knows immediately if SAB / SIMD are active on this device. -->
+  <div id="isolation-bar">
+    <span class="iso-label">ISOLATION CHECK:</span>
+    <span id="iso-coi" class="iso-warn">crossOriginIsolated: …</span>
+    <span id="iso-sab" class="iso-warn">SharedArrayBuffer: …</span>
+    <span id="iso-simd" class="iso-warn">SIMD128: …</span>
+    <span id="iso-variant" class="iso-warn">WASM: …</span>
+    <span id="iso-gpu" class="iso-warn">WebGPU: …</span>
+  </div>
+  <script>
+    (function() {
+      const SIMD_PROBE = new Uint8Array([
+        0,97,115,109,1,0,0,0,1,5,1,96,0,1,
+        123,3,2,1,0,10,10,1,8,0,65,0,253,15,253,98,11
+      ]);
+      const coi  = !!window.crossOriginIsolated;
+      const sab  = typeof SharedArrayBuffer !== "undefined";
+      const simd = WebAssembly.validate(SIMD_PROBE);
+      const hasSab  = typeof SharedArrayBuffer !== "undefined";
+      const hasSIMD = WebAssembly.validate(SIMD_PROBE);
+      const variant = (hasSab && hasSIMD) ? "omr_threads" : hasSIMD ? "omr_simd" : "omr";
+      const hasGPU  = !!navigator.gpu;
+
+      function setEl(id, text, cls) {
+        const el = document.getElementById(id);
+        el.textContent = text;
+        el.className = cls;
       }
+      setEl("iso-coi",     "crossOriginIsolated: " + coi,   coi  ? "iso-ok" : "iso-fail");
+      setEl("iso-sab",     "SharedArrayBuffer: "   + sab,   sab  ? "iso-ok" : "iso-fail");
+      setEl("iso-simd",    "SIMD128: "             + simd,  simd ? "iso-ok" : "iso-warn");
+      setEl("iso-variant", "WASM variant → "       + variant, (variant === "omr_threads" || variant === "omr_simd") ? "iso-ok" : "iso-warn");
+      setEl("iso-gpu",     "WebGPU: "              + hasGPU, hasGPU ? "iso-ok" : "iso-warn");
 
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        font-family: "Segoe UI", Tahoma, sans-serif;
-        background: var(--bg);
-        color: var(--text);
+      if (!coi) {
+        document.getElementById("isolation-bar").style.background = "#3b0000";
+        console.error(
+          "[OMR] crossOriginIsolated=false — SharedArrayBuffer/SIMD threads will be DISABLED.\n" +
+          "Mobile fix options:\n" +
+          "  A) ADB:         adb reverse tcp:8080 tcp:8080  →  open http://localhost:8080\n" +
+          "  B) Chrome flag: chrome://flags/#unsafely-treat-insecure-origin-as-secure\n" +
+          "  C) HTTPS:       python server.py 8080 --https"
+        );
       }
+    })();
+  </script>
 
-      .topbar {
-        background: var(--primary);
-        color: #fff;
-        padding: 12px;
-        position: sticky;
-        top: 0;
-        z-index: 20;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-      }
+  <header>
+    <h1>OMR Benchmark</h1>
+    <div class="controls">
+      <label class="btn">
+        <input type="file" id="uploadSheet" accept="image/*" multiple />
+        📷 Sheet(s)
+      </label>
+      <span id="sheetName" style="font-size:12px; color:var(--text-muted); max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">No sheet</span>
+      
+      <label class="btn">
+        <input type="file" id="uploadKey" accept="image/*" multiple />
+        🔑 Key(s)
+      </label>
+      <span id="keyName" style="font-size:12px; color:var(--text-muted); max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">No key</span>
+      
+      <button id="resetRefBtn" class="btn" style="color:var(--warn); display:none;">↺ Reset Reference</button>
 
-      .topbar h1 { margin: 0; font-size: 38px; }
-      .topbar p { margin: 2px 0 0; font-size: 13px; opacity: 0.9; }
+      <div class="input-group">
+        <label style="font-size:13px; display:flex; align-items:center; gap:6px; cursor:pointer;">
+          <input type="checkbox" id="benchToggle" />
+          Benchmark
+        </label>
+        <span style="color:var(--border);">|</span>
+        <label style="font-size:13px;">Runs:</label>
+        <input type="number" id="benchRuns" value="30" min="1" max="1000" />
+      </div>
 
-      .app { max-width: 1100px; margin: 0 auto; padding: 10px; }
-      .view { display: none; }
-      .view.active { display: block; }
+      <button id="submitBtn" class="btn primary" disabled>🚀 Run & Set Reference</button>
+      <span id="benchProgress" style="font-size:13px; font-weight:bold; color:var(--accent);"></span>
+    </div>
+  </header>
 
-      .card {
-        background: var(--surface);
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        padding: 12px;
-        margin-bottom: 12px;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-      }
-
-      .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-      .muted { color: var(--muted); font-size: 12px; }
-
-      .btn {
-        border: 0;
-        border-radius: 10px;
-        padding: 10px 12px;
-        font-weight: 600;
-        cursor: pointer;
-      }
-      .btn.primary { background: var(--primary); color: #fff; }
-      .btn.secondary { background: var(--accent); color: #fff; }
-      .btn.ghost { background: #e8edf5; color: #1f2937; }
-      .btn.warn { background: var(--danger); color: #fff; }
-      .btn.subtle {
-        background: #f1f5fb;
-        color: #26415d;
-        border: 1px solid #d9e4f2;
-      }
-      .btn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-      .project-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
-      .project-form input {
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 10px;
-      }
-
-      .project-item {
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 10px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-top: 8px;
-      }
-
-      .scan-title {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 8px;
-      }
-
-      .scan-title .left { display: flex; align-items: center; gap: 8px; }
-      .scan-title .back {
-        background: transparent;
-        border: 0;
-        font-size: 24px;
-        cursor: pointer;
-        color: var(--primary-dark);
-      }
-
-      .title-inline {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-      }
-
-      .title-inline .left {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-
-      .title-inline .back {
-        background: transparent;
-        border: 0;
-        font-size: 30px;
-        line-height: 1;
-        cursor: pointer;
-        color: var(--primary-dark);
-      }
-
-      .asset-section {
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 10px;
-        margin-top: 8px;
-      }
-
-      .thumb-list {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
-        gap: 8px;
-        margin-top: 8px;
-      }
-
-      .thumb {
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        overflow: hidden;
-        background: #fff;
-      }
-
-      .thumb img { width: 100%; height: 72px; object-fit: cover; display: block; }
-      .thumb button {
-        width: 100%;
-        border: 0;
-        border-top: 1px solid var(--line);
-        padding: 4px;
-        font-size: 11px;
-        cursor: pointer;
-        background: #fff;
-      }
-
-      .progress-wrap {
-        margin-top: 10px;
-        border-top: 1px solid var(--line);
-        padding-top: 8px;
-      }
-
-      .progress-track {
-        width: 100%;
-        height: 8px;
-        border-radius: 99px;
-        overflow: hidden;
-        background: #e5e7eb;
-      }
-
-      .progress-fill {
-        width: 0%;
-        height: 100%;
-        background: var(--primary);
-        transition: width .2s ease;
-      }
-
-      .output-box canvas {
-        width: 100%;
-        border-radius: 10px;
-        background: #0f172a;
-        max-height: 460px;
-        object-fit: contain;
-      }
-
-      .metric-grid {
-        display: grid;
-        grid-template-columns: repeat(2,minmax(0,1fr));
-        gap: 8px;
-        margin-top: 8px;
-      }
-
-      .metric {
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 8px;
-        background: #f8fafc;
-      }
-      .metric .v { font-size: 18px; font-weight: 800; color: var(--primary); }
-
-      .split {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 12px;
-      }
-
-      .banner-warn {
-        margin-top: 8px;
-        border: 1px solid #f6d8a6;
-        background: #fff7e8;
-        color: #c05621;
-        border-radius: 10px;
-        padding: 8px 10px;
-        font-size: 14px;
-      }
-
-      .preview-pair {
-        margin-top: 10px;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-      }
-
-      .preview-pair img {
-        width: 100%;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: #fff;
-      }
-
-      .tab-btn {
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        padding: 7px 12px;
-        background: #fff;
-        cursor: pointer;
-        font-weight: 700;
-      }
-
-      .tab-btn.active {
-        background: var(--primary);
-        color: #fff;
-        border-color: var(--primary);
-      }
-
-      .result-tabs {
-        display: flex;
-        gap: 8px;
-        margin-bottom: 8px;
-      }
-
-      .q-list {
-        margin-top: 12px;
-        border-top: 1px solid var(--line);
-      }
-
-      .q-row {
-        display: grid;
-        grid-template-columns: 90px 1fr 1fr auto;
-        gap: 8px;
-        align-items: center;
-        padding: 8px 0;
-        border-bottom: 1px solid #eef2f7;
-      }
-
-      .suspicious-card {
-        cursor: pointer;
-      }
-
-      .list-item {
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 10px;
-        margin-top: 8px;
-        background: #fff;
-      }
-
-      .list-actions {
-        display: flex;
-        gap: 6px;
-      }
-
-      .icon-btn {
-        width: 34px;
-        height: 34px;
-        border-radius: 50%;
-        border: 1px solid var(--line);
-        background: #fff;
-        cursor: pointer;
-        font-size: 16px;
-      }
-
-      .list-item.suspicious {
-        border-color: #f7bf74;
-        background: #fff9ef;
-      }
-
-      .modal {
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,.45);
-        display: none;
-        align-items: center;
-        justify-content: center;
-        padding: 12px;
-        z-index: 50;
-      }
-
-      .modal.show { display: flex; }
-
-      .modal-card {
-        width: min(680px, 100%);
-        background: #fff;
-        border-radius: 14px;
-        border: 1px solid var(--line);
-        padding: 12px;
-        max-height: 90vh;
-        overflow: auto;
-      }
-
-      #captureVideo,
-      #reviewCanvas {
-        width: 100%;
-        border-radius: 10px;
-        background: #0f172a;
-      }
-
-      textarea {
-        width: 100%;
-        min-height: 170px;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 8px;
-        font-family: ui-monospace, monospace;
-        font-size: 12px;
-      }
-
-      select {
-        width: 100%;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 10px;
-        background: #fff;
-      }
-
-      #editQuestionGrid .btn.active {
-        background: var(--primary);
-        color: #fff;
-      }
-
-      @media (min-width: 980px) {
-        .split { grid-template-columns: 1fr 1fr; }
-      }
-    </style>
-  </head>
-  <body>
-    <header class="topbar">
-      <h1>GradeSnap</h1>
-      <p>Trải nghiệm trên thiết bị bằng WebAssembly</p>
-    </header>
-
-    <main class="app">
-      <section id="projectsView" class="view active">
-        <div class="card">
-          <h2>Project kỳ thi</h2>
-          <p class="muted">Tạo project rồi mở để thêm bài làm và đáp án.</p>
-          <div class="project-form">
-            <input id="projectNameInput" type="text" placeholder="Ví dụ: test" />
-            <button id="createProjectBtn" class="btn primary" type="button">Tạo</button>
-          </div>
-          <div class="row" style="margin-top:8px;">
-            <button id="refreshProjectsBtn" class="btn ghost" type="button">Làm mới</button>
-          </div>
-          <div id="projectList"></div>
-        </div>
-      </section>
-
-      <section id="scanView" class="view">
-        <div class="card">
-          <div class="scan-title">
-            <div class="left">
-              <button id="backToProjectsBtn" class="back" type="button">←</button>
-              <h2 id="activeProjectTitle" style="margin:0;"></h2>
-            </div>
-            <div class="row">
-              <button id="goResultBtn" class="btn secondary" type="button">Kết quả</button>
-              <button id="exportBtn" class="btn ghost" type="button">Export</button>
-            </div>
-          </div>
-
-          <p id="scanStatus" class="muted">Khởi tạo...</p>
-
-          <div class="asset-section">
-            <div class="row" style="justify-content:space-between;">
-              <strong>Bài làm học viên</strong>
-              <div class="row">
-                <button id="addStudentBtn" class="btn primary" type="button">Thêm ảnh</button>
-                <button id="clearStudentBtn" class="btn ghost" type="button" style="display:none;">Xoá tất cả</button>
-              </div>
-            </div>
-            <p id="studentCountText" class="muted">0 bài làm</p>
-            <div id="studentThumbList" class="thumb-list"></div>
-
-            <hr style="border:0;border-top:1px solid var(--line);margin:10px 0;" />
-
-            <div class="row" style="justify-content:space-between;">
-              <strong>Đáp án (answer key)</strong>
-              <div class="row">
-                <button id="addKeyBtn" class="btn secondary" type="button">Thêm ảnh</button>
-                <button id="clearKeyBtn" class="btn ghost" type="button" style="display:none;">Xoá tất cả</button>
-              </div>
-            </div>
-            <p id="keyCountText" class="muted">0 đáp án</p>
-            <div id="keyThumbList" class="thumb-list"></div>
-          </div>
-
-          <div class="row" style="margin-top:10px;">
-            <button id="startGradingBtn" class="btn primary" type="button" style="width:100%;" disabled>Bắt đầu chấm</button>
-          </div>
-
-          <div class="progress-wrap">
-            <div class="row" style="justify-content:space-between; margin-bottom:6px;">
-              <span id="progressText" class="muted">Chưa chấm</span>
-              <span id="progressCount" class="muted">0/0</span>
-            </div>
-            <div class="progress-track"><div id="progressFill" class="progress-fill"></div></div>
-          </div>
-
-          <input id="uploadInput" type="file" accept="image/*" multiple hidden />
-        </div>
-      </section>
-
-      <section id="resultView" class="view">
-        <div class="card">
-          <div class="title-inline">
-            <div class="left">
-              <button id="backToScanBtn" class="back" type="button">←</button>
-              <h2 style="margin:0;">Kết quả</h2>
-            </div>
-          </div>
-          <p id="resultSummary" class="muted">-</p>
-        </div>
-
-        <div class="split">
-          <article class="card">
-            <h3>Kết quả</h3>
-            <div class="result-tabs">
-              <button id="resultTabStudentBtn" class="tab-btn active" type="button">Bài đã lưu</button>
-              <button id="resultTabKeyBtn" class="tab-btn" type="button">Đáp án</button>
-            </div>
-            <p id="resultTabHint" class="muted">Không suspicious hoặc đã xác nhận/sửa xong</p>
-            <div id="resultStudentPane">
-              <div id="studentList"></div>
-            </div>
-            <div id="resultKeyPane" style="display:none;">
-              <div id="keyList"></div>
-            </div>
-          </article>
-
-          <article class="card">
-            <h3>Bài làm cần xem lại</h3>
-            <p class="muted">Cần xác nhận đúng hoặc sửa trước khi lưu chính thức</p>
-            <div id="suspiciousList"></div>
-          </article>
-        </div>
-      </section>
-
-      <div id="reviewModal2" class="modal">
-        <div class="modal-card">
-          <div class="row" style="justify-content:space-between;align-items:center;">
-            <h3 id="reviewTitle" style="margin:0;">Bài làm cần xem lại</h3>
-            <button id="closeReviewBtn" class="btn ghost" type="button">✕</button>
-          </div>
-          <div class="row" style="justify-content:flex-start;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px;">
-            <p id="reviewMeta" class="muted" style="margin:0;">-</p>
-            <button id="editIdentityBtn" class="btn subtle" type="button">Sửa MSSV/Key Code</button>
-          </div>
-          <div id="reviewWarn" class="banner-warn" style="display:none;"></div>
-          <div class="preview-pair">
-            <div>
-              <div id="reviewStudentLabel" class="muted">Bài làm học sinh</div>
-              <img id="reviewStudentImg" alt="student preview" />
-            </div>
-            <div>
-              <div id="reviewKeyLabel" class="muted">Đáp án chuẩn</div>
-              <img id="reviewKeyImg" alt="key preview" />
-            </div>
-          </div>
-          <div id="reviewQuestionList" class="q-list"></div>
-          <div class="row" style="margin-top:10px;">
-            <button id="reviewConfirmBtn" class="btn primary" type="button">Không cần sửa</button>
-          </div>
+  <div class="main-content">
+    
+    <!-- LEFT PANEL: Traditional CV -->
+    <div class="panel" id="panelCV">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title"><span class="status-dot" id="statusCV"></span> Traditional CV (OpenCV.js)</h2>
+          <div class="platform-info" id="infoCV">Loading...</div>
         </div>
       </div>
-    </main>
-
-    <div id="addModeModal" class="modal">
-      <div class="modal-card">
-        <h3 id="addModeTitle">Thêm ảnh</h3>
-        <p class="muted">Chọn cách thêm ảnh.</p>
-        <div class="row">
-          <button id="addByCaptureBtn" class="btn primary" type="button">Chụp ảnh</button>
-          <button id="addByUploadBtn" class="btn secondary" type="button">Tải lên</button>
-          <button id="cancelAddModeBtn" class="btn ghost" type="button">Huỷ</button>
+      <div class="panel-body">
+        <canvas class="visual-preview" id="previewCV"></canvas>
+        <div class="log-container">
+          <div class="log-header">
+            <span class="log-title">Execution Log</span>
+            <div style="display:flex; gap:6px;">
+              <button class="btn" id="copyCvBtn" style="padding:4px 8px; font-size:11px;">Copy</button>
+              <button class="btn" id="exportCvBtn" style="padding:4px 8px; font-size:11px;">Export Bench</button>
+              <button class="btn" id="exportBubbleCvBtn" style="padding:4px 8px; font-size:11px;">Export Bubbles</button>
+              <button class="btn" id="clearCvBtn" style="padding:4px 8px; font-size:11px;">Clear</button>
+            </div>
+          </div>
+          <div class="log-area" id="logCV"></div>
         </div>
       </div>
     </div>
 
-    <div id="captureModal" class="modal">
-      <div class="modal-card">
-        <h3>Chụp ảnh</h3>
-        <p class="muted">Chụp ảnh rồi xem lại trước khi chọn.</p>
-        <video id="captureVideo" autoplay playsinline muted></video>
-        <div class="row" style="margin-top:10px;">
-          <button id="takePhotoBtn" class="btn primary" type="button">Chụp</button>
-          <button id="cancelCaptureBtn" class="btn ghost" type="button">Huỷ</button>
+    <!-- RIGHT PANEL: YOLO -->
+    <div class="panel" id="panelYOLO">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title"><span class="status-dot" id="statusYOLO"></span> YOLOv8n (ONNX WebGPU)</h2>
+          <div class="platform-info" id="infoYOLO">Loading...</div>
+        </div>
+      </div>
+      <div class="panel-body">
+        <canvas class="visual-preview" id="previewYOLO"></canvas>
+        <div class="log-container">
+          <div class="log-header">
+            <span class="log-title">Execution Log</span>
+            <div style="display:flex; gap:6px;">
+              <button class="btn" id="copyYoloBtn" style="padding:4px 8px; font-size:11px;">Copy</button>
+              <button class="btn" id="exportYoloBtn" style="padding:4px 8px; font-size:11px;">Export Bench</button>
+              <button class="btn" id="exportBubbleYoloBtn" style="padding:4px 8px; font-size:11px;">Export Bubbles</button>
+              <button class="btn" id="clearYoloBtn" style="padding:4px 8px; font-size:11px;">Clear</button>
+            </div>
+          </div>
+          <div class="log-area" id="logYOLO"></div>
         </div>
       </div>
     </div>
 
-    <div id="reviewModal" class="modal">
-      <div class="modal-card">
-        <h3>Xem lại ảnh trước khi thêm</h3>
-        <p class="muted">Bạn có thể xoay ảnh hoặc chụp lại.</p>
-        <canvas id="reviewCanvas" width="1200" height="1700"></canvas>
-        <div class="row" style="margin-top:10px;">
-          <button id="rotateLeftBtn" class="btn ghost" type="button">Xoay trái</button>
-          <button id="rotateRightBtn" class="btn ghost" type="button">Xoay phải</button>
-          <button id="retakeBtn" class="btn warn" type="button">Chụp lại</button>
-          <button id="useImageBtn" class="btn primary" type="button">Chọn ảnh này</button>
+  </div>
+
+  <!-- Key Preview Modal -->
+  <div id="keyPreviewModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:100; align-items:center; justify-content:center; padding:24px;">
+    <div style="background:var(--panel-bg); border:1px solid var(--border); border-radius:12px; width:100%; max-width:900px; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 10px 25px rgba(0,0,0,0.8);">
+      <div style="padding:16px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <h2 style="margin:0; font-size:18px; color:var(--text);">Verified Answer Key (Ground Truth)</h2>
+        <button class="btn" onclick="document.getElementById('keyPreviewModal').style.display='none'">Close</button>
+      </div>
+      <div style="display:flex; flex:1; overflow:hidden;">
+        <div style="flex:1; padding:16px 24px; overflow-y:auto; border-right:1px solid var(--border); font-family:var(--font-mono); font-size:12px; color:var(--text); line-height:1.6;">
+           <h3 style="margin-top:0; color:var(--accent);">CV Ground Truth</h3>
+           <div id="keyTableContentCV"></div>
+        </div>
+        <div style="flex:1; padding:16px 24px; overflow-y:auto; font-family:var(--font-mono); font-size:12px; color:var(--text); line-height:1.6;">
+           <h3 style="margin-top:0; color:var(--accent);">YOLO Ground Truth</h3>
+           <div id="keyTableContentYOLO"></div>
+        </div>
+      </div>
+      <div style="padding:16px 24px; border-top:1px solid var(--border); background:rgba(0,0,0,0.3); display:flex; flex-direction:column; gap:12px;">
+        <div id="keyWarningBox" style="color:var(--warn); font-size:14px; font-weight:600;"></div>
+        <div style="align-self:flex-end;">
+          <button id="confirmKeyBtn" class="btn primary" style="display:none; padding:8px 16px;">✓ Approve & Set as Ground Truth</button>
         </div>
       </div>
     </div>
+  </div>
 
-    <div id="editModal" class="modal">
-      <div class="modal-card">
-        <div class="row" style="justify-content:space-between;align-items:center;">
-          <h3 style="margin:0;">Sửa bài làm</h3>
-          <button id="closeEditBtn" class="btn ghost" type="button" aria-label="Đóng">✕</button>
-        </div>
-        <p id="editMeta" class="muted"></p>
-        <div id="editQuestionGrid"></div>
-      </div>
-    </div>
-
-    <div id="exportModal" class="modal">
-      <div class="modal-card">
-        <div class="row" style="justify-content:space-between;align-items:center;">
-          <h3 style="margin:0;">Tùy chọn export</h3>
-          <button id="closeExportBtn" class="btn ghost" type="button" aria-label="Đóng">✕</button>
-        </div>
-        <div style="margin-top:10px;">
-          <div style="font-weight:700;margin-bottom:6px;">Dòng 1: Bạn muốn xuất file json hay csv?</div>
-          <select id="exportFormatSelect">
-            <option value="json">JSON</option>
-            <option value="csv">CSV</option>
-          </select>
-        </div>
-        <div style="margin-top:12px;">
-          <div style="font-weight:700;margin-bottom:6px;">Dòng 2: In toàn bộ đáp án hay chỉ in kết quả?</div>
-          <select id="exportScopeSelect">
-            <option value="result">Chỉ in kết quả</option>
-            <option value="full">In toàn bộ đáp án</option>
-          </select>
-        </div>
-        <div class="row" style="margin-top:14px;">
-          <button id="confirmExportBtn" class="btn primary" type="button">Xuất file</button>
-          <button id="cancelExportBtn" class="btn ghost" type="button">Hủy</button>
-        </div>
-      </div>
-    </div>
-
-    <script src="./js/db.js?v=20260310-2"></script>
-    <script src="./js/app.js?v=20260310-11"></script>
-  </body>
+  <script src="./js/worker-protocol.js?v=test"></script>
+  <script src="./js/app.js?v=test"></script>
+</body>
 </html>
-

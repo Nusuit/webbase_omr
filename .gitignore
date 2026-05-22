@@ -18,6 +18,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
+.venv/
 env/
 venv/
 *.egg-info/
@@ -32,10 +33,21 @@ package-lock.json
 # IDE
 .vscode/
 .idea/
+*.iml
 *.swp
 *.swo
 *~
 .DS_Store
+
+# Android local state
+android/.gradle/
+android/local.properties
+android/key.properties
+
+# Training/runtime outputs
+runs/
+yolov8n.pt
+full_label_yolo/labels.cache
 
 # OS
 Thumbs.db

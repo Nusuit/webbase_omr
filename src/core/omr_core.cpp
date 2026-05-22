@@ -78,7 +78,6 @@ struct Bubble {
     int cx;
     int cy;
     double density;
-    cv::Mat ink;
 };
 
 struct RegionData {
@@ -126,9 +125,8 @@ SheetProcessResult OmrCore::ProcessSheetRgba(std::uint8_t* rgba, int width, int 
     std::vector<std::vector<cv::Point>> ctrs;
     cv::findContours(cleaned, ctrs, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
-    // Collect valid markers: area 1500-15000, aspect 0.8-1.2, fill > 0.7
-    // Additionally restrict to outer 20% zone of each side to avoid confusion with
-    // filled bubbles in the interior of the form.
+    // Collect valid markers: area 150-15000 (edge-clipped) / 1500-15000 (interior),
+    // aspect 0.7-1.4, fill > 0.55/0.7 — restricted to outer 20% corner zones.
     const int zone_w = kBaseWidth  / 5;  // 340px
     const int zone_h = kBaseHeight / 5;  // 480px
     std::vector<cv::Point2f> markers;
@@ -136,9 +134,16 @@ SheetProcessResult OmrCore::ProcessSheetRgba(std::uint8_t* rgba, int width, int 
       cv::Rect bound = cv::boundingRect(c);
       double area = cv::contourArea(c);
       double ar = (double)bound.width / bound.height;
-      if (area < 1500 || area > 15000) continue;
-      if (ar < 0.8 || ar > 1.2) continue;
-      if ((area / (double)(bound.width * bound.height)) < 0.7) continue;
+      // Edge-touching blobs (from Stage 1 mapping marker centers to canvas corners)
+      // are partially clipped and have smaller area — accept them with a lower threshold.
+      bool touches_edge = (bound.x <= 1 || bound.y <= 1 ||
+                           bound.x + bound.width >= kBaseWidth - 1 ||
+                           bound.y + bound.height >= kBaseHeight - 1);
+      double min_area = touches_edge ? 150.0 : 1500.0;
+      if (area < min_area || area > 15000) continue;
+      if (ar < 0.7 || ar > 1.4) continue;
+      double min_fill = touches_edge ? 0.55 : 0.7;
+      if ((area / (double)(bound.width * bound.height)) < min_fill) continue;
       float cx = bound.x + bound.width / 2.0f;
       float cy = bound.y + bound.height / 2.0f;
       // Must be in one of the 4 corner zones
@@ -226,34 +231,79 @@ SheetProcessResult OmrCore::ProcessSheetRgba(std::uint8_t* rgba, int width, int 
   // Fixed bubble radius for density sampling (in 1700x2400 space)
   const int R = 18;
 
+  // Precompute circle sampling row bounds. Replaces the old
+  // cv::Mat::zeros + cv::circle + cv::bitwise_and + cv::countNonZero pattern
+  // (which allocated a 1700x2400 mask per bubble — ~3GB churn per sheet).
+  std::vector<int> circle_dx(2 * R + 1);
+  for (int dy = -R; dy <= R; ++dy) {
+    circle_dx[dy + R] = static_cast<int>(std::sqrt(static_cast<double>(R * R - dy * dy)));
+  }
+
+  auto countCircle = [&](const cv::Mat& img, int cx, int cy) -> int {
+    const int W = img.cols, H = img.rows;
+    int sum = 0;
+    for (int dy = -R; dy <= R; ++dy) {
+      const int yy = cy + dy;
+      if (yy < 0 || yy >= H) continue;
+      const int dx_max = circle_dx[dy + R];
+      const int x0 = std::max(0, cx - dx_max);
+      const int x1 = std::min(W - 1, cx + dx_max);
+      const std::uint8_t* row = img.ptr<std::uint8_t>(yy);
+      for (int xx = x0; xx <= x1; ++xx) {
+        if (row[xx]) ++sum;
+      }
+    }
+    return sum;
+  };
+
+  auto paintInkGreen = [&](cv::Mat& dst, const cv::Mat& bin, int cx, int cy) {
+    const int W = dst.cols, H = dst.rows;
+    for (int dy = -R; dy <= R; ++dy) {
+      const int yy = cy + dy;
+      if (yy < 0 || yy >= H) continue;
+      const int dx_max = circle_dx[dy + R];
+      const int x0 = std::max(0, cx - dx_max);
+      const int x1 = std::min(W - 1, cx + dx_max);
+      const std::uint8_t* binRow = bin.ptr<std::uint8_t>(yy);
+      std::uint8_t* dstRow = dst.ptr<std::uint8_t>(yy);
+      for (int xx = x0; xx <= x1; ++xx) {
+        if (binRow[xx]) {
+          const int i = xx * 4;
+          dstRow[i + 0] = 0;
+          dstRow[i + 1] = 255;
+          dstRow[i + 2] = 0;
+          dstRow[i + 3] = 255;
+        }
+      }
+    }
+  };
+
   std::vector<RegionData> regions_data;
   std::vector<double> all_grid_densities;
 
   for (int bi = 0; bi < num_blocks; ++bi) {
       const Block& blk = blocks[bi];
 
-      // Compute cell centers using same logic as app.js questionCenter()
-      int cellW = (blk.x2 - blk.x1) / blk.cols;
-      int cellH = (blk.y2 - blk.y1) / blk.rows;
+      // Compute cell centers using floating-point to avoid integer truncation drift
+      float cellW = (float)(blk.x2 - blk.x1) / blk.cols;
+      float cellH = (float)(blk.y2 - blk.y1) / blk.rows;
 
       std::vector<int> expected_x(blk.cols);
       for (int c = 0; c < blk.cols; c++)
-          expected_x[c] = blk.x1 + c * cellW + cellW / 2;
+          expected_x[c] = static_cast<int>(std::round(blk.x1 + (c + 0.5f) * cellW));
 
       std::vector<int> expected_y(blk.rows);
       for (int r = 0; r < blk.rows; r++)
-          expected_y[r] = blk.y1 + r * cellH + cellH / 2;
+          expected_y[r] = static_cast<int>(std::round(blk.y1 + (r + 0.5f) * cellH));
 
-      // Sample density at each fixed cell center
+      // Sample density at each fixed cell center — direct pixel scan
+      // within the circle's bounding box (no per-bubble Mat allocation).
       std::vector<Bubble> region_bubbles;
+      const double circle_area = CV_PI * R * R;
       for (int cy : expected_y) {
           for (int cx : expected_x) {
-              cv::Mat mask_mat = cv::Mat::zeros(binary.size(), CV_8UC1);
-              cv::circle(mask_mat, cv::Point(cx, cy), R, cv::Scalar(255), -1);
-              cv::Mat ink_pixels;
-              cv::bitwise_and(binary, binary, ink_pixels, mask_mat);
-              double density = cv::countNonZero(ink_pixels) / (CV_PI * R * R);
-              region_bubbles.push_back({cx, cy, density, ink_pixels});
+              const double density = countCircle(binary, cx, cy) / circle_area;
+              region_bubbles.push_back(Bubble{cx, cy, density});
               all_grid_densities.push_back(density);
           }
       }
@@ -274,6 +324,7 @@ SheetProcessResult OmrCore::ProcessSheetRgba(std::uint8_t* rgba, int width, int 
   out.mssv_valid = 1; out.key_valid = 1;
   out.answer_masks.fill(0);
   out.suspicious.fill(0);
+  out.bubble_densities.fill(0);
 
   for (const auto& region : regions_data) {
       if (region.name == "MSSV" || region.name == "KEY") {
@@ -292,8 +343,8 @@ SheetProcessResult OmrCore::ProcessSheetRgba(std::uint8_t* rgba, int width, int 
 
               if (best.density > 0.20 && best.density >= global_avg_density * 0.40) {
                   // Color it green
-                  display.setTo(cv::Scalar(0, 255, 0, 255), best.ink > 0);
-                  
+                  paintInkGreen(display, binary, best.cx, best.cy);
+
                   int best_row = -1;
                   for (int r = 0; r < 10; r++) { if (region.expected_y[r] == best.cy) { best_row = r; break; } }
                   
@@ -325,11 +376,21 @@ SheetProcessResult OmrCore::ProcessSheetRgba(std::uint8_t* rgba, int width, int 
                   ref_density = sum / recent_history.size();
               }
 
+              int q_index = region.q_offset + r;
+              
+              // Record raw densities upfront for benchmarking (before any gating)
+              for (size_t col_idx = 0; col_idx < region.expected_x.size(); col_idx++) {
+                  int cx = region.expected_x[col_idx];
+                  auto it = std::find_if(row_b.begin(), row_b.end(), [cx](const Bubble& b){ return b.cx==cx; });
+                  if (it != row_b.end() && q_index >= 0 && q_index < 60 && col_idx < 5) {
+                      out.bubble_densities[q_index * 5 + col_idx] = static_cast<int>(it->density * 10000.0);
+                  }
+              }
+
               if (max_d < 0.20 || max_d < ref_density * 0.55) {
                   continue;
               }
 
-              int q_index = region.q_offset + r;
               int mask = 0;
               int filled_count = 0;
 
@@ -338,7 +399,7 @@ SheetProcessResult OmrCore::ProcessSheetRgba(std::uint8_t* rgba, int width, int 
                   auto it = std::find_if(row_b.begin(), row_b.end(), [cx](const Bubble& b){ return b.cx==cx; });
                   if (it != row_b.end()) {
                       if (it->density > 0.20 && it->density >= max_d * 0.70 && it->density >= ref_density * 0.55) {
-                          display.setTo(cv::Scalar(0, 255, 0, 255), it->ink > 0);
+                          paintInkGreen(display, binary, it->cx, it->cy);
                           mask |= (1 << col_idx);
                           filled_count++;
                       }
@@ -385,6 +446,11 @@ int OmrCore::CopyLastWarped(std::uint8_t* dst, int dst_len) const {
   if (static_cast<int>(g_last_warped.size()) < kPreviewBytes) return -1;
   std::memcpy(dst, g_last_warped.data(), static_cast<std::size_t>(kPreviewBytes));
   return kPreviewBytes;
+}
+
+void OmrCore::ClearPreviews() {
+  std::vector<std::uint8_t>().swap(g_last_preview);
+  std::vector<std::uint8_t>().swap(g_last_warped);
 }
 
 }  // namespace omr
