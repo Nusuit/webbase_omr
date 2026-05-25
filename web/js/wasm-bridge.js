@@ -13,9 +13,12 @@ class WasmBridge {
 
   async init() {
     if (this.module) return;
+    // Cache-bust the .wasm fetch — Chrome caches `omr.wasm` aggressively and a
+    // freshly rebuilt binary would otherwise be silently ignored.
+    const _wasmBust = (typeof self !== "undefined" && self._wasmCacheBust) || ("v=" + Date.now());
     this.module = await OmrModule({
       // Worker runs under /js, but wasm output is in /wasm.
-      locateFile: (file) => (file.endsWith(".wasm") ? `../wasm/${file}` : file),
+      locateFile: (file) => (file.endsWith(".wasm") ? `../wasm/${file}?${_wasmBust}` : file),
       print: (text) => {
         if (typeof self.onCppLog === "function") {
           self.onCppLog(text);

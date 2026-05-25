@@ -16,46 +16,214 @@ let globalGroundTruthsYOLO = [];
 
 let testRuns = 1;
 let currentRun = 0;
+let currentSheetIdx = 0;
 
 const Metrics = {
   CV: { stats: [], bubbles: [] },
   YOLO: { stats: [], bubbles: [] }
 };
 
+// ── WASM heap query (worker side) ───────────────────────────────────────
+let _wasmSeq = 0;
+const _pendingWasmReqs = new Map();
+
+function attachWasmHeapListener(worker) {
+  worker.addEventListener('message', (e) => {
+    const msg = e.data;
+    if (msg && msg.type === OMR_MSG.WASM_HEAP_RESULT) {
+      const req = _pendingWasmReqs.get(msg.seq);
+      if (req) {
+        clearTimeout(req.timer);
+        req.resolve(msg.bytes);
+        _pendingWasmReqs.delete(msg.seq);
+      }
+    }
+  });
+}
+
+function queryWasmHeap(worker, timeoutMs = 80) {
+  return new Promise(resolve => {
+    const seq = ++_wasmSeq;
+    const timer = setTimeout(() => {
+      _pendingWasmReqs.delete(seq);
+      resolve(null);
+    }, timeoutMs);
+    _pendingWasmReqs.set(seq, { resolve, timer });
+    try {
+      worker.postMessage({ type: OMR_MSG.GET_WASM_HEAP, seq });
+    } catch (_e) {
+      clearTimeout(timer);
+      _pendingWasmReqs.delete(seq);
+      resolve(null);
+    }
+  });
+}
+
+// ── Resource Monitor: in-app CPU/RAM time-series ────────────────────────
+const ResourceMonitor = {
+  enabled: false,
+  intervalMs: 100,
+  samples: [],
+  active: false,
+  startTime: 0,
+  lastSampleTime: 0,
+  timer: null,
+  sessionLabel: "",
+
+  reset() {
+    this.samples = [];
+    this.startTime = 0;
+    this.lastSampleTime = 0;
+  },
+
+  start(label = "") {
+    if (!this.enabled) return;
+    this.reset();
+    this.active = true;
+    this.sessionLabel = label;
+    this.startTime = performance.now();
+    this.lastSampleTime = this.startTime;
+    this._scheduleTick();
+    console.log(`[ResourceMonitor] START interval=${this.intervalMs}ms label=${label}`);
+  },
+
+  stop() {
+    if (!this.active) return;
+    this.active = false;
+    if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+    console.log(`[ResourceMonitor] STOP samples=${this.samples.length}`);
+  },
+
+  _scheduleTick() {
+    if (!this.active) return;
+    this.timer = setTimeout(() => this._tick(), this.intervalMs);
+  },
+
+  async _tick() {
+    if (!this.active) return;
+    const now = performance.now();
+    const expectedDelta = this.intervalMs;
+    const actualDelta = now - this.lastSampleTime;
+    const lag = Math.max(0, actualDelta - expectedDelta);
+    const cpuLoad = lag / expectedDelta;
+    this.lastSampleTime = now;
+
+    let wasmCvBytes = 0, wasmYoloBytes = 0;
+    try {
+      const [cv, yolo] = await Promise.all([
+        workerCV ? queryWasmHeap(workerCV, 80) : Promise.resolve(null),
+        workerYOLO ? queryWasmHeap(workerYOLO, 80) : Promise.resolve(null)
+      ]);
+      wasmCvBytes = cv || 0;
+      wasmYoloBytes = yolo || 0;
+    } catch (_e) {}
+
+    let jsHeapUsed = 0, jsHeapTotal = 0, jsHeapLimit = 0;
+    if (performance.memory) {
+      jsHeapUsed = performance.memory.usedJSHeapSize / (1024 * 1024);
+      jsHeapTotal = performance.memory.totalJSHeapSize / (1024 * 1024);
+      jsHeapLimit = performance.memory.jsHeapSizeLimit / (1024 * 1024);
+    }
+
+    this.samples.push({
+      t_ms: now - this.startTime,
+      run_idx: currentRun,
+      sheet_idx: currentSheetIdx,
+      js_heap_used_mb: jsHeapUsed,
+      js_heap_total_mb: jsHeapTotal,
+      js_heap_limit_mb: jsHeapLimit,
+      wasm_heap_cv_mb: wasmCvBytes / (1024 * 1024),
+      wasm_heap_yolo_mb: wasmYoloBytes / (1024 * 1024),
+      event_loop_lag_ms: lag,
+      cpu_load_proxy: cpuLoad
+    });
+
+    if (this.active) this._scheduleTick();
+  },
+
+  exportCSV() {
+    if (this.samples.length === 0) {
+      alert("No resource samples. Enable 'Resource Monitor' and run benchmark first.");
+      return;
+    }
+    const header = "t_ms,run_idx,sheet_idx,js_heap_used_mb,js_heap_total_mb,js_heap_limit_mb,wasm_heap_cv_mb,wasm_heap_yolo_mb,event_loop_lag_ms,cpu_load_proxy,platform,timestamp,session_label\n";
+    const ts = new Date().toISOString();
+    const plat = navigator.userAgent.replace(/"/g, "'");
+    const label = (this.sessionLabel || "").replace(/"/g, "'");
+    const rows = this.samples.map(s =>
+      `${s.t_ms.toFixed(1)},${s.run_idx},${s.sheet_idx},${s.js_heap_used_mb.toFixed(2)},${s.js_heap_total_mb.toFixed(2)},${s.js_heap_limit_mb.toFixed(2)},${s.wasm_heap_cv_mb.toFixed(2)},${s.wasm_heap_yolo_mb.toFixed(2)},${s.event_loop_lag_ms.toFixed(2)},${s.cpu_load_proxy.toFixed(4)},"${plat}",${ts},"${label}"`
+    ).join("\n");
+    const csv = header + rows + "\n";
+
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const safeTs = ts.replace(/[:.]/g, '-');
+    a.download = `resources_${safeTs}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+};
+window.ResourceMonitor = ResourceMonitor;
+
+// Method selector: ?method=cv → only CV pipeline; ?method=yolo → only YOLO pipeline;
+// ?method=both or omitted → both (default).
+const METHOD = (new URLSearchParams(window.location.search).get("method") || "both").toLowerCase();
+const RUN_CV   = (METHOD === "cv"   || METHOD === "both");
+const RUN_YOLO = (METHOD === "yolo" || METHOD === "both");
+window.METHOD = METHOD;
+
 function checkAndInit() {
   const infoCV = document.getElementById("infoCV");
   const infoYOLO = document.getElementById("infoYOLO");
-  const platformStr = `Screen: ${window.innerWidth}×${window.innerHeight} <br/> Browser: ${navigator.userAgent.substring(0,60)}...`;
-  
+  const platformStr = `Screen: ${window.innerWidth}×${window.innerHeight} <br/> Browser: ${navigator.userAgent.substring(0,60)}... <br/> Method: <b>${METHOD}</b>`;
+
   infoCV.innerHTML = platformStr;
   infoYOLO.innerHTML = platformStr;
 
-  workerCV = new Worker("./js/worker-cv.js?v=" + Date.now());
-  workerYOLO = new Worker("./js/worker-yolo.js?v=" + Date.now());
+  if (RUN_CV) {
+    workerCV = new Worker("./js/worker-cv.js?v=" + Date.now());
+    attachWasmHeapListener(workerCV);
+    workerCV.onmessage = (e) => {
+      if (e.data && e.data.type === OMR_MSG.READY) {
+        readyCV = true;
+        document.getElementById("statusCV").classList.add("ready");
+        infoCV.innerHTML += "<br/>WASM: Loaded";
+        checkReady();
+      }
+    };
+    workerCV.postMessage({ type: OMR_MSG.INIT });
+  } else {
+    readyCV = true;
+    infoCV.innerHTML += "<br/><i>(skipped — method=yolo)</i>";
+  }
 
-  const onMessage = (tag) => (e) => {
-    const msg = e.data;
-    if (msg.type === OMR_MSG.READY) {
-      if (tag === 'CV') { readyCV = true; document.getElementById("statusCV").classList.add("ready"); infoCV.innerHTML += "<br/>WASM: Loaded"; }
-      if (tag === 'YOLO') { readyYOLO = true; document.getElementById("statusYOLO").classList.add("ready"); infoYOLO.innerHTML += "<br/>WebGPU/WASM: Loaded"; }
-      checkReady();
-    }
-  };
-
-  workerCV.onmessage = onMessage('CV');
-  workerYOLO.onmessage = onMessage('YOLO');
-
-  workerCV.postMessage({ type: OMR_MSG.INIT });
-  workerYOLO.postMessage({ type: OMR_MSG.INIT });
+  if (RUN_YOLO) {
+    workerYOLO = new Worker("./js/worker-yolo.js?v=" + Date.now());
+    attachWasmHeapListener(workerYOLO);
+    workerYOLO.onmessage = (e) => {
+      if (e.data && e.data.type === OMR_MSG.READY) {
+        readyYOLO = true;
+        document.getElementById("statusYOLO").classList.add("ready");
+        infoYOLO.innerHTML += "<br/>WebGPU/WASM: Loaded";
+        checkReady();
+      }
+    };
+    workerYOLO.postMessage({ type: OMR_MSG.INIT });
+  } else {
+    readyYOLO = true;
+    infoYOLO.innerHTML += "<br/><i>(skipped — method=cv)</i>";
+  }
 }
 
 function checkReady() {
   if (readyCV && readyYOLO) {
-    const hasValidKeyCV = globalGroundTruthsCV.length > 0 && globalGroundTruthsCV.every(k => k !== null);
-    const hasValidKeyYOLO = globalGroundTruthsYOLO.length > 0 && globalGroundTruthsYOLO.every(k => k !== null);
+    const hasValidKeyCV = !RUN_CV || (globalGroundTruthsCV.length > 0 && globalGroundTruthsCV.every(k => k !== null));
+    const hasValidKeyYOLO = !RUN_YOLO || (globalGroundTruthsYOLO.length > 0 && globalGroundTruthsYOLO.every(k => k !== null));
     if (sheetFiles.length > 0 && hasValidKeyCV && hasValidKeyYOLO) {
       document.getElementById("submitBtn").disabled = false;
-      document.getElementById("submitBtn").innerText = "🚀 Run Batch Benchmark";
+      document.getElementById("submitBtn").innerText = `🚀 Run (${METHOD})`;
     } else {
       document.getElementById("submitBtn").disabled = true;
     }
@@ -150,10 +318,10 @@ document.getElementById("uploadKey").onchange = async (e) => {
         });
     };
 
-    const [resCV, resYOLO] = await Promise.all([
-       processKey(workerCV, 'CV', 'keyTableContentCV', pendingGroundTruthsCV),
-       processKey(workerYOLO, 'YOLO', 'keyTableContentYOLO', pendingGroundTruthsYOLO)
-    ]);
+    const tasks = [];
+    if (RUN_CV)   tasks.push(processKey(workerCV,   'CV',   'keyTableContentCV',   pendingGroundTruthsCV));
+    if (RUN_YOLO) tasks.push(processKey(workerYOLO, 'YOLO', 'keyTableContentYOLO', pendingGroundTruthsYOLO));
+    await Promise.all(tasks);
     validKeysCount++;
   }
 
@@ -191,7 +359,18 @@ document.getElementById("submitBtn").onclick = async () => {
   Metrics.CV.bubbles = [];
   Metrics.YOLO.stats = [];
   Metrics.YOLO.bubbles = [];
-  
+
+  // Sync ResourceMonitor UI state
+  const rmToggle = document.getElementById("resourceToggle");
+  const rmIntervalEl = document.getElementById("resourceInterval");
+  if (rmToggle) {
+    ResourceMonitor.enabled = !!rmToggle.checked;
+    if (rmIntervalEl) {
+      const v = parseInt(rmIntervalEl.value, 10);
+      ResourceMonitor.intervalMs = (isFinite(v) && v >= 20) ? v : 100;
+    }
+  }
+
   document.getElementById("logCV").innerHTML = "";
   document.getElementById("logYOLO").innerHTML = "";
   document.getElementById("submitBtn").disabled = true;
@@ -199,29 +378,39 @@ document.getElementById("submitBtn").onclick = async () => {
   // Run Sequential iterations
   let totalRuns = testRuns * sheetFiles.length;
   let counter = 0;
-  
+
   const progBox = document.getElementById("benchProgress");
   progBox.innerText = `Process: 0/${totalRuns}`;
+
+  if (ResourceMonitor.enabled) {
+    ResourceMonitor.start(`method=${METHOD} n=${testRuns} sheets=${sheetFiles.length}`);
+  }
 
   for (let i = 0; i < testRuns; i++) {
     for (let j = 0; j < sheetFiles.length; j++) {
       counter++;
       currentRun = counter;
+      currentSheetIdx = j;
       progBox.innerText = `Process: ${counter}/${totalRuns}`;
 
       const file = sheetFiles[j];
       const gtIdxCV = Math.min(j, globalGroundTruthsCV.length - 1);
       const gtIdxYOLO = Math.min(j, globalGroundTruthsYOLO.length - 1);
-      
-      const p1 = runPipeline('CV', file, globalGroundTruthsCV[gtIdxCV]);
-      const p2 = runPipeline('YOLO', file, globalGroundTruthsYOLO[gtIdxYOLO]);
-      
-      await Promise.all([p1, p2]);
+
+      const tasks = [];
+      if (RUN_CV)   tasks.push(runPipeline('CV',   file, globalGroundTruthsCV[gtIdxCV]));
+      if (RUN_YOLO) tasks.push(runPipeline('YOLO', file, globalGroundTruthsYOLO[gtIdxYOLO]));
+
+      await Promise.all(tasks);
       await new Promise(r => setTimeout(r, 50)); // Render UI fast tick
     }
   }
 
-  progBox.innerText = `✅ Completed ${totalRuns}`;
+  if (ResourceMonitor.enabled) {
+    ResourceMonitor.stop();
+  }
+
+  progBox.innerText = `✅ Completed ${totalRuns}` + (ResourceMonitor.enabled ? ` (res=${ResourceMonitor.samples.length} samples)` : "");
 
   if (totalRuns > 1) {
     printBenchmarkSummary('CV', Metrics.CV.stats, totalRuns);
@@ -503,5 +692,13 @@ function renderPreview(canvasId, buffer, w, h) {
     URL.revokeObjectURL(url);
   };
 });
+
+// Resource Monitor export button
+{
+  const btn = document.getElementById("exportResourcesBtn");
+  if (btn) {
+    btn.onclick = () => ResourceMonitor.exportCSV();
+  }
+}
 
 window.onload = checkAndInit;

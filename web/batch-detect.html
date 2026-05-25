@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>OMR Batch Detect</title>
+<style>body{font-family:monospace;background:#0f172a;color:#f8fafc;padding:16px}
+#log{white-space:pre-wrap;font-size:11px;max-height:80vh;overflow:auto;background:#1e293b;padding:8px;border-radius:6px}
+button{background:#3b82f6;color:#fff;border:0;padding:8px 16px;border-radius:6px;cursor:pointer;margin-right:8px}
+</style></head>
+<body>
+<h2>OMR Batch Detect</h2>
+<p>Manifest URL: <input id="manifest" value="/manifest.json" size="60"/>
+<button id="run">Run</button>
+<button id="download">Download results</button>
+<span id="progress"></span></p>
+<div id="log"></div>
+<script src="./js/worker-protocol.js"></script>
+<script>
+const log = document.getElementById("log");
+function L(s){ log.textContent += s + "\n"; log.scrollTop = log.scrollHeight; }
+let results = [];
+let worker = null;
+let currentSheetIdx = 0;
+
+// Inline ResourceMonitor (matches schema in web/js/app.js)
+const ResourceMonitor = {
+  enabled: true, intervalMs: 100, samples: [], active: false,
+  startTime: 0, lastSampleTime: 0, timer: null, sessionLabel: "",
+  reset(){ this.samples=[]; this.startTime=0; this.lastSampleTime=0; },
+  start(label){
+    this.reset(); this.active=true; this.sessionLabel=label||"";
+    this.startTime = performance.now(); this.lastSampleTime = this.startTime;
+    this._tick();
+  },
+  stop(){ this.active=false; if(this.timer){clearTimeout(this.timer); this.timer=null;} },
+  _queryWasmHeap(){
+    return new Promise((res)=>{
+      if(!worker) return res(0);
+      const seq = Math.random();
+      const h = (e)=>{
+        if(e.data && e.data.type===OMR_MSG.WASM_HEAP_RESULT && e.data.seq===seq){
+          worker.removeEventListener("message", h); res(e.data.bytes||0);
+        }
+      };
+      worker.addEventListener("message", h);
+      worker.postMessage({type: OMR_MSG.GET_WASM_HEAP, seq});
+      setTimeout(()=>{ worker.removeEventListener("message", h); res(0); }, 80);
+    });
+  },
+  async _tick(){
+    if(!this.active) return;
+    const now = performance.now();
+    const lag = Math.max(0, (now - this.lastSampleTime) - this.intervalMs);
+    const cpuLoad = lag / this.intervalMs;
+    this.lastSampleTime = now;
+    let wasmCv = 0;
+    try { wasmCv = await this._queryWasmHeap(); } catch(_){}
+    let jhu=0,jht=0,jhl=0;
+    if(performance.memory){
+      jhu = performance.memory.usedJSHeapSize/(1024*1024);
+      jht = performance.memory.totalJSHeapSize/(1024*1024);
+      jhl = performance.memory.jsHeapSizeLimit/(1024*1024);
+    }
+    const heapMb = wasmCv/(1024*1024);
+    this.samples.push({
+      t_ms: now - this.startTime, run_idx: 1, sheet_idx: currentSheetIdx,
+      js_heap_used_mb: jhu, js_heap_total_mb: jht, js_heap_limit_mb: jhl,
+      wasm_heap_cv_mb: METHOD === "yolo" ? 0 : heapMb,
+      wasm_heap_yolo_mb: METHOD === "yolo" ? heapMb : 0,
+      event_loop_lag_ms: lag, cpu_load_proxy: cpuLoad,
+    });
+    if(this.active) this.timer = setTimeout(()=>this._tick(), this.intervalMs);
+  },
+  exportCSV(filename){
+    const header = "t_ms,run_idx,sheet_idx,js_heap_used_mb,js_heap_total_mb,js_heap_limit_mb,wasm_heap_cv_mb,wasm_heap_yolo_mb,event_loop_lag_ms,cpu_load_proxy,platform,timestamp,session_label\n";
+    const ts = new Date().toISOString();
+    const plat = navigator.userAgent.replace(/"/g,"'");
+    const label = (this.sessionLabel||"").replace(/"/g,"'");
+    const rows = this.samples.map(s=>
+      `${s.t_ms.toFixed(1)},${s.run_idx},${s.sheet_idx},${s.js_heap_used_mb.toFixed(2)},${s.js_heap_total_mb.toFixed(2)},${s.js_heap_limit_mb.toFixed(2)},${s.wasm_heap_cv_mb.toFixed(2)},${s.wasm_heap_yolo_mb.toFixed(2)},${s.event_loop_lag_ms.toFixed(2)},${s.cpu_load_proxy.toFixed(4)},"${plat}",${ts},"${label}"`
+    ).join("\n");
+    const blob = new Blob([header+rows+"\n"], {type:"text/csv"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename || `resources_${ts.replace(/[:.]/g,"-")}.csv`;
+    a.click();
+  }
+};
+window.ResourceMonitor = ResourceMonitor;
+
+const METHOD = (new URLSearchParams(location.search).get("method") || "cv").toLowerCase();
+const WORKER_SRC = METHOD === "yolo" ? "./js/worker-yolo.js" : "./js/worker-cv.js";
+document.title = `OMR Batch Detect [${METHOD}]`;
+function initWorker(){
+  return new Promise((resolve, reject) => {
+    L(`[worker] loading ${WORKER_SRC}`);
+    worker = new Worker(WORKER_SRC + "?v=" + Date.now());
+    const onMsg = (e) => {
+      if (e.data && e.data.type === OMR_MSG.READY) {
+        worker.removeEventListener("message", onMsg);
+        L("[worker] READY");
+        resolve();
+      } else if (e.data && e.data.type === OMR_MSG.ERROR) {
+        worker.removeEventListener("message", onMsg);
+        reject(new Error(e.data.error));
+      }
+    };
+    worker.addEventListener("message", onMsg);
+    worker.postMessage({ type: OMR_MSG.INIT });
+  });
+}
+
+function processOne(url){
+  return new Promise(async (resolve) => {
+    let file;
+    try {
+      const r = await fetch(url);
+      if (!r.ok) return resolve({ url, error: "http_" + r.status });
+      const blob = await r.blob();
+      file = new File([blob], url.split("/").pop(), { type: blob.type || "image/jpeg" });
+    } catch (e) {
+      return resolve({ url, error: "fetch:" + e.message });
+    }
+    const timeout = setTimeout(() => {
+      worker.removeEventListener("message", handler);
+      resolve({ url, error: "timeout" });
+    }, 30000);
+    const handler = (e) => {
+      if (!e.data) return;
+      if (e.data.type === OMR_MSG.SHEET_RESULT) {
+        clearTimeout(timeout);
+        worker.removeEventListener("message", handler);
+        const p = e.data.payload;
+        const r = p.result || {};
+        resolve({
+          url,
+          status: p.status,
+          examCode: r.examCode || null,
+          mssv: r.mssv || null,
+          mssvValid: !!r.mssvValid,
+          keyValid: !!r.keyValid,
+          answered: r.answeredCount || 0,
+          suspicious: r.suspiciousCount || 0,
+          multi: r.multiMarkCount || 0,
+          cpp_ms: p.perf ? Math.round(p.perf.cpp_ms) : null
+        });
+      } else if (e.data.type === OMR_MSG.ERROR) {
+        clearTimeout(timeout);
+        worker.removeEventListener("message", handler);
+        resolve({ url, error: e.data.error });
+      }
+    };
+    worker.addEventListener("message", handler);
+    worker.postMessage({ type: OMR_MSG.PROCESS_SHEET, payload: { width: 0, height: 0, file, groundTruth: null } });
+  });
+}
+
+async function run(){
+  results = [];
+  const manifestUrl = document.getElementById("manifest").value;
+  L("[init] fetching manifest: " + manifestUrl);
+  const manifest = await (await fetch(manifestUrl)).json();
+  L("[init] " + manifest.length + " images. Initializing worker...");
+  await initWorker();
+  L("[run] starting; resource sampling enabled");
+  ResourceMonitor.start(`batch-detect ${METHOD} n=${manifest.length}`);
+  const t0 = performance.now();
+  for (let i = 0; i < manifest.length; i++) {
+    currentSheetIdx = i;
+    const url = manifest[i];
+    const r = await processOne(url);
+    results.push(r);
+    if (i % 5 === 0 || i === manifest.length - 1) {
+      document.getElementById("progress").textContent = ` ${i+1}/${manifest.length}`;
+    }
+    if (r.error) {
+      L(`[${i+1}/${manifest.length}] ERR  ${url} -> ${r.error}`);
+    } else {
+      L(`[${i+1}/${manifest.length}] ${r.status} examCode=${r.examCode || "-"} mssv=${r.mssv || "-"} answered=${r.answered} susp=${r.suspicious} ms=${r.cpp_ms} :: ${url.split("/").slice(-2).join("/")}`);
+    }
+    window.__BATCH_RESULTS__ = results;
+  }
+  ResourceMonitor.stop();
+  L(`[done] elapsed ${((performance.now()-t0)/1000).toFixed(1)}s; samples=${ResourceMonitor.samples.length}`);
+  window.__BATCH_DONE__ = true;
+  window.__RES_SAMPLES__ = ResourceMonitor.samples;
+}
+
+function download(){
+  const blob = new Blob([JSON.stringify(results, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "batch-results.json";
+  a.click();
+}
+
+document.getElementById("run").onclick = run;
+document.getElementById("download").onclick = download;
+window.__runBatch = run;
+window.__getResults = () => results;
+</script></body></html>

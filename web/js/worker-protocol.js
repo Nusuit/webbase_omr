@@ -7,7 +7,9 @@ const OMR_MSG = {
   FRAME_RESULT: "omr/frame-result",
   PROCESS_SHEET: "omr/process-sheet",
   SHEET_RESULT: "omr/sheet-result",
-  ERROR: "omr/error"
+  ERROR: "omr/error",
+  GET_WASM_HEAP: "omr/get-wasm-heap",
+  WASM_HEAP_RESULT: "omr/wasm-heap-result"
 };
 
 self.OMR_PROTOCOL_VERSION = OMR_PROTOCOL_VERSION;

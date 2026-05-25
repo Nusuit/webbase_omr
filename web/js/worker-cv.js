@@ -15,17 +15,21 @@ console.log(`[worker-cv] SIMD=${_hasSIMD} SAB=${_hasThreads} → /wasm/${_omrVar
 importScripts(
   "../js/ort.min.js",
   "./worker-protocol.js?v=20260328-yolo2",
-  "./wasm-bridge.js?v=20260328-yolo2"
+  "./wasm-bridge.js?v=20260523-ruleE"
 );
 
 // Try the best variant first; fall back to baseline if the file hasn't been built yet.
+// `?v=` busts Chrome's HTTP cache for the worker importScripts URL; without it, a
+// rebuilt omr.js + omr.wasm pair can be served from cache and silently keep the
+// old C++ behaviour. The worker URL itself is busted in app.js via Date.now().
 let _loadedVariant = _omrVariant;
+self._wasmCacheBust = "v=20260523f";
 try {
-  importScripts(`/wasm/${_omrVariant}.js`);
+  importScripts(`/wasm/${_omrVariant}.js?${self._wasmCacheBust}`);
 } catch (_e) {
   _loadedVariant = "omr";
   console.warn(`[worker-cv] /wasm/${_omrVariant}.js not found — falling back to omr.js`);
-  importScripts("/wasm/omr.js");
+  importScripts(`/wasm/omr.js?${self._wasmCacheBust}`);
 }
 
 const bridge = new WasmBridge();
@@ -335,6 +339,12 @@ self.onmessage = async (event) => {
     } catch (err) {
       self.postMessage({ type: OMR_MSG.ERROR, error: `Init failed: ${err.message}` });
     }
+    return;
+  }
+
+  if (msg.type === OMR_MSG.GET_WASM_HEAP) {
+    const bytes = (bridge && bridge.module && bridge.module.HEAPU8) ? bridge.module.HEAPU8.byteLength : 0;
+    self.postMessage({ type: OMR_MSG.WASM_HEAP_RESULT, bytes, seq: msg.seq });
     return;
   }
 

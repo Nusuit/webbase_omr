@@ -3,11 +3,13 @@
 OMR Benchmark Server — serves web/ with Cross-Origin isolation headers.
 
 Usage:
-    python web/server.py [port] [--https]
+    python web/server.py [port] [--https] [--dataset=PATH]
 
 Flags:
-    --https   Generate & use a self-signed TLS cert (requires OpenSSL in PATH).
-              Lets Chrome Mobile accept SharedArrayBuffer without ADB tunnel.
+    --https        Generate & use a self-signed TLS cert (requires OpenSSL in PATH).
+                   Lets Chrome Mobile accept SharedArrayBuffer without ADB tunnel.
+    --dataset=PATH Alias /dataset/* to PATH (default: ../Dataset_OMR_classified).
+                   Lets batch-detect.html fetch images from outside web/.
 
 Required headers (SharedArrayBuffer / crossOriginIsolated):
     Cross-Origin-Opener-Policy:   same-origin
@@ -23,6 +25,8 @@ import socket
 import ssl
 import subprocess
 import tempfile
+import urllib.parse
+import posixpath
 
 # ── Args ──────────────────────────────────────────────────────────────────────
 _args = sys.argv[1:]
@@ -32,8 +36,14 @@ for a in _args:
         PORT = int(a)
 USE_HTTPS = "--https" in _args
 
+WEB_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_DATASET = os.path.abspath(os.path.join(WEB_DIR, "..", "Dataset_OMR_classified"))
+DATASET_DIR = next((a.split("=", 1)[1] for a in _args if a.startswith("--dataset=")),
+                   DEFAULT_DATASET)
+DATASET_DIR = os.path.abspath(DATASET_DIR)
+
 # Serve from the directory where this script lives (web/)
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(WEB_DIR)
 
 
 # ── Request handler ───────────────────────────────────────────────────────────
@@ -48,6 +58,15 @@ class IsolatedHandler(http.server.SimpleHTTPRequestHandler):
         # Suppress 200s to reduce noise; show errors.
         if args and str(args[1]) != "200":
             super().log_message(fmt, *args)
+
+    def translate_path(self, path):
+        p = urllib.parse.urlsplit(path).path
+        p = urllib.parse.unquote(p)
+        p = posixpath.normpath(p)
+        if p.startswith("/dataset/") or p == "/dataset":
+            rel = p[len("/dataset"):].lstrip("/")
+            return os.path.join(DATASET_DIR, rel.replace("/", os.sep))
+        return super().translate_path(path)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -103,6 +122,7 @@ with socketserver.TCPServer(("", PORT), IsolatedHandler) as httpd:
     print(f"  PC local  :  {scheme}://localhost:{PORT}")
     print(f"  LAN mobile:  {scheme}://{lan_ip}:{PORT}")
     print(f"  Headers   :  COOP=same-origin  COEP=require-corp  CORP=cross-origin")
+    print(f"  Dataset   :  /dataset/  ->  {DATASET_DIR}")
     print(f"{'='*W}")
 
     if USE_HTTPS:
