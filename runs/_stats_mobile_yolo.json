@@ -1,0 +1,72 @@
+{
+  "dataset_1": {
+    "n": 48,
+    "avg_answered": 59.29,
+    "min_answered": 57,
+    "max_answered": 60,
+    "full_60": 20,
+    "ge_50": 48,
+    "lt_30": 0,
+    "marker_fail": 0,
+    "marker_fail_pct": 0.0,
+    "avg_suspicious": 15.23,
+    "avg_multi": 0.92,
+    "total_multi": 44
+  },
+  "dataset_2": {
+    "n": 47,
+    "avg_answered": 49.91,
+    "min_answered": 14,
+    "max_answered": 60,
+    "full_60": 1,
+    "ge_50": 33,
+    "lt_30": 2,
+    "marker_fail": 2,
+    "marker_fail_pct": 4.3,
+    "avg_suspicious": 23.55,
+    "avg_multi": 1.53,
+    "total_multi": 72
+  },
+  "dataset_3": {
+    "n": 35,
+    "avg_answered": 47.09,
+    "min_answered": 7,
+    "max_answered": 60,
+    "full_60": 3,
+    "ge_50": 23,
+    "lt_30": 5,
+    "marker_fail": 6,
+    "marker_fail_pct": 17.1,
+    "avg_suspicious": 27.06,
+    "avg_multi": 1.71,
+    "total_multi": 60
+  },
+  "dataset_4": {
+    "n": 45,
+    "avg_answered": 50.69,
+    "min_answered": 36,
+    "max_answered": 60,
+    "full_60": 6,
+    "ge_50": 24,
+    "lt_30": 0,
+    "marker_fail": 6,
+    "marker_fail_pct": 13.3,
+    "avg_suspicious": 28.02,
+    "avg_multi": 2.8,
+    "total_multi": 126
+  },
+  "dataset_5": {
+    "n": 4,
+    "avg_answered": 57.5,
+    "min_answered": 50,
+    "max_answered": 60,
+    "full_60": 3,
+    "ge_50": 4,
+    "lt_30": 0,
+    "marker_fail": 0,
+    "marker_fail_pct": 0.0,
+    "avg_suspicious": 29.0,
+    "avg_multi": 0.25,
+    "total_multi": 1
+  }
+}
