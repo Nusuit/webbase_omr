@@ -52,6 +52,7 @@ class IsolatedHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Cross-Origin-Opener-Policy", "same-origin")
         self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
         self.send_header("Cross-Origin-Resource-Policy", "cross-origin")
+        self.send_header("Access-Control-Allow-Origin", "*")
         super().end_headers()
 
     def log_message(self, fmt, *args):
