@@ -1,6 +1,7 @@
 """Drive Chrome (PC or Android) via CDP to run batch-detect.html on n=179 dataset.
 
-Exports BOTH the resource sample CSV AND the per-sheet batch results JSON.
+Exports the resource sample CSV, per-sheet batch results JSON, a system-level
+CSV with real CPU%/RAM from the Chrome renderer process, and a full log file.
 
 Prerequisites (PC):
   - launch Chrome with: chrome --remote-debugging-port=9222 --user-data-dir=...
@@ -12,14 +13,17 @@ Prerequisites (Mobile via USB):
   - laptop: python web/server.py 8080 --dataset=Dataset_OMR_classified
 
 Usage:
-  python scripts/drive_batch.py <platform> <method> [--cdp-port 9222] [--base-url http://localhost:8080]
+  python scripts/drive_batch.py <platform> <method> [--cdp-port 9222]
+      [--base-url http://localhost:8080] [--chrome-pid PID] [--log-file PATH]
 
-  platform: pc | mobile  (only affects output filenames)
+  platform: any string (e.g. pc, mobile, acer_nitro5)
   method:   cv | yolo
 
 Outputs:
-  runs/resources/<platform>/resources_<platform>_<method>_n179.csv
+  runs/resources/<platform>/resources_<platform>_<method>_n179.csv      (in-browser)
+  runs/resources/<platform>/resources_<platform>_<method>_n179_sys.csv  (system CPU%/RAM)
   runs/batch_results/<platform>_<method>_n179.json
+  logs/drive_<platform>_<method>.log   (if --log-file not specified, auto-named)
 """
 from __future__ import annotations
 
@@ -27,12 +31,138 @@ import argparse
 import json
 import os
 import sys
+import threading
 import time
 import urllib.request
 
 import websocket  # type: ignore
 
+try:
+    import psutil  # type: ignore
+    HAS_PSUTIL = True
+except ImportError:
+    HAS_PSUTIL = False
 
+
+# ── Tee logger ────────────────────────────────────────────────────────────────
+class _Tee:
+    """Write to both stdout and a log file simultaneously."""
+    def __init__(self, log_path: str):
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        self._file = open(log_path, "w", encoding="utf-8", buffering=1)
+        self._orig = sys.__stdout__
+
+    def write(self, s: str):
+        self._orig.write(s)
+        self._file.write(s)
+
+    def flush(self):
+        self._orig.flush()
+        self._file.flush()
+
+    def close(self):
+        self._file.close()
+        sys.stdout = self._orig
+
+
+# ── System monitor (psutil) ───────────────────────────────────────────────────
+class SysMonitor:
+    """Sample Chrome renderer process CPU% and RAM (RSS) via psutil.
+
+    CPU% here is per-process across all threads (main thread + Web Workers),
+    matching what Chrome Task Manager shows for the tab's renderer process.
+    Value > 100 is possible on multi-core (e.g. 400% = 4 cores saturated).
+    """
+
+    def __init__(self, interval_s: float = 1.0, chrome_pid: int | None = None):
+        self.interval = interval_s
+        self.chrome_pid = chrome_pid
+        self.samples: list[dict] = []
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._t0: float = 0.0
+        self._procs: list = []
+
+    def _find_procs(self) -> list:
+        """Locate Chrome renderer child processes of the given browser PID."""
+        procs = []
+        if self.chrome_pid:
+            try:
+                parent = psutil.Process(self.chrome_pid)
+                for p in parent.children(recursive=True):
+                    try:
+                        cmdline = " ".join(p.cmdline())
+                        if "--type=renderer" in cmdline and "--extension-process" not in cmdline:
+                            procs.append(p)
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        pass
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+        if not procs:
+            # Fallback: scan all Chrome processes
+            for p in psutil.process_iter(["pid", "name"]):
+                try:
+                    if p.name().lower() in ("chrome.exe", "chromium.exe", "chrome", "chromium"):
+                        cmdline = " ".join(p.cmdline())
+                        if "--type=renderer" in cmdline and "--extension-process" not in cmdline:
+                            procs.append(p)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+        return procs
+
+    def start(self):
+        if not HAS_PSUTIL:
+            print("[SysMonitor] psutil not installed; skipping system metrics.")
+            return
+        self._t0 = time.time()
+        self._procs = self._find_procs()
+        pids = [p.pid for p in self._procs]
+        print(f"[SysMonitor] Monitoring {len(self._procs)} renderer process(es): PIDs={pids}")
+        for p in self._procs:
+            try:
+                p.cpu_percent(interval=None)  # prime (first call always returns 0)
+            except Exception:
+                pass
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._run, daemon=True, name="SysMonitor")
+        self._thread.start()
+
+    def _run(self):
+        time.sleep(self.interval)  # let cpu_percent stabilize after priming
+        while not self._stop.is_set():
+            t_ms = (time.time() - self._t0) * 1000
+            cpu_total = 0.0
+            ram_mb = 0.0
+            alive = []
+            for p in self._procs:
+                try:
+                    cpu_total += p.cpu_percent(interval=None)
+                    ram_mb += p.memory_info().rss / (1024 * 1024)
+                    alive.append(p)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+            self._procs = alive
+            self.samples.append({"t_ms": t_ms, "cpu_pct": cpu_total, "ram_mb": ram_mb})
+            time.sleep(self.interval)
+
+    def stop(self):
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=5)
+
+    def write_csv(self, path: str) -> int:
+        if not self.samples:
+            print("[SysMonitor] No system samples collected.")
+            return 0
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            f.write("t_ms,cpu_pct,ram_mb\n")
+            for s in self.samples:
+                f.write(f"{s['t_ms']:.1f},{s['cpu_pct']:.2f},{s['ram_mb']:.2f}\n")
+        return len(self.samples)
+
+
+# ── CDP helpers ───────────────────────────────────────────────────────────────
 def cdp_pages(cdp_host: str):
     with urllib.request.urlopen(f"{cdp_host}/json") as r:
         return json.loads(r.read())
@@ -80,7 +210,6 @@ def pick_target(cdp_host: str, url_hint: str = ""):
         for p in pages:
             if url_hint in (p.get("url") or ""):
                 return p
-    # fallback: first non-extension page
     for p in pages:
         u = p.get("url") or ""
         if not u.startswith("chrome-extension://") and not u.startswith("chrome://"):
@@ -88,21 +217,40 @@ def pick_target(cdp_host: str, url_hint: str = ""):
     return pages[0]
 
 
+# ── Main ──────────────────────────────────────────────────────────────────────
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("platform", choices=["pc", "mobile"])
+    ap.add_argument("platform")
     ap.add_argument("method", choices=["cv", "yolo"])
     ap.add_argument("--cdp-port", type=int, default=9222)
     ap.add_argument("--cdp-host", default="http://localhost")
     ap.add_argument("--base-url", default="http://localhost:8080")
     ap.add_argument("--timeout", type=int, default=3600, help="batch run cap in seconds")
+    ap.add_argument("--chrome-pid", type=int, default=None,
+                    help="PID of Chrome browser process (for psutil CPU/RAM monitoring)")
+    ap.add_argument("--log-file", default=None,
+                    help="Path to log file. Defaults to logs/drive_<platform>_<method>.log")
     args = ap.parse_args()
+
+    # ── Setup log file (tee stdout) ──────────────────────────────────────────
+    log_path = args.log_file or os.path.join(
+        "logs", f"drive_{args.platform}_{args.method}.log"
+    )
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+    tee = _Tee(log_path)
+    sys.stdout = tee
+    print(f"[LOG] Writing to {log_path}")
+    print(f"[LOG] Started at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
     cdp_host = f"{args.cdp_host}:{args.cdp_port}"
     url = f"{args.base_url}/batch-detect.html?method={args.method}"
 
-    out_csv = os.path.join("runs", "resources", args.platform, f"resources_{args.platform}_{args.method}_n179.csv")
-    out_json = os.path.join("runs", "batch_results", f"{args.platform}_{args.method}_n179.json")
+    out_csv = os.path.join("runs", "resources", args.platform,
+                           f"resources_{args.platform}_{args.method}_n179.csv")
+    out_sys_csv = os.path.join("runs", "resources", args.platform,
+                               f"resources_{args.platform}_{args.method}_n179_sys.csv")
+    out_json = os.path.join("runs", "batch_results",
+                            f"{args.platform}_{args.method}_n179.json")
     os.makedirs(os.path.dirname(out_csv), exist_ok=True)
     os.makedirs(os.path.dirname(out_json), exist_ok=True)
 
@@ -110,7 +258,6 @@ def main() -> int:
     print(f"[INFO] CDP target: {target.get('id')} ({target.get('title', '')[:60]})")
     print(f"[INFO] Navigating to: {url}")
 
-    # Bring the chosen tab to foreground (Android Chrome will pause background tabs)
     try:
         with urllib.request.urlopen(f"{cdp_host}/json/activate/{target['id']}", timeout=5) as r:
             r.read()
@@ -118,14 +265,15 @@ def main() -> int:
         print(f"[WARN] activate failed (continuing): {e}")
 
     ws = WS(target["webSocketDebuggerUrl"])
+    sys_mon = SysMonitor(interval_s=1.0, chrome_pid=args.chrome_pid)
+
     try:
-        # short timeout for the initial handshake to fail fast if the tab is unresponsive
         ws.ws.settimeout(15)
         ws.call("Page.enable")
         ws.ws.settimeout(120)
         ws.call("Page.navigate", {"url": url})
 
-        print("[STEP] Waiting for window.__runBatch …")
+        print("[STEP] Waiting for window.__runBatch ...")
         deadline = time.time() + 60
         while time.time() < deadline:
             try:
@@ -138,12 +286,14 @@ def main() -> int:
             print("[ERR] window.__runBatch never appeared.")
             return 1
 
+        sys_mon.start()
         ws.js("window.__runBatch()")
-        print("[STEP] Batch started; polling progress …", flush=True)
+        print("[STEP] Batch started; polling progress ...", flush=True)
         start = time.time()
         last_seen = -1
         consecutive_errors = 0
         target_id = target["id"]
+
         while time.time() - start < args.timeout:
             try:
                 state = ws.js(
@@ -152,26 +302,24 @@ def main() -> int:
                 consecutive_errors = 0
             except Exception as e:
                 consecutive_errors += 1
-                print(f"  poll error #{consecutive_errors}: {e}; reconnecting …", flush=True)
-                # Re-establish WS to the same tab (Page.navigate state survives).
+                print(f"  poll error #{consecutive_errors}: {e}; reconnecting ...", flush=True)
                 try:
                     ws.close()
                 except Exception:
                     pass
                 time.sleep(3)
-                # Re-bring tab to foreground (mobile Chrome aggressively backgrounds tabs)
                 try:
                     with urllib.request.urlopen(f"{cdp_host}/json/activate/{target_id}", timeout=5) as r:
                         r.read()
                 except Exception:
                     pass
                 try:
-                    # find the target again — id should be stable
                     pages = cdp_pages(cdp_host)
                     new_target = next((p for p in pages if p.get("id") == target_id), None)
                     if not new_target:
-                        # fallback: any tab with batch-detect URL
-                        new_target = next((p for p in pages if "batch-detect.html" in (p.get("url") or "")), None)
+                        new_target = next(
+                            (p for p in pages if "batch-detect.html" in (p.get("url") or "")), None
+                        )
                     if new_target:
                         ws = WS(new_target["webSocketDebuggerUrl"])
                         ws.ws.settimeout(120)
@@ -183,9 +331,17 @@ def main() -> int:
                     print(f"[ERR] {consecutive_errors} consecutive errors, giving up.", flush=True)
                     return 1
                 continue
+
             n = state["n"]
             if n != last_seen:
-                print(f"  [t+{int(time.time()-start)}s] {n}/179", flush=True)
+                elapsed = int(time.time() - start)
+                # Show system metrics inline with progress
+                if sys_mon.samples:
+                    s = sys_mon.samples[-1]
+                    print(f"  [t+{elapsed}s] {n}/179  cpu={s['cpu_pct']:.1f}%  ram={s['ram_mb']:.0f}MB",
+                          flush=True)
+                else:
+                    print(f"  [t+{elapsed}s] {n}/179", flush=True)
                 last_seen = n
             if state["done"]:
                 break
@@ -194,6 +350,7 @@ def main() -> int:
             print(f"[ERR] Bench timed out after {args.timeout}s.")
             return 1
 
+        sys_mon.stop()
         elapsed = time.time() - start
         print(f"[INFO] Bench done in {elapsed:.1f}s")
 
@@ -205,9 +362,9 @@ def main() -> int:
         with open(out_json, "w", encoding="utf-8") as f:
             f.write(results_json)
         results = json.loads(results_json)
-        print(f"[OK] Wrote {len(results)} sheets → {out_json}")
+        print(f"[OK] Wrote {len(results)} sheets -> {out_json}")
 
-        # ── Export resource CSV ──────────────────────────────────────────────
+        # ── Export in-browser resource CSV ───────────────────────────────────
         csv_str = ws.js(
             """
             (() => {
@@ -225,11 +382,19 @@ def main() -> int:
         with open(out_csv, "w", encoding="utf-8", newline="") as f:
             f.write(csv_str)
         nrows = csv_str.count("\n") - 1
-        print(f"[OK] Wrote {nrows} resource samples → {out_csv}")
+        print(f"[OK] Wrote {nrows} in-browser samples -> {out_csv}")
 
+        # ── Export system CPU%/RAM CSV ────────────────────────────────────────
+        n_sys = sys_mon.write_csv(out_sys_csv)
+        print(f"[OK] Wrote {n_sys} system samples -> {out_sys_csv}")
+
+        print(f"[LOG] Finished at {time.strftime('%Y-%m-%d %H:%M:%S')}")
         return 0
+
     finally:
+        sys_mon.stop()
         ws.close()
+        tee.close()
 
 
 if __name__ == "__main__":

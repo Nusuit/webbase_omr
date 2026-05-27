@@ -245,12 +245,12 @@ def plot_csv(csv_path: Path):
     out_path = csv_path.parent / (csv_path.stem + ".png")
     if "cpu_percent" in fieldnames and "rss_mb" in fieldnames:
         meta = plot_android(rows, out_path)
-        print(f"  [OK] {csv_path.name}  →  {out_path.name}  (android schema)")
+        print(f"  [OK] {csv_path.name}  ->  {out_path.name}  (android schema)")
         print(f"       RSS peak={meta['rss_peak']:.0f} MB  native={meta['native_heap_peak']:.0f} MB  "
               f"CPU peak={meta['cpu_peak']:.0f}%")
     elif "cpu_load_proxy" in fieldnames or "wasm_heap_cv_mb" in fieldnames:
         meta = plot_web(rows, out_path)
-        print(f"  [OK] {csv_path.name}  →  {out_path.name}  (web schema)")
+        print(f"  [OK] {csv_path.name}  ->  {out_path.name}  (web schema)")
         print(f"       peak WASM CV={meta['wasm_cv_peak']:.0f} MB  "
               f"YOLO={meta['wasm_yolo_peak']:.0f} MB  lag peak={meta['lag_peak']:.0f}ms")
     else:

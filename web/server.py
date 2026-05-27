@@ -130,7 +130,7 @@ with socketserver.TCPServer(("", PORT), IsolatedHandler) as httpd:
         print(f"\n  [HTTPS MODE]")
         print(f"  1. Open {scheme}://{lan_ip}:{PORT} in Chrome Mobile")
         print(f"  2. Chrome will warn about the self-signed cert — tap")
-        print(f"     'Advanced' → 'Proceed' to trust it for this session.")
+        print(f"     'Advanced' -> 'Proceed' to trust it for this session.")
         print(f"  3. Verify in DevTools console:")
         print(f"     window.crossOriginIsolated  // expect true")
     else:
@@ -139,7 +139,7 @@ with socketserver.TCPServer(("", PORT), IsolatedHandler) as httpd:
         print(f"  [A] ADB reverse tunnel  (recommended — requires USB + ADB)")
         print(f"      > adb reverse tcp:{PORT} tcp:{PORT}")
         print(f"      Open http://localhost:{PORT} on Chrome Mobile.")
-        print(f"      Localhost is treated as secure → SAB enabled.")
+        print(f"      Localhost is treated as secure -> SAB enabled.")
         print()
         print(f"  [B] Chrome flag  (no USB needed)")
         print(f"      On the phone, open:")
