@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OMR Pipeline — Web vs Mobile Web vs Native (architecture &amp; latency)</title>
+<style>
+  :root{
+    --web:#2563eb; --weblite:#dbeafe;
+    --mob:#7c3aed; --moblite:#ede9fe;
+    --nat:#059669; --natlite:#d1fae5;
+    --ink:#111827; --mut:#6b7280; --line:#e5e7eb; --bg:#f9fafb;
+  }
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:var(--bg);color:var(--ink);line-height:1.45}
+  header{padding:24px 28px;background:#fff;border-bottom:1px solid var(--line)}
+  h1{margin:0 0 4px;font-size:21px}
+  .sub{color:var(--mut);font-size:13px}
+  .wrap{max-width:1240px;margin:0 auto;padding:24px 16px}
+  .cols{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media(max-width:880px){.cols{grid-template-columns:1fr}}
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+  .chead{padding:14px 16px;color:#fff}
+  .chead.w{background:var(--web)} .chead.m{background:var(--mob)} .chead.n{background:var(--nat)}
+  .chead h2{margin:0;font-size:16px} .chead .dev{font-size:12px;opacity:.9;margin-top:2px}
+  .chead .dep{display:inline-block;margin-top:8px;font-size:11px;background:rgba(255,255,255,.22);padding:2px 8px;border-radius:20px}
+  .stages{padding:12px;flex:1}
+  .stage{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;margin-bottom:6px;background:var(--bg);font-size:12.5px}
+  .stage .nm{flex:1}
+  .stage .be{color:var(--mut);font-size:11px}
+  .stage .ms{font-variant-numeric:tabular-nums;font-weight:600;min-width:54px;text-align:right}
+  .bar{height:8px;border-radius:6px;margin-top:3px}
+  .w .bar{background:var(--web)} .m .bar{background:var(--mob)} .n .bar{background:var(--nat)}
+  .stagewrap{margin-bottom:6px}
+  .arrow{text-align:center;color:var(--mut);font-size:12px;margin:1px 0}
+  .foot{padding:12px 16px;border-top:1px dashed var(--line);font-size:12.5px}
+  .foot b{font-size:15px}
+  .e2e{display:flex;justify-content:space-between;align-items:baseline}
+  .pill{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--bg);color:var(--mut)}
+  .acc{margin-top:6px;color:var(--mut)}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:13px;margin-top:8px}
+  th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--bg);font-weight:600}
+  td.dim{font-weight:600;background:#fcfcfd;width:190px}
+  .cw{color:var(--web)} .cm{color:var(--mob)} .cn{color:var(--nat)}
+  h3{margin:28px 0 8px;font-size:16px}
+  .notes{background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px 18px}
+  .notes li{margin:8px 0;font-size:13px}
+  .warn{color:#b45309;font-weight:600}
+  .ok{color:var(--nat);font-weight:600}
+  .legend{font-size:12px;color:var(--mut);margin:6px 2px 0}
+  code{background:#f3f4f6;padding:1px 5px;border-radius:5px;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>OMR Pipeline — Web vs Mobile Web vs Native Android</h1>
+  <div class="sub">Kiến trúc &amp; latency same-boundary (per sheet, N=179, dataset OMR). Số đo 2026-05-31 · Native = debug build (release nhanh hơn).</div>
+</header>
+
+<div class="wrap">
+
+  <div class="cols">
+
+    <!-- WEB LAPTOP -->
+    <div class="card">
+      <div class="chead w">
+        <h2>Web — Laptop</h2>
+        <div class="dev">ASUS Vivobook · Chrome · OpenCV.js (WASM)</div>
+        <span class="dep">Deploy: URL, không cài đặt</span>
+      </div>
+      <div class="stages w">
+        <div class="stagewrap stage"><span class="nm">JPEG decode<br><span class="be">createImageBitmap (browser)</span></span><span class="ms">31 ms</span></div>
+        <div class="arrow">▼</div>
+        <div class="stagewrap stage"><span class="nm">RGBA extract<br><span class="be">OffscreenCanvas getImageData</span></span><span class="ms">23 ms</span></div>
+        <div class="arrow">▼</div>
+        <div class="stagewrap stage" style="background:var(--weblite)"><span class="nm">CV compute<br><span class="be">WASM C++ · omr.wasm <b class="warn">BASELINE</b><br>warp + adaptiveThresh + density + z-score</span></span><span class="ms">559 ms</span></div>
+        <div class="bar" style="width:100%"></div>
+      </div>
+      <div class="foot">
+        <div class="e2e"><span>E2E / sheet</span><b>612 ms</b></div>
+        <div class="acc">Recognition vs GT: <span class="ok">~99%</span> (CV) · 1k sheets ≈ 10 phút</div>
+      </div>
+    </div>
+
+    <!-- WEB MOBILE -->
+    <div class="card">
+      <div class="chead m">
+        <h2>Web — Mobile</h2>
+        <div class="dev">Redmi Note 13 Pro+ · Android Chrome · OpenCV.js (WASM)</div>
+        <span class="dep">Deploy: URL, không cài đặt</span>
+      </div>
+      <div class="stages m">
+        <div class="stagewrap stage"><span class="nm">JPEG decode<br><span class="be">createImageBitmap (browser)</span></span><span class="ms">91 ms</span></div>
+        <div class="arrow">▼</div>
+        <div class="stagewrap stage"><span class="nm">RGBA extract<br><span class="be">OffscreenCanvas getImageData</span></span><span class="ms">93 ms</span></div>
+        <div class="arrow">▼</div>
+        <div class="stagewrap stage" style="background:var(--moblite)"><span class="nm">CV compute<br><span class="be">WASM C++ · omr.wasm <b class="warn">BASELINE</b><br>đơn luồng, (gần như) không SIMD</span></span><span class="ms">524 ms</span></div>
+        <div class="bar" style="width:100%"></div>
+      </div>
+      <div class="foot">
+        <div class="e2e"><span>E2E / sheet</span><b>708 ms</b></div>
+        <div class="acc">Recognition vs GT: <span class="ok">99.27%</span> (CV) · 1k sheets ≈ 12 phút</div>
+      </div>
+    </div>
+
+    <!-- NATIVE -->
+    <div class="card">
+      <div class="chead n">
+        <h2>Native — Android</h2>
+        <div class="dev">Redmi Note 13 Pro+ · Kotlin app · OpenCV ARM (JNI)</div>
+        <span class="dep">Deploy: cài APK</span>
+      </div>
+      <div class="stages n">
+        <div class="stagewrap stage"><span class="nm">JPEG decode<br><span class="be">BitmapFactory (Android)</span></span><span class="ms">24 ms</span></div>
+        <div class="arrow">▼</div>
+        <div class="stagewrap stage"><span class="nm">Bitmap → Mat<br><span class="be">OpenCV Utils</span></span><span class="ms">12 ms</span></div>
+        <div class="arrow">▼</div>
+        <div class="stagewrap stage" style="background:var(--natlite)"><span class="nm">Normalize (warp)<br><span class="be">OpenCV ARM native (NEON)</span></span><span class="ms">43 ms</span></div>
+        <div class="bar" style="width:52%"></div>
+        <div class="arrow">▼</div>
+        <div class="stagewrap stage" style="background:var(--natlite)"><span class="nm">Threshold + OMR read<br><span class="be">adaptiveThresh + density + z-score</span></span><span class="ms">24 ms</span></div>
+        <div class="bar" style="width:29%"></div>
+      </div>
+      <div class="foot">
+        <div class="e2e"><span>E2E / sheet <span class="pill">debug build</span></span><b>106 ms</b></div>
+        <div class="acc">Recognition vs GT: <span class="ok">99.6%</span> (ảnh sáng) · 87% tổng (corner nền tối)</div>
+      </div>
+    </div>
+
+  </div>
+  <div class="legend">Bar tỉ lệ theo ms của riêng stage CV trong mỗi cột. CV compute (cpp) là phần chênh chính: Web ~524-559 ms vs Native ~82 ms.</div>
+
+  <h3>So sánh same-boundary (cùng Redmi, cùng N=179)</h3>
+  <table>
+    <tr><th class="dim">Boundary</th><th>Web Mobile (Redmi)</th><th>Native (Redmi, debug)</th><th>Tỉ lệ Web / Native</th></tr>
+    <tr><td class="dim">CV compute (cpp)</td><td class="cm">524 ms</td><td class="cn">82 ms</td><td><b>6.35×</b></td></tr>
+    <tr><td class="dim">E2E (decode→answers, không tính debug-write)</td><td class="cm">708 ms</td><td class="cn">106 ms</td><td><b>6.66×</b></td></tr>
+  </table>
+  <div class="legend">6.66× là <b>lower bound</b>: Native là debug build (release nhanh hơn → tỉ lệ tăng). Bottleneck = WASM CV stage chạy baseline (không SIMD/threads).</div>
+
+  <h3>Ma trận khác biệt kỹ thuật</h3>
+  <table>
+    <tr><th class="dim">Chiều</th><th class="cw">Web Laptop</th><th class="cm">Web Mobile</th><th class="cn">Native Android</th></tr>
+    <tr><td class="dim">Thiết bị</td><td>ASUS Vivobook</td><td>Redmi Note 13 Pro+</td><td>Redmi Note 13 Pro+</td></tr>
+    <tr><td class="dim">Triển khai</td><td>Mở URL</td><td>Mở URL</td><td>Cài APK</td></tr>
+    <tr><td class="dim">Decode ảnh</td><td colspan="2">Browser <code>createImageBitmap</code> + canvas <code>getImageData</code></td><td>Android <code>BitmapFactory</code> + <code>bitmapToMat</code></td></tr>
+    <tr><td class="dim">CV runtime</td><td colspan="2">OpenCV.js <b>WASM</b> (omr.wasm baseline)</td><td>OpenCV <b>ARM native</b> qua JNI (NEON)</td></tr>
+    <tr><td class="dim">SIMD / đa luồng</td><td colspan="2"><span class="warn">Baseline: không threads, (gần như) không SIMD</span> — bản omr_simd/omr_threads chưa build</td><td>Native ARM + NEON; đơn luồng (CV)</td></tr>
+    <tr><td class="dim">YOLO runtime</td><td colspan="2">ONNX Runtime Web (WASM / WebGPU); ORT SIMD-threaded build <span class="ok">có sẵn</span></td><td>ONNX Runtime Android (CPU-1T/4T / NNAPI)</td></tr>
+    <tr><td class="dim">Pipeline</td><td colspan="2">Main thread → Web Worker → WASM; UI tách worker</td><td>Coroutine Dispatchers.Default; gọi JNI</td></tr>
+    <tr><td class="dim">CV compute / sheet</td><td class="cw">559 ms</td><td class="cm">524 ms</td><td class="cn">82 ms (debug)</td></tr>
+    <tr><td class="dim">E2E / sheet</td><td class="cw">612 ms</td><td class="cm">708 ms</td><td class="cn">106 ms (debug)</td></tr>
+    <tr><td class="dim">Recognition vs GT</td><td class="cw">~99%</td><td class="cm">99.27%</td><td class="cn">99.6% sáng / 87% tổng</td></tr>
+    <tr><td class="dim">Resource instrument</td><td class="cw">psutil (renderer)</td><td class="cm">in-page proxy</td><td class="cn">adb / Android sampler</td></tr>
+    <tr><td class="dim">Ưu điểm</td><td colspan="2">URL, không cài, cùng code path đa thiết bị, privacy on-device</td><td>Latency thấp, truy cập NNAPI/OpenCV native</td></tr>
+    <tr><td class="dim">Nhược điểm</td><td colspan="2">Browser sandbox, WASM chậm, hạn chế GPU/CV backend</td><td>Phải cài đặt, maintain theo platform</td></tr>
+  </table>
+
+  <h3>Phát hiện chính &amp; hướng tối ưu</h3>
+  <ul class="notes">
+    <li><span class="warn">Web CV đang chạy WASM baseline.</span> Worker chọn <code>omr_threads</code> (SIMD+đa luồng, server đã bật COOP/COEP) nhưng <code>omr_simd.wasm</code>/<code>omr_threads.wasm</code> <b>chưa build</b> → <code>importScripts</code> 404 → fallback <code>omr.wasm</code>. Tức 524 ms cpp đơn luồng, phí 8 nhân Redmi.</li>
+    <li><b>Lever lớn nhất:</b> build <code>omr_threads</code> (SIMD128 + pthreads). Kỳ vọng cpp <b>2-6×</b> nhanh hơn → E2E 708 → ~250-400 ms → tỉ lệ Web/Native 6.66× xuống <b>~2-3×</b>. Infra build đã có (<code>scripts/build_opencv_variants.sh</code>), cần Emscripten.</li>
+    <li><b>Lever phụ:</b> giảm canonical resolution (warp 1700×2400 = 4M px → nhỏ hơn) — tuyến tính theo pixel, nhưng phải test accuracy.</li>
+    <li><b>Boundary đã sửa:</b> trước đây Web đo <code>cpp_ms</code> (worker compute) còn Native đo <code>e2e_ms</code> (file-based) — lệch. Nay cả hai đo cùng boundary decode→answers, ratio 6.66× là so sánh công bằng same-device.</li>
+    <li><span class="ok">Recognition đã parity</span> trên ảnh đủ sáng (Web ~99%, Native 99.6%). Native 87% tổng bị kéo bởi 25 ảnh nền tối (corner detection chọn nhầm marker) — vấn đề localization riêng, không phải đọc bubble.</li>
+    <li><b>Caveat đo:</b> Native = debug build (release nhanh hơn). YOLO E2E chưa đo (Native YOLO pipeline còn cần fix raw-handoff trước).</li>
+  </ul>
+
+</div>
+</body>
+</html>

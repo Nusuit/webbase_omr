@@ -2,7 +2,7 @@
 
 Same logic as drive_batch.py; adds 'mac' as a platform choice so output files
 land in runs/batch_results/mac_<method>_n179.json and
-runs/resources/mac/resources_mac_<method>_n179.csv without touching pc/mobile results.
+runs/resources/mac_air_m1/resources_mac_<method>_n179.csv without touching pc/mobile results.
 
 Usage:
   python scripts/drive_batch_mac.py <platform> <method> [--timeout 2400]

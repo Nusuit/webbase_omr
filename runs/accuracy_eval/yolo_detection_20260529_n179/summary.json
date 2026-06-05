@@ -1,0 +1,104 @@
+{
+  "created_utc": "2026-05-28T17:33:48.604811+00:00",
+  "source": "runs\\batch_results\\redmi_note13_pro_plus_20260529_yolo_raw_n179.json",
+  "n": 179,
+  "yolo_detected_true": 154,
+  "yolo_detected_false_or_missing": 25,
+  "yolo_detected_rate": 0.8603351955307262,
+  "yolo_chosen_path_raw": 179,
+  "yolo_chosen_path_raw_rate": 1.0,
+  "yolo_fallback_none": 179,
+  "yolo_fallback_used_true": 0,
+  "chosen_path_counts": {
+    "raw": 179
+  },
+  "fallback_counts": {
+    "none": 179
+  },
+  "mask_mode_counts": {
+    "raw": 179
+  },
+  "miss_examples_first10": [
+    {
+      "index": 49,
+      "url": "/dataset/dataset_2/B%C3%A0i%20l%C3%A0m/z7860194615891_6c7a947b69e711bbbf2184b0521a53d8.jpg",
+      "yolo_detected": false,
+      "yolo_fallback": "none",
+      "yolo_chosen_path": "raw",
+      "yolo_fallback_used": false
+    },
+    {
+      "index": 50,
+      "url": "/dataset/dataset_2/B%C3%A0i%20l%C3%A0m/z7860194615920_371055ed96fa209db7f1b3e40c913e12.jpg",
+      "yolo_detected": false,
+      "yolo_fallback": "none",
+      "yolo_chosen_path": "raw",
+      "yolo_fallback_used": false
+    },
+    {
+      "index": 54,
+      "url": "/dataset/dataset_2/B%C3%A0i%20l%C3%A0m/z7860194647990_b80d189e0e775900d5ddb4a17e0bf479.jpg",
+      "yolo_detected": false,
+      "yolo_fallback": "none",
+      "yolo_chosen_path": "raw",
+      "yolo_fallback_used": false
+    },
+    {
+      "index": 55,
+      "url": "/dataset/dataset_2/B%C3%A0i%20l%C3%A0m/z7860194662074_1cbeaf415557dd13bc0d49f3bf121f8c.jpg",
+      "yolo_detected": false,
+      "yolo_fallback": "none",
+      "yolo_chosen_path": "raw",
+      "yolo_fallback_used": false
+    },
+    {
+      "index": 56,
+      "url": "/dataset/dataset_2/B%C3%A0i%20l%C3%A0m/z7860194662187_2fa3fdedb7d0f9bb5d2abc43692c92bf.jpg",
+      "yolo_detected": false,
+      "yolo_fallback": "none",
+      "yolo_chosen_path": "raw",
+      "yolo_fallback_used": false
+    },
+    {
+      "index": 62,
+      "url": "/dataset/dataset_2/B%C3%A0i%20l%C3%A0m/z7860194663224_a155cf0f212ba8aadfeb34850a3390be.jpg",
+      "yolo_detected": false,
+      "yolo_fallback": "none",
+      "yolo_chosen_path": "raw",
+      "yolo_fallback_used": false
+    },
+    {
+      "index": 64,
+      "url": "/dataset/dataset_2/B%C3%A0i%20l%C3%A0m/z7860194688896_cec03033a92119fb5cb2ba52bbb90e5d.jpg",
+      "yolo_detected": false,
+      "yolo_fallback": "none",
+      "yolo_chosen_path": "raw",
+      "yolo_fallback_used": false
+    },
+    {
+      "index": 68,
+      "url": "/dataset/dataset_2/B%C3%A0i%20l%C3%A0m/z7860194703605_89f55005c3c55f36d55a34db74210231.jpg",
+      "yolo_detected": false,
+      "yolo_fallback": "none",
+      "yolo_chosen_path": "raw",
+      "yolo_fallback_used": false
+    },
+    {
+      "index": 89,
+      "url": "/dataset/dataset_2/B%C3%A0i%20l%C3%A0m/z7860194756479_04c32aed3a21a7500915bfc8a085c7b9.jpg",
+      "yolo_detected": false,
+      "yolo_fallback": "none",
+      "yolo_chosen_path": "raw",
+      "yolo_fallback_used": false
+    },
+    {
+      "index": 98,
+      "url": "/dataset/dataset_3/B%C3%A0i%20l%C3%A0m/z7860224951725_c701a3049ba1e152c55946a86c99f047.jpg",
+      "yolo_detected": false,
+      "yolo_fallback": "none",
+      "yolo_chosen_path": "raw",
+      "yolo_fallback_used": false
+    }
+  ],
+  "miss_count": 25
+}

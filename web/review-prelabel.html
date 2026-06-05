@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>OMR Review Prelabel</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: Consolas, monospace;
+      background: #0f172a;
+      color: #e5e7eb;
+    }
+    #log {
+      white-space: pre-wrap;
+      font-size: 12px;
+      line-height: 1.45;
+      max-height: 92vh;
+      overflow: auto;
+      background: #111827;
+      border: 1px solid #334155;
+      padding: 12px;
+    }
+  </style>
+</head>
+<body>
+<h2>OMR Review Prelabel</h2>
+<div id="log">initializing...</div>
+<script src="./js/worker-protocol.js"></script>
+<script>
+const logEl = document.getElementById("log");
+function log(line) {
+  logEl.textContent += "\n" + line;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+const ANSWER_LABELS = ["A", "B", "C", "D", "E"];
+const PREVIEW_BLOCKS = [
+  { name: "MSSV", qOffset: -1, cols: 6, rows: 10, x1: 78, y1: 860, x2: 456, y2: 1530 },
+  { name: "KEY", qOffset: -2, cols: 3, rows: 10, x1: 519, y1: 860, x2: 711, y2: 1530 },
+  { name: "Q1-10", qOffset: 0, cols: 5, rows: 10, x1: 880, y1: 860, x2: 1183, y2: 1530 },
+  { name: "Q11-20", qOffset: 10, cols: 5, rows: 10, x1: 1249, y1: 856, x2: 1563, y2: 1527 },
+  { name: "Q21-30", qOffset: 20, cols: 5, rows: 10, x1: 140, y1: 1604, x2: 447, y2: 2311 },
+  { name: "Q31-40", qOffset: 30, cols: 5, rows: 10, x1: 515, y1: 1597, x2: 819, y2: 2303 },
+  { name: "Q41-50", qOffset: 40, cols: 5, rows: 10, x1: 882, y1: 1593, x2: 1194, y2: 2311 },
+  { name: "Q51-60", qOffset: 50, cols: 5, rows: 10, x1: 1251, y1: 1585, x2: 1568, y2: 2292 }
+];
+
+let worker = null;
+let workerReady = false;
+
+function workerSource() {
+  const params = new URLSearchParams(location.search);
+  if (params.get("method") !== "yolo") return "./js/worker-preview-cv.js";
+  const workerParams = new URLSearchParams();
+  ["pad", "mask", "fallback"].forEach((key) => {
+    if (params.has(key)) workerParams.set(key, params.get(key));
+  });
+  const query = workerParams.toString();
+  return "./js/worker-yolo.js" + (query ? `?${query}` : "");
+}
+
+function initWorker() {
+  return new Promise((resolve, reject) => {
+    const src = workerSource();
+    log("loading worker: " + src);
+    worker = new Worker(src + (src.includes("?") ? "&" : "?") + "v=review-" + Date.now());
+    const handler = (event) => {
+      const msg = event.data || {};
+      if (msg.type === OMR_MSG.READY) {
+        worker.removeEventListener("message", handler);
+        workerReady = true;
+        log("worker ready");
+        resolve();
+      } else if (msg.type === OMR_MSG.ERROR) {
+        worker.removeEventListener("message", handler);
+        reject(new Error(msg.error || "worker init failed"));
+      }
+    };
+    worker.addEventListener("message", handler);
+    worker.postMessage({ type: OMR_MSG.INIT });
+  });
+}
+
+function processUrl(url) {
+  return new Promise(async (resolve, reject) => {
+    if (!workerReady) {
+      reject(new Error("worker not ready"));
+      return;
+    }
+
+    let file;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      const blob = await response.blob();
+      const name = decodeURIComponent(url.split("/").pop() || "sheet.jpg");
+      file = new File([blob], name, { type: blob.type || "image/jpeg" });
+    } catch (error) {
+      reject(new Error("fetch failed: " + error.message));
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      worker.removeEventListener("message", handler);
+      reject(new Error("timeout"));
+    }, 45000);
+
+    const handler = (event) => {
+      const msg = event.data || {};
+      if (msg.type === OMR_MSG.SHEET_RESULT) {
+        clearTimeout(timeout);
+        worker.removeEventListener("message", handler);
+        resolve(msg.payload);
+      } else if (msg.type === OMR_MSG.ERROR) {
+        clearTimeout(timeout);
+        worker.removeEventListener("message", handler);
+        reject(new Error(msg.error || "worker error"));
+      }
+    };
+
+    worker.addEventListener("message", handler);
+    worker.postMessage({
+      type: OMR_MSG.PROCESS_SHEET,
+      payload: { width: 0, height: 0, file, groundTruth: null }
+    });
+  });
+}
+
+function answerText(answer) {
+  if (!answer || !answer.selected || !answer.selected.length) return "";
+  return answer.selected.join("+");
+}
+
+function getQuestionBubbleCenter(question, choice) {
+  const block = PREVIEW_BLOCKS.find((item) =>
+    item.qOffset >= 0 && question >= item.qOffset + 1 && question <= item.qOffset + 10
+  );
+  if (!block) return null;
+  const row = question - block.qOffset - 1;
+  const cellW = (block.x2 - block.x1) / block.cols;
+  const cellH = (block.y2 - block.y1) / block.rows;
+  return {
+    x: Math.round(block.x1 + (choice + 0.5) * cellW),
+    y: Math.round(block.y1 + (row + 0.5) * cellH)
+  };
+}
+
+function drawBlockOutlines(ctx, scale) {
+  ctx.lineWidth = Math.max(1, 2 * scale);
+  ctx.font = `${Math.max(11, Math.round(22 * scale))}px Arial`;
+  ctx.textBaseline = "top";
+  PREVIEW_BLOCKS.forEach((block) => {
+    const isMeta = block.qOffset < 0;
+    const x = block.x1 * scale;
+    const y = block.y1 * scale;
+    const w = (block.x2 - block.x1) * scale;
+    const h = (block.y2 - block.y1) * scale;
+    ctx.strokeStyle = isMeta ? "#2563eb" : "#f59e0b";
+    ctx.fillStyle = isMeta ? "rgba(37,99,235,0.08)" : "rgba(245,158,11,0.07)";
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = isMeta ? "#1d4ed8" : "#b45309";
+    ctx.fillText(block.name, x + 4, Math.max(4, y - 22 * scale));
+  });
+}
+
+function drawBubbleOverlay(ctx, result, scale) {
+  const r = Math.max(4, 14 * scale);
+  result.bubbles.forEach((bubble) => {
+    const center = getQuestionBubbleCenter(bubble.question, bubble.choice);
+    if (!center) return;
+    const x = center.x * scale;
+    const y = center.y * scale;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    if (bubble.detected) {
+      ctx.fillStyle = "rgba(22,163,74,0.32)";
+      ctx.strokeStyle = bubble.suspicious ? "#eab308" : "#16a34a";
+      ctx.lineWidth = bubble.suspicious ? 3 : 2;
+    } else if (bubble.suspicious) {
+      ctx.fillStyle = "rgba(234,179,8,0.18)";
+      ctx.strokeStyle = "#eab308";
+      ctx.lineWidth = 2;
+    } else {
+      ctx.fillStyle = "rgba(148,163,184,0.03)";
+      ctx.strokeStyle = "rgba(148,163,184,0.28)";
+      ctx.lineWidth = 1;
+    }
+    ctx.fill();
+    ctx.stroke();
+  });
+
+  result.answers.forEach((answer) => {
+    if (!answer.selected || answer.selected.length <= 1) return;
+    const firstChoice = Math.max(0, ANSWER_LABELS.indexOf(answer.selected[0]));
+    const center = getQuestionBubbleCenter(answer.q, firstChoice);
+    if (!center) return;
+    ctx.fillStyle = "#dc2626";
+    ctx.font = `700 ${Math.max(12, Math.round(22 * scale))}px Arial`;
+    ctx.fillText(`Q${String(answer.q).padStart(2, "0")} multi`, center.x * scale + r + 3, center.y * scale - r);
+  });
+}
+
+function groupedAnswers(result, start, end) {
+  const parts = [];
+  for (let q = start; q <= end; q += 1) {
+    const answer = result.answers[q - 1];
+    parts.push(`${String(q).padStart(2, "0")}:${answerText(answer) || "-"}`);
+  }
+  return parts.join("  ");
+}
+
+function drawTextPanel(ctx, x, width, height, meta, result, perf) {
+  ctx.fillStyle = "#f8fafc";
+  ctx.fillRect(x, 0, width, height);
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "700 22px Arial";
+  ctx.fillText("OMR review pre-label", x + 24, 36);
+  ctx.font = "14px Arial";
+  ctx.fillText("Green = detected answer bubble; yellow = suspicious; red text = multi-mark", x + 24, 62);
+
+  const rows = [
+    ["Dataset", meta.dataset],
+    ["Image", meta.image],
+    ["Exam code", result.examCode || "-"],
+    ["MSSV", result.mssv || "-"],
+    ["Answered", `${result.answeredCount}/60`],
+    ["Suspicious", String(result.suspiciousCount)],
+    ["Multi-mark", String(result.multiMarkCount)],
+    ["Status", String(result.status)],
+    ["C++ ms", perf && Number.isFinite(perf.cpp_ms) ? perf.cpp_ms.toFixed(1) : "-"]
+  ];
+
+  let y = 104;
+  rows.forEach(([key, value]) => {
+    ctx.fillStyle = "#475569";
+    ctx.font = "700 13px Arial";
+    ctx.fillText(key, x + 24, y);
+    ctx.fillStyle = "#0f172a";
+    ctx.font = "14px Arial";
+    ctx.fillText(String(value), x + 124, y);
+    y += 24;
+  });
+
+  y += 12;
+  ctx.font = "700 15px Arial";
+  ctx.fillStyle = "#0f172a";
+  ctx.fillText("Auto answers", x + 24, y);
+  y += 26;
+  ctx.font = "13px Consolas, monospace";
+  [1, 11, 21, 31, 41, 51].forEach((start) => {
+    const text = groupedAnswers(result, start, start + 9);
+    wrapText(ctx, text, x + 24, y, width - 48, 18);
+    y += 40;
+  });
+
+  ctx.fillStyle = "#334155";
+  ctx.font = "12px Arial";
+  wrapText(ctx, "This is not ground truth until a human verifies or corrects the CSV row.", x + 24, height - 54, width - 48, 16);
+}
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  const words = text.split(" ");
+  let line = "";
+  for (const word of words) {
+    const testLine = line ? line + " " + word : word;
+    if (ctx.measureText(testLine).width > maxWidth && line) {
+      ctx.fillText(line, x, y);
+      line = word;
+      y += lineHeight;
+    } else {
+      line = testLine;
+    }
+  }
+  if (line) ctx.fillText(line, x, y);
+}
+
+function parseMeta(url) {
+  const decoded = decodeURIComponent(url);
+  const match = decoded.match(/\/dataset\/([^/]+)\/[^/]+\/([^/]+)$/);
+  return {
+    dataset: match ? match[1] : "",
+    image: match ? match[2] : decoded.split("/").pop(),
+    decodedUrl: decoded
+  };
+}
+
+function makePreview(payload, url) {
+  const result = payload.result || {};
+  const perf = payload.perf || {};
+  const meta = parseMeta(url);
+  const src = payload.warpedPreview || payload.preview;
+  const sourceWidth = payload.previewWidth || 1700;
+  const sourceHeight = payload.previewHeight || 2400;
+
+  const targetHeight = 1200;
+  const scale = targetHeight / sourceHeight;
+  const imageWidth = Math.round(sourceWidth * scale);
+  const panelWidth = 520;
+  const canvas = document.createElement("canvas");
+  canvas.width = imageWidth + panelWidth;
+  canvas.height = targetHeight;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (src) {
+    const imgCanvas = document.createElement("canvas");
+    imgCanvas.width = sourceWidth;
+    imgCanvas.height = sourceHeight;
+    imgCanvas.getContext("2d").putImageData(
+      new ImageData(new Uint8ClampedArray(src), sourceWidth, sourceHeight),
+      0,
+      0
+    );
+    ctx.drawImage(imgCanvas, 0, 0, imageWidth, targetHeight);
+    drawBlockOutlines(ctx, scale);
+    drawBubbleOverlay(ctx, result, scale);
+  } else {
+    ctx.fillStyle = "#f1f5f9";
+    ctx.fillRect(0, 0, imageWidth, targetHeight);
+    ctx.fillStyle = "#475569";
+    ctx.font = "24px Arial";
+    ctx.fillText("No preview buffer", 40, 80);
+  }
+
+  drawTextPanel(ctx, imageWidth, panelWidth, targetHeight, meta, result, perf);
+  return canvas.toDataURL("image/jpeg", 0.86);
+}
+
+function resultToRow(payload, url, previewFile) {
+  const result = payload.result || {};
+  const perf = payload.perf || {};
+  const meta = parseMeta(url);
+  const row = {
+    verified: "",
+    needs_fix: "",
+    expected_questions: "60",
+    sheet_id: `${meta.dataset}/${meta.image}`,
+    dataset: meta.dataset,
+    image: meta.image,
+    source_url: meta.decodedUrl,
+    preview_path: previewFile,
+    exam_code_auto: result.examCode || "",
+    mssv_auto: result.mssv || "",
+    mssv_valid_auto: result.mssvValid ? "1" : "0",
+    key_valid_auto: result.keyValid ? "1" : "0",
+    answered_auto: String(result.answeredCount ?? ""),
+    suspicious_auto: String(result.suspiciousCount ?? ""),
+    multi_auto: String(result.multiMarkCount ?? ""),
+    status_auto: String(result.status ?? ""),
+    cpp_ms: perf && Number.isFinite(perf.cpp_ms) ? perf.cpp_ms.toFixed(1) : "",
+    worker_total_ms: perf && Number.isFinite(perf.worker_total_ms) ? perf.worker_total_ms.toFixed(1) : "",
+    yolo_ms: perf && Number.isFinite(perf.yolo_ms) ? perf.yolo_ms.toFixed(1) : "",
+    yolo_detected: perf && perf.yolo_detected ? "1" : "0",
+    yolo_pad_pct: perf && Number.isFinite(perf.yolo_pad_pct) ? String(perf.yolo_pad_pct) : "",
+    yolo_mask_mode: perf && perf.yolo_mask_mode ? String(perf.yolo_mask_mode) : "",
+    yolo_fallback: perf && perf.yolo_fallback ? String(perf.yolo_fallback) : "",
+    yolo_chosen_path: perf && perf.chosen_path ? String(perf.chosen_path) : "",
+    yolo_fallback_used: perf && perf.fallback_used ? "1" : "0",
+    yolo_chosen_score: perf && Number.isFinite(perf.chosen_score) ? perf.chosen_score.toFixed(3) : "",
+    yolo_fallback_score: perf && Number.isFinite(perf.fallback_score) ? perf.fallback_score.toFixed(3) : "",
+    notes: ""
+  };
+
+  for (let i = 1; i <= 60; i += 1) {
+    const key = `q${String(i).padStart(2, "0")}`;
+    const value = answerText(result.answers ? result.answers[i - 1] : null);
+    row[`auto_${key}`] = value;
+    row[`gt_${key}`] = value;
+  }
+  return row;
+}
+
+window.__processReviewUrl = async function(url, previewFile) {
+  const payload = await processUrl(url);
+  const previewDataUrl = makePreview(payload, url);
+  const row = resultToRow(payload, url, previewFile || "");
+  return { row, previewDataUrl };
+};
+
+initWorker()
+  .then(() => {
+    window.__reviewReady = true;
+    log("ready for CDP driver");
+  })
+  .catch((error) => {
+    window.__reviewError = error.message;
+    log("ERROR: " + error.message);
+  });
+</script>
+</body>
+</html>

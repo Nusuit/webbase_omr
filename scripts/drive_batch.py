@@ -34,6 +34,7 @@ import sys
 import threading
 import time
 import urllib.request
+import urllib.parse
 
 import websocket  # type: ignore
 
@@ -230,6 +231,14 @@ def main() -> int:
                     help="PID of Chrome browser process (for psutil CPU/RAM monitoring)")
     ap.add_argument("--log-file", default=None,
                     help="Path to log file. Defaults to logs/drive_<platform>_<method>.log")
+    ap.add_argument("--yolo-pad", type=float, default=None,
+                    help="Forward YOLO bbox expansion fraction to worker-yolo.js")
+    ap.add_argument("--yolo-mask", choices=["mask", "raw"], default=None,
+                    help="Forward YOLO preprocessing mode to worker-yolo.js")
+    ap.add_argument("--yolo-fallback", choices=["none", "bestdiag"], default=None,
+                    help="Forward YOLO diagnostic fallback mode to worker-yolo.js")
+    ap.add_argument("--output-tag", default=None,
+                    help="Optional output stem suffix instead of <platform>_<method>_n179")
     args = ap.parse_args()
 
     # ── Setup log file (tee stdout) ──────────────────────────────────────────
@@ -243,14 +252,20 @@ def main() -> int:
     print(f"[LOG] Started at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
     cdp_host = f"{args.cdp_host}:{args.cdp_port}"
-    url = f"{args.base_url}/batch-detect.html?method={args.method}"
+    page_params = {"method": args.method}
+    if args.method == "yolo":
+        if args.yolo_pad is not None:
+            page_params["pad"] = str(args.yolo_pad)
+        if args.yolo_mask is not None:
+            page_params["mask"] = args.yolo_mask
+        if args.yolo_fallback is not None:
+            page_params["fallback"] = args.yolo_fallback
+    url = f"{args.base_url}/batch-detect.html?{urllib.parse.urlencode(page_params)}"
 
-    out_csv = os.path.join("runs", "resources", args.platform,
-                           f"resources_{args.platform}_{args.method}_n179.csv")
-    out_sys_csv = os.path.join("runs", "resources", args.platform,
-                               f"resources_{args.platform}_{args.method}_n179_sys.csv")
-    out_json = os.path.join("runs", "batch_results",
-                            f"{args.platform}_{args.method}_n179.json")
+    stem = args.output_tag or f"{args.platform}_{args.method}_n179"
+    out_csv = os.path.join("runs", "resources", args.platform, f"resources_{stem}.csv")
+    out_sys_csv = os.path.join("runs", "resources", args.platform, f"resources_{stem}_sys.csv")
+    out_json = os.path.join("runs", "batch_results", f"{stem}.json")
     os.makedirs(os.path.dirname(out_csv), exist_ok=True)
     os.makedirs(os.path.dirname(out_json), exist_ok=True)
 

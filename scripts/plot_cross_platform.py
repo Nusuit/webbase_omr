@@ -2,18 +2,16 @@
 Cross-platform unified chart: 3 platforms overlaid on SAME metric.
 
 Inputs (hard-coded paths):
-  runs/resources/desktop/resources_desktop_cv_n179.csv  (web schema)
-  runs/resources/mobile/resources_mobile_cv_n179.csv    (web schema)
-  runs/resources/native/resources_native_yolo_n179.csv  (android schema)
+  runs/resources/PC_gaming/resources_PC_gaming_cv_n179.csv
+  runs/resources/redmi_note13_pro_plus/resources_redmi_note13_pro_plus_cv_n179.csv
+  runs/resources/redmi_note13_pro_plus_native/resources_redmi_note13_pro_plus_native_cv_n179.csv
 
 Output:
   runs/resources/chart_cross_platform.png
+  runs/resources/chart_cross_platform.pdf
 
-Dataset = 179 sheets across all platforms.
-
-TODO: re-bench Mobile (Chrome on Android via adb tunnel) and Native Android
-on the n=179 dataset. Until those CSVs exist, this script will fail on those
-reads. See header comment in scripts/plot_per_sheet.py for the run order.
+Dataset = 179 sheets across all platforms. This chart uses the Traditional
+CV pipeline for all three traces and current PC_gaming/Redmi artifacts.
 
 Two panels:
   (a) Process memory (MB) over time — 3 lines
@@ -31,19 +29,19 @@ from _plot_utils import fnum, read_csv as read
 PLATFORMS = [
     {
         "name":   "Desktop Web (Chrome WebGPU)",
-        "csv":    "runs/resources/desktop/resources_desktop_cv_n179.csv",
+        "csv":    "runs/resources/PC_gaming/resources_PC_gaming_cv_n179.csv",
         "schema": "web",
         "color":  "#3b82f6",
     },
     {
         "name":   "Mobile Web (Chrome Android WebGPU)",
-        "csv":    "runs/resources/mobile/resources_mobile_cv_n179.csv",
+        "csv":    "runs/resources/redmi_note13_pro_plus/resources_redmi_note13_pro_plus_cv_n179.csv",
         "schema": "web",
         "color":  "#10b981",
     },
     {
-        "name":   "Native Android (YOLO 3-pass, real /proc)",
-        "csv":    "runs/resources/native/resources_native_yolo_n179.csv",
+        "name":   "Native Android (CV, real /proc)",
+        "csv":    "runs/resources/redmi_note13_pro_plus_native/resources_redmi_note13_pro_plus_native_cv_n179.csv",
         "schema": "android",
         "color":  "#ef4444",
     },
@@ -93,9 +91,8 @@ def main():
     for s in series:
         axM.plot(s["t"], s["mem"], label=s["name"], color=s["color"], linewidth=1.6)
     axM.set_ylabel("Process memory (MB)")
-    axM.set_title("Memory usage over time — same metric across 3 platforms\n"
+    axM.set_title("Memory usage over time — CV pipeline, harmonised plotting units\n"
                   "Web: JS heap + WASM heap (both workers)    Native: RSS from /proc/self/status")
-    axM.legend(loc="upper left", fontsize=10)
     axM.grid(True, alpha=0.3)
 
     # ── Panel B: CPU ──────────────────────────────────────────────────
@@ -105,10 +102,22 @@ def main():
                 label="1 core fully saturated (100%)")
     axC.set_ylabel("CPU usage (% of one core — can exceed 100% on multi-core)")
     axC.set_xlabel("Time since benchmark start (seconds)")
-    axC.set_title("Process CPU utilisation over time — same metric across 3 platforms\n"
+    axC.set_title("Process CPU utilisation over time — CV pipeline, harmonised plotting units\n"
                   "Web: main-thread saturation × 100 (capped at ~100% — single-thread WASM)    "
                   "Native: top-style process CPU% (out of cores × 100)")
-    axC.legend(loc="upper left", fontsize=10)
+    handles, labels = axC.get_legend_handles_labels()
+    fig.legend(
+        handles,
+        labels,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.995),
+        ncol=4,
+        fontsize=8,
+        framealpha=0.9,
+        borderpad=0.25,
+        handlelength=1.6,
+        columnspacing=1.0,
+    )
     axC.grid(True, alpha=0.3)
 
     # Summary box
@@ -124,11 +133,13 @@ def main():
              family="monospace", fontsize=8, va="bottom", ha="left",
              bbox=dict(boxstyle="round,pad=0.5", fc="#f8fafc", ec="#94a3b8"))
 
-    plt.tight_layout(rect=[0, 0.07, 1, 1])
+    plt.tight_layout(rect=[0, 0.07, 1, 0.93])
     out = root / "runs" / "resources" / "chart_cross_platform.png"
     plt.savefig(out, dpi=130)
+    plt.savefig(out.with_suffix(".pdf"))
     plt.close(fig)
     print(f"Wrote {out}")
+    print(f"Wrote {out.with_suffix('.pdf')}")
     for s in series:
         mmin, mmax, mmean, _ = stats(s["mem"])
         cmin, cmax, cmean, _ = stats(s["cpu"])

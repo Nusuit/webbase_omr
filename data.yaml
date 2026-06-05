@@ -1,0 +1,7 @@
+names:
+  0: paper_region
+  1: info_region
+  2: q_1_20
+  3: q_21_60
+path: .
+train: train.txt

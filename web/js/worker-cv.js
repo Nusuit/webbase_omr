@@ -371,30 +371,41 @@ self.onmessage = async (event) => {
     if (!ready) { self.postMessage({ type: OMR_MSG.ERROR, error: "Worker not ready" }); return; }
     try {
       const { file, groundTruth } = msg.payload;
+
+      // ── Same-boundary E2E timing ───────────────────────────────────────────────
+      // Timer starts BEFORE decode so the Web boundary matches the Native runner
+      // (BitmapFactory.decode + bitmapToMat are inside the Native e2e_ms). Stages:
+      //   jpeg_decode_ms  = createImageBitmap        ↔ Native jpeg_decode_ms
+      //   rgba_extract_ms = drawImage + getImageData ↔ Native bitmap_to_mat_ms
+      //   cpp_ms          = C++ NormalizeSheet+read  ↔ Native normalize+thresh+omr
+      // e2e_ms = decode + rgba_extract + cpp (no debug-JPEG encode, so it matches
+      // Native's e2e_ms MINUS jpeg_write_ms; compare on that matched boundary).
+      const t_worker_start = performance.now();
       const bmp = await createImageBitmap(file);
+      const t_decode_end = performance.now();
       const width = bmp.width;
       const height = bmp.height;
-      
+
       const canvas = new OffscreenCanvas(width, height);
       const ctx = canvas.getContext("2d");
       ctx.drawImage(bmp, 0, 0);
       const rgba = ctx.getImageData(0, 0, width, height).data;
+      const t_rgba_end = performance.now();
 
       // ── Traditional OpenCV: pass raw image directly to C++ ─────────────────────
       // C++ NormalizeSheet uses two-layer detection:
       //   Layer 1: FindMarkerCorners (black registration squares) — most reliable
       //   Layer 2: FindPaperCorners (white paper boundary) — fallback
       // No YOLO masking needed — marker corner detection works on raw photos.
-      pipelineStartTs = performance.now();
       cppLogs = [];
       const wasmMemBefore = bridge.module ? bridge.module.HEAPU8.byteLength : 0;
-      const t_worker_start = pipelineStartTs;
 
       const processRgba = rgba;
       const processW = width, processH = height;
       console.log(`[worker] Passing raw image ${processW}x${processH} to C++ (marker corner detection)`);
 
-      const t_cpp_start = performance.now();
+      pipelineStartTs = performance.now();
+      const t_cpp_start = pipelineStartTs;
       const { status, result, raw, preview, warpedPreview, previewWidth, previewHeight } =
         bridge.processSheet(processRgba, processW, processH);
       const t_cpp_end = performance.now();
@@ -405,7 +416,10 @@ self.onmessage = async (event) => {
       const perf = {
         yolo_ms:          0,
         yolo_detected:    false,
+        jpeg_decode_ms:   t_decode_end - t_worker_start,
+        rgba_extract_ms:  t_rgba_end - t_decode_end,
         cpp_ms:           t_cpp_end - t_cpp_start,
+        e2e_ms:           t_cpp_end - t_worker_start,
         worker_total_ms:  t_cpp_end - t_worker_start,
         wasm_heap_before: wasmMemBefore,
         wasm_heap_after:  wasmMemAfter,

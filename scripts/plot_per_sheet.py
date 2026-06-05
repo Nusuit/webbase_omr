@@ -1,4 +1,5 @@
 """Build 4 per-sheet cross-platform charts (CPU/RAM × CV/YOLO).
+Each chart is written as both PNG and PDF.
 
 Chart 1: CPU-CV    — X=detect 1..N, Y=CPU%,  3 lines (Desktop/Mobile/Native)
 Chart 2: RAM-CV    — same X, Y=RAM (MB)
@@ -10,17 +11,8 @@ Per-platform color (consistent across charts):
   Mobile Web     → green  (#10b981)
   Native Android → red    (#ef4444)
 
-Dataset = 179 sheets across all platforms.
-
-TODO: re-bench Mobile (Chrome on Android via adb tunnel) and Native Android
-on the n=179 dataset. Until then, mobile/native n=179 CSV files do NOT exist
-and this script will fail on those reads. Run order:
-  1. python web/server.py 8080 --dataset=Dataset_OMR_classified
-  2. adb reverse tcp:8080 tcp:8080
-  3. open http://<phone>:8080/batch-detect.html?method=cv on phone, Export CSV
-  4. same for ?method=yolo  -> save as resources_mobile_{cv,yolo}_n179.csv
-  5. Native: run Android app's BenchActivity on 179 sheets, then
-     scripts/pull_native_resources.sh  -> save as resources_native_{cv,yolo}_n179.csv
+Dataset = 179 sheets across all platforms. The desktop trace uses the
+current PC_gaming resource artifact.
 
 Metric harmonisation (in _plot_utils):
   RAM:  Web = js_heap_used + wasm_heap_cv + wasm_heap_yolo (process working mem)
@@ -52,20 +44,34 @@ def plot_chart(title, ylabel, series, out_path):
     ax.set_title(title)
     ax.set_xlim(left=0)
     ax.grid(True, alpha=0.3)
-    ax.legend(loc="best", fontsize=10)
-    plt.tight_layout()
+    handles, labels = ax.get_legend_handles_labels()
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.01),
+        ncol=3,
+        fontsize=8,
+        framealpha=0.9,
+        borderpad=0.25,
+        handlelength=1.6,
+        columnspacing=1.0,
+    )
+    plt.tight_layout(rect=[0, 0.09, 1, 1])
     plt.savefig(out_path, dpi=130)
+    plt.savefig(out_path.with_suffix(".pdf"))
     plt.close(fig)
     print(f"  wrote {out_path.name}")
+    print(f"  wrote {out_path.with_suffix('.pdf').name}")
 
 
 def main():
-    desk_cv   = per_sheet_web(read_csv(RES_DIR / "desktop" / "resources_desktop_cv_n179.csv"))
-    desk_yolo = per_sheet_web(read_csv(RES_DIR / "desktop" / "resources_desktop_yolo_n179.csv"))
-    mob_cv    = per_sheet_web(read_csv(RES_DIR / "mobile"  / "resources_mobile_cv_n179.csv"))
-    mob_yolo  = per_sheet_web(read_csv(RES_DIR / "mobile"  / "resources_mobile_yolo_n179.csv"))
-    nat_cv    = per_sheet_native(read_csv(RES_DIR / "native" / "resources_native_cv_n179.csv"), "CV")
-    nat_yolo  = per_sheet_native(read_csv(RES_DIR / "native" / "resources_native_yolo_n179.csv"), "NNAPI")
+    desk_cv   = per_sheet_web(read_csv(RES_DIR / "PC_gaming" / "resources_PC_gaming_cv_n179.csv"))
+    desk_yolo = per_sheet_web(read_csv(RES_DIR / "PC_gaming" / "resources_PC_gaming_yolo_n179.csv"))
+    mob_cv    = per_sheet_web(read_csv(RES_DIR / "redmi_note13_pro_plus" / "resources_redmi_note13_pro_plus_cv_n179.csv"))
+    mob_yolo  = per_sheet_web(read_csv(RES_DIR / "redmi_note13_pro_plus" / "resources_redmi_note13_pro_plus_yolo_raw_n179.csv"))
+    nat_cv    = per_sheet_native(read_csv(RES_DIR / "redmi_note13_pro_plus_native" / "resources_redmi_note13_pro_plus_native_cv_n179.csv"), "CV")
+    nat_yolo  = per_sheet_native(read_csv(RES_DIR / "redmi_note13_pro_plus_native" / "resources_redmi_note13_pro_plus_native_yolo_n179.csv"), "NNAPI")
 
     plot_chart(
         "CPU usage per detection — CV pipeline (179 sheets)",

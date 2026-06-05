@@ -85,13 +85,23 @@ const ResourceMonitor = {
 };
 window.ResourceMonitor = ResourceMonitor;
 
-const METHOD = (new URLSearchParams(location.search).get("method") || "cv").toLowerCase();
-const WORKER_SRC = METHOD === "yolo" ? "./js/worker-yolo.js" : "./js/worker-cv.js";
+const PAGE_PARAMS = new URLSearchParams(location.search);
+const METHOD = (PAGE_PARAMS.get("method") || "cv").toLowerCase();
+function workerSource() {
+  if (METHOD !== "yolo") return "./js/worker-cv.js";
+  const workerParams = new URLSearchParams();
+  ["pad", "mask", "fallback"].forEach((key) => {
+    if (PAGE_PARAMS.has(key)) workerParams.set(key, PAGE_PARAMS.get(key));
+  });
+  const query = workerParams.toString();
+  return "./js/worker-yolo.js" + (query ? `?${query}` : "");
+}
+const WORKER_SRC = workerSource();
 document.title = `OMR Batch Detect [${METHOD}]`;
 function initWorker(){
   return new Promise((resolve, reject) => {
     L(`[worker] loading ${WORKER_SRC}`);
-    worker = new Worker(WORKER_SRC + "?v=" + Date.now());
+    worker = new Worker(WORKER_SRC + (WORKER_SRC.includes("?") ? "&" : "?") + "v=" + Date.now());
     const onMsg = (e) => {
       if (e.data && e.data.type === OMR_MSG.READY) {
         worker.removeEventListener("message", onMsg);
@@ -129,7 +139,7 @@ function processOne(url){
         worker.removeEventListener("message", handler);
         const p = e.data.payload;
         const r = p.result || {};
-        resolve({
+        const out = {
           url,
           status: p.status,
           examCode: r.examCode || null,
@@ -139,8 +149,24 @@ function processOne(url){
           answered: r.answeredCount || 0,
           suspicious: r.suspiciousCount || 0,
           multi: r.multiMarkCount || 0,
-          cpp_ms: p.perf ? Math.round(p.perf.cpp_ms) : null
+          cpp_ms: p.perf ? Math.round(p.perf.cpp_ms) : null,
+          worker_total_ms: p.perf && Number.isFinite(p.perf.worker_total_ms) ? Math.round(p.perf.worker_total_ms) : null,
+          e2e_ms: p.perf && Number.isFinite(p.perf.e2e_ms) ? Math.round(p.perf.e2e_ms) : null,
+          jpeg_decode_ms: p.perf && Number.isFinite(p.perf.jpeg_decode_ms) ? Math.round(p.perf.jpeg_decode_ms) : null,
+          rgba_extract_ms: p.perf && Number.isFinite(p.perf.rgba_extract_ms) ? Math.round(p.perf.rgba_extract_ms) : null,
+          yolo_ms: p.perf && Number.isFinite(p.perf.yolo_ms) ? Math.round(p.perf.yolo_ms) : null,
+          yolo_detected: p.perf ? !!p.perf.yolo_detected : false,
+          yolo_pad_pct: p.perf && Number.isFinite(p.perf.yolo_pad_pct) ? p.perf.yolo_pad_pct : null,
+          yolo_mask_mode: p.perf ? p.perf.yolo_mask_mode || null : null,
+          yolo_fallback: p.perf ? p.perf.yolo_fallback || null : null,
+          yolo_chosen_path: p.perf ? p.perf.chosen_path || null : null,
+          yolo_fallback_used: p.perf ? !!p.perf.fallback_used : false
+        };
+        (r.answers || []).forEach((answer, idx) => {
+          out[`auto_q${String(idx + 1).padStart(2, "0")}`] =
+            answer && answer.selected && answer.selected.length ? answer.selected.join("+") : "";
         });
+        resolve(out);
       } else if (e.data.type === OMR_MSG.ERROR) {
         clearTimeout(timeout);
         worker.removeEventListener("message", handler);
@@ -159,6 +185,16 @@ async function run(){
   const manifest = await (await fetch(manifestUrl)).json();
   L("[init] " + manifest.length + " images. Initializing worker...");
   await initWorker();
+
+  // ── Warm-up (discarded) — matches the Native runner's 5-sheet warmup so the
+  //    first measured sheet does not absorb WASM JIT / cache warm-up cost. ──────
+  const WARMUP = Math.min(5, manifest.length);
+  L(`[warmup] processing ${WARMUP} sheets (discarded)...`);
+  for (let i = 0; i < WARMUP; i++) {
+    try { await processOne(manifest[i]); } catch (e) {}
+  }
+  L("[warmup] done.");
+
   L("[run] starting; resource sampling enabled");
   ResourceMonitor.start(`batch-detect ${METHOD} n=${manifest.length}`);
   const t0 = performance.now();

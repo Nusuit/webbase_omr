@@ -6,10 +6,10 @@ Prerequisites:
   - laptop: python web/server.py 8080 --dataset=Dataset_OMR_classified
 
 Usage:
-  python scripts/drive_mobile_batch.py cv   runs/resources/mobile/resources_mobile_cv_n179.csv
-  python scripts/drive_mobile_batch.py yolo runs/resources/mobile/resources_mobile_yolo_n179.csv
+  python scripts/drive_mobile_batch.py cv   runs/resources/redmi_note13_pro_plus/resources_redmi_note13_pro_plus_cv_n179.csv
+  python scripts/drive_mobile_batch.py yolo runs/resources/redmi_note13_pro_plus/resources_redmi_note13_pro_plus_yolo_raw_n179.csv --yolo-mask raw --out-json runs/batch_results/redmi_note13_pro_plus_yolo_raw_n179.json
 """
-import json, sys, time, urllib.request
+import argparse, json, sys, time, urllib.parse, urllib.request
 import websocket  # type: ignore
 
 CDP = "http://localhost:9222"
@@ -59,11 +59,25 @@ class WS:
 
 
 def main():
-    if len(sys.argv) < 3:
-        print(__doc__); sys.exit(1)
-    method = sys.argv[1]
-    out_csv = sys.argv[2]
-    url = f"http://localhost:8080/batch-detect.html?method={method}"
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("method", choices=["cv", "yolo"])
+    ap.add_argument("out_csv")
+    ap.add_argument("--yolo-pad", type=float, default=None)
+    ap.add_argument("--yolo-mask", choices=["mask", "raw"], default=None)
+    ap.add_argument("--yolo-fallback", choices=["none", "bestdiag"], default=None)
+    ap.add_argument("--out-json", default=None)
+    args = ap.parse_args()
+    method = args.method
+    out_csv = args.out_csv
+    page_params = {"method": method}
+    if method == "yolo":
+        if args.yolo_pad is not None:
+            page_params["pad"] = str(args.yolo_pad)
+        if args.yolo_mask is not None:
+            page_params["mask"] = args.yolo_mask
+        if args.yolo_fallback is not None:
+            page_params["fallback"] = args.yolo_fallback
+    url = f"http://localhost:8080/batch-detect.html?{urllib.parse.urlencode(page_params)}"
 
     # Reuse first page tab; navigate it to our URL (Chrome Android disables /json/new)
     pages = [p for p in cdp_pages() if p.get("type") == "page"]
@@ -116,6 +130,12 @@ def main():
 
         elapsed = time.time() - start
         print(f"[INFO] Done in {elapsed:.1f}s")
+
+        if args.out_json:
+            results_json = ws.js("JSON.stringify(window.__BATCH_RESULTS__ || [])")
+            with open(args.out_json, "w", encoding="utf-8") as f:
+                f.write(results_json)
+            print(f"[OK] Wrote batch results → {args.out_json}")
 
         ua = ws.js("navigator.userAgent")
         label = f"batch-detect {method} mobile n=179"

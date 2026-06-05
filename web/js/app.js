@@ -170,6 +170,15 @@ window.ResourceMonitor = ResourceMonitor;
 // Method selector: ?method=cv → only CV pipeline; ?method=yolo → only YOLO pipeline;
 // ?method=both or omitted → both (default).
 const METHOD = (new URLSearchParams(window.location.search).get("method") || "both").toLowerCase();
+const PAGE_PARAMS = new URLSearchParams(window.location.search);
+function yoloWorkerSource() {
+  const workerParams = new URLSearchParams();
+  ["pad", "mask", "fallback"].forEach((key) => {
+    if (PAGE_PARAMS.has(key)) workerParams.set(key, PAGE_PARAMS.get(key));
+  });
+  const query = workerParams.toString();
+  return "./js/worker-yolo.js" + (query ? `?${query}` : "");
+}
 const RUN_CV   = (METHOD === "cv"   || METHOD === "both");
 const RUN_YOLO = (METHOD === "yolo" || METHOD === "both");
 window.METHOD = METHOD;
@@ -200,7 +209,8 @@ function checkAndInit() {
   }
 
   if (RUN_YOLO) {
-    workerYOLO = new Worker("./js/worker-yolo.js?v=" + Date.now());
+    const yoloSrc = yoloWorkerSource();
+    workerYOLO = new Worker(yoloSrc + (yoloSrc.includes("?") ? "&" : "?") + "v=" + Date.now());
     attachWasmHeapListener(workerYOLO);
     workerYOLO.onmessage = (e) => {
       if (e.data && e.data.type === OMR_MSG.READY) {

@@ -17,8 +17,8 @@ Handles two CSV schemas automatically (detected from the header row):
 
 Usage:
   python scripts/plot_resources.py <csv_path> [<csv_path> ...]
-  python scripts/plot_resources.py runs/resources/desktop/
-  python scripts/plot_resources.py runs/resources/native/
+  python scripts/plot_resources.py runs/resources/asus_vivobook/
+  python scripts/plot_resources.py runs/resources/redmi_note13_pro_plus_native/
 """
 
 import sys

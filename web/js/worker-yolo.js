@@ -59,6 +59,11 @@ const MARKER_CLASS_ID   = 0;          // use marker_corners bbox to crop paper r
 const CONF_THRESHOLD    = 0.50;       // v2 model is trained on real-world shots; 0.5 is sufficient
 const IOU_THRESHOLD     = 0.45;
 const ROI_RATIO = { x: 0.25, y: 0.25, w: 0.5, h: 0.5 };
+const WORKER_PARAMS = new URL(self.location.href).searchParams;
+const YOLO_PAD_PCT = Math.max(0, Math.min(0.5, Number(WORKER_PARAMS.get("pad") || "0.12")));
+const YOLO_MASK_MODE = WORKER_PARAMS.get("mask") || "mask"; // mask | raw
+const YOLO_FALLBACK = WORKER_PARAMS.get("fallback") || "none"; // none | bestdiag
+console.log(`[worker-yolo] config pad=${YOLO_PAD_PCT} mask=${YOLO_MASK_MODE} fallback=${YOLO_FALLBACK}`);
 
 // ─── YOLO utilities ───────────────────────────────────────────────────────────
 
@@ -221,13 +226,12 @@ async function detectMarkerRegion(imageData) {
   // Expand by 12% so corner markers at the edges aren't clipped
   const origW = origX2 - origX1;
   const origH = origY2 - origY1;
-  const padPct = 0.12;
   const W = imageData.width, H = imageData.height;
   const bbox = {
-    x1: Math.max(0, Math.round(origX1 - origW * padPct)),
-    y1: Math.max(0, Math.round(origY1 - origH * padPct)),
-    x2: Math.min(W - 1, Math.round(origX2 + origW * padPct)),
-    y2: Math.min(H - 1, Math.round(origY2 + origH * padPct))
+    x1: Math.max(0, Math.round(origX1 - origW * YOLO_PAD_PCT)),
+    y1: Math.max(0, Math.round(origY1 - origH * YOLO_PAD_PCT)),
+    x2: Math.min(W - 1, Math.round(origX2 + origW * YOLO_PAD_PCT)),
+    y2: Math.min(H - 1, Math.round(origY2 + origH * YOLO_PAD_PCT))
   };
 
   console.log(`[YOLOv2] Final bbox: (${bbox.x1},${bbox.y1})-(${bbox.x2},${bbox.y2}), Image: ${W}x${H}`);
@@ -362,6 +366,39 @@ function parseSheetRaw(raw, groundTruth) {
   };
 }
 
+function scoreParsedResult(parsed) {
+  // Diagnostic selector only; supervised accuracy is still computed offline.
+  let score = 0;
+  if (parsed.status === 0) score += 100;
+  if (parsed.mssvValid) score += 20;
+  if (parsed.keyValid) score += 20;
+  score += parsed.answeredCount * 2;
+  score -= parsed.multiMarkCount * 3;
+  score -= parsed.suspiciousCount * 0.1;
+  return score;
+}
+
+function runCppSheet(rgba, width, height, groundTruth, pathName) {
+  const t0 = performance.now();
+  const { status, result, raw, preview, warpedPreview, previewWidth, previewHeight } =
+    bridge.processSheet(rgba, width, height);
+  const t1 = performance.now();
+  const parsed = parseSheetRaw(raw, groundTruth);
+  return {
+    pathName,
+    status,
+    result,
+    raw,
+    preview,
+    warpedPreview,
+    previewWidth,
+    previewHeight,
+    parsed,
+    cpp_ms: t1 - t0,
+    score: scoreParsedResult(parsed),
+  };
+}
+
 // ─── Worker message handler ───────────────────────────────────────────────────
 self.onmessage = async (event) => {
   const msg = event.data;
@@ -435,26 +472,49 @@ self.onmessage = async (event) => {
       const t_yolo_end = performance.now();
 
       let processRgba = rgba, processW = width, processH = height;
+      let processPath = "raw";
       if (markerBox) {
-        const masked = maskImageOutsideBox(imageData, markerBox);
-        processRgba = new Uint8ClampedArray(masked.data);
-        console.log(`[worker] YOLO masked image ${processW}x${processH} → C++ (marker_corners crop)`);
+        if (YOLO_MASK_MODE === "raw") {
+          console.log(`[worker] YOLO detected marker box but mask=raw, passing raw image to C++`);
+        } else {
+          const masked = maskImageOutsideBox(imageData, markerBox);
+          processRgba = new Uint8ClampedArray(masked.data);
+          processPath = "yolo_mask";
+          console.log(`[worker] YOLO masked image ${processW}x${processH} → C++ (marker_corners crop)`);
+        }
       } else {
         console.log(`[worker] YOLO miss — passing raw image ${processW}x${processH} to C++`);
       }
 
       const t_cpp_start = performance.now();
-      const { status, result, raw, preview, warpedPreview, previewWidth, previewHeight } =
-        bridge.processSheet(processRgba, processW, processH);
+      let chosenRun = runCppSheet(processRgba, processW, processH, groundTruth, processPath);
+      let fallbackRun = null;
+      if (YOLO_FALLBACK === "bestdiag" && markerBox && processPath === "yolo_mask") {
+        fallbackRun = runCppSheet(rgba, width, height, groundTruth, "raw_fallback");
+        if (fallbackRun.score > chosenRun.score) {
+          console.log(`[worker] diagnostic fallback selected raw score=${fallbackRun.score.toFixed(1)} over yolo_mask=${chosenRun.score.toFixed(1)}`);
+          chosenRun = fallbackRun;
+        } else {
+          console.log(`[worker] diagnostic fallback kept yolo_mask score=${chosenRun.score.toFixed(1)} over raw=${fallbackRun.score.toFixed(1)}`);
+        }
+      }
       const t_cpp_end = performance.now();
 
       const wasmMemAfter = bridge.module ? bridge.module.HEAPU8.byteLength : 0;
-      const parsed = parseSheetRaw(raw, groundTruth);
+      const parsed = chosenRun.parsed;
 
       const perf = {
         yolo_ms:          t_yolo_end - t_yolo_start,
         yolo_detected:    markerBox !== null,
-        cpp_ms:           t_cpp_end - t_cpp_start,
+        yolo_pad_pct:     YOLO_PAD_PCT,
+        yolo_mask_mode:   YOLO_MASK_MODE,
+        yolo_fallback:    YOLO_FALLBACK,
+        chosen_path:      chosenRun.pathName,
+        chosen_score:     chosenRun.score,
+        fallback_score:   fallbackRun ? fallbackRun.score : null,
+        fallback_used:    !!fallbackRun && chosenRun === fallbackRun,
+        cpp_ms:           chosenRun.cpp_ms,
+        cpp_total_ms:     t_cpp_end - t_cpp_start,
         worker_total_ms:  t_cpp_end - t_worker_start,
         wasm_heap_before: wasmMemBefore,
         wasm_heap_after:  wasmMemAfter,
@@ -464,12 +524,12 @@ self.onmessage = async (event) => {
         threads_supported: _hasThreads,
       };
 
-      const transfers = [result.buffer];
-      if (preview) transfers.push(preview.buffer);
-      if (warpedPreview) transfers.push(warpedPreview.buffer);
+      const transfers = [chosenRun.result.buffer];
+      if (chosenRun.preview) transfers.push(chosenRun.preview.buffer);
+      if (chosenRun.warpedPreview) transfers.push(chosenRun.warpedPreview.buffer);
 
       self.postMessage(
-        { type: OMR_MSG.SHEET_RESULT, payload: { status, width, height, buffer: result.buffer, preview: preview ? preview.buffer : null, warpedPreview: warpedPreview ? warpedPreview.buffer : null, previewWidth, previewHeight, result: parsed, perf } },
+        { type: OMR_MSG.SHEET_RESULT, payload: { status: chosenRun.status, width, height, buffer: chosenRun.result.buffer, preview: chosenRun.preview ? chosenRun.preview.buffer : null, warpedPreview: chosenRun.warpedPreview ? chosenRun.warpedPreview.buffer : null, previewWidth: chosenRun.previewWidth, previewHeight: chosenRun.previewHeight, result: parsed, perf } },
         transfers
       );
     } catch (err) {
