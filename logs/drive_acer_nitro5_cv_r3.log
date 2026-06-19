@@ -1,0 +1,43 @@
+[LOG] Writing to logs/drive_acer_nitro5_cv_r3.log
+[LOG] Started at 2026-06-19 22:45:49
+[INFO] CDP target: 066ED2BFC3C08D759C066E5D91901CAA (OMR Batch Detect [cv])
+[INFO] Navigating to: http://localhost:8080/batch-detect.html?method=cv&variant=threads
+[STEP] Waiting for window.__runBatch ...
+[SysMonitor] Monitoring 2 renderer process(es): PIDs=[3136, 5612]
+[STEP] Batch started; polling progress ...
+  [t+0s] 0/179
+  [t+6s] 5/179  cpu=151.5%  ram=1211MB
+  [t+9s] 10/179  cpu=145.2%  ram=831MB
+  [t+12s] 16/179  cpu=104.6%  ram=1082MB
+  [t+15s] 22/179  cpu=162.5%  ram=1322MB
+  [t+18s] 28/179  cpu=169.9%  ram=901MB
+  [t+21s] 34/179  cpu=145.3%  ram=1077MB
+  [t+24s] 41/179  cpu=146.8%  ram=1351MB
+  [t+27s] 46/179  cpu=145.5%  ram=941MB
+  [t+30s] 52/179  cpu=118.7%  ram=1291MB
+  [t+33s] 59/179  cpu=156.2%  ram=920MB
+  [t+36s] 65/179  cpu=131.2%  ram=1245MB
+  [t+39s] 71/179  cpu=165.5%  ram=1538MB
+  [t+42s] 77/179  cpu=182.6%  ram=1098MB
+  [t+45s] 84/179  cpu=164.0%  ram=1438MB
+  [t+48s] 90/179  cpu=167.1%  ram=1001MB
+  [t+51s] 96/179  cpu=144.1%  ram=1296MB
+  [t+54s] 102/179  cpu=173.3%  ram=858MB
+  [t+57s] 107/179  cpu=168.5%  ram=1105MB
+  [t+60s] 113/179  cpu=132.7%  ram=1495MB
+  [t+63s] 119/179  cpu=173.3%  ram=957MB
+  [t+66s] 126/179  cpu=148.4%  ram=1300MB
+  [t+69s] 132/179  cpu=148.3%  ram=901MB
+  [t+72s] 138/179  cpu=173.4%  ram=1200MB
+  [t+75s] 144/179  cpu=167.1%  ram=1501MB
+  [t+78s] 150/179  cpu=140.5%  ram=1054MB
+  [t+81s] 156/179  cpu=139.0%  ram=1339MB
+  [t+84s] 162/179  cpu=176.5%  ram=892MB
+  [t+87s] 168/179  cpu=143.7%  ram=1190MB
+  [t+90s] 173/179  cpu=165.5%  ram=1472MB
+  [t+93s] 179/179  cpu=149.9%  ram=999MB
+[INFO] Bench done in 93.1s
+[OK] Wrote 179 sheets -> runs\batch_results\acer_nitro5_cv_threads_r3_n179.json
+[OK] Wrote 517 in-browser samples -> runs\resources\acer_nitro5\resources_acer_nitro5_cv_threads_r3_n179.csv
+[OK] Wrote 92 system samples -> runs\resources\acer_nitro5\resources_acer_nitro5_cv_threads_r3_n179_sys.csv
+[LOG] Finished at 2026-06-19 22:47:29

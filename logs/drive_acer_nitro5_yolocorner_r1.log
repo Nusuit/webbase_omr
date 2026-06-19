@@ -1,0 +1,70 @@
+[LOG] Writing to logs/drive_acer_nitro5_yolocorner_r1.log
+[LOG] Started at 2026-06-19 21:49:32
+[INFO] CDP target: A74E2758E04356323C053402BBF8385C (OMR Batch Detect [yolocorner])
+[INFO] Navigating to: http://localhost:8080/batch-detect.html?method=yolocorner&variant=threads
+[STEP] Waiting for window.__runBatch ...
+[SysMonitor] Monitoring 3 renderer process(es): PIDs=[17564, 17880, 14848]
+[STEP] Batch started; polling progress ...
+  [t+0s] 0/179
+  [t+15s] 3/179  cpu=39.0%  ram=855MB
+  [t+18s] 6/179  cpu=25.0%  ram=985MB
+  [t+21s] 9/179  cpu=54.7%  ram=606MB
+  [t+24s] 12/179  cpu=40.6%  ram=734MB
+  [t+27s] 15/179  cpu=57.8%  ram=862MB
+  [t+30s] 18/179  cpu=31.2%  ram=989MB
+  [t+33s] 21/179  cpu=54.7%  ram=565MB
+  [t+36s] 24/179  cpu=35.9%  ram=566MB
+  [t+39s] 28/179  cpu=43.7%  ram=523MB
+  [t+42s] 31/179  cpu=56.2%  ram=560MB
+  [t+45s] 34/179  cpu=46.8%  ram=547MB
+  [t+48s] 37/179  cpu=54.6%  ram=548MB
+  [t+51s] 40/179  cpu=53.1%  ram=548MB
+  [t+54s] 43/179  cpu=54.6%  ram=549MB
+  [t+57s] 46/179  cpu=34.4%  ram=547MB
+  [t+60s] 49/179  cpu=68.7%  ram=631MB
+  [t+63s] 52/179  cpu=37.5%  ram=631MB
+  [t+66s] 56/179  cpu=59.3%  ram=650MB
+  [t+69s] 59/179  cpu=37.5%  ram=682MB
+  [t+72s] 62/179  cpu=40.6%  ram=631MB
+  [t+75s] 65/179  cpu=35.9%  ram=631MB
+  [t+78s] 68/179  cpu=64.0%  ram=632MB
+  [t+81s] 72/179  cpu=40.6%  ram=645MB
+  [t+84s] 75/179  cpu=43.7%  ram=645MB
+  [t+87s] 78/179  cpu=45.3%  ram=635MB
+  [t+90s] 81/179  cpu=48.4%  ram=637MB
+  [t+93s] 84/179  cpu=43.7%  ram=637MB
+  [t+96s] 87/179  cpu=31.2%  ram=637MB
+  [t+99s] 90/179  cpu=50.0%  ram=637MB
+  [t+102s] 94/179  cpu=46.9%  ram=674MB
+  [t+105s] 97/179  cpu=29.7%  ram=688MB
+  [t+108s] 100/179  cpu=34.4%  ram=639MB
+  [t+111s] 103/179  cpu=42.2%  ram=640MB
+  [t+114s] 106/179  cpu=51.5%  ram=641MB
+  [t+117s] 110/179  cpu=25.0%  ram=641MB
+  [t+120s] 112/179  cpu=65.6%  ram=641MB
+  [t+123s] 116/179  cpu=40.6%  ram=656MB
+  [t+126s] 119/179  cpu=28.1%  ram=657MB
+  [t+129s] 122/179  cpu=53.1%  ram=640MB
+  [t+132s] 125/179  cpu=42.2%  ram=641MB
+  [t+135s] 128/179  cpu=68.7%  ram=642MB
+  [t+138s] 131/179  cpu=31.2%  ram=681MB
+  [t+141s] 134/179  cpu=71.8%  ram=683MB
+  [t+144s] 138/179  cpu=21.9%  ram=683MB
+  [t+147s] 140/179  cpu=56.2%  ram=683MB
+  [t+150s] 143/179  cpu=39.0%  ram=682MB
+  [t+153s] 146/179  cpu=62.5%  ram=685MB
+  [t+156s] 149/179  cpu=46.8%  ram=686MB
+  [t+159s] 152/179  cpu=45.3%  ram=686MB
+  [t+162s] 155/179  cpu=29.7%  ram=687MB
+  [t+165s] 158/179  cpu=51.5%  ram=687MB
+  [t+168s] 162/179  cpu=37.5%  ram=688MB
+  [t+171s] 165/179  cpu=31.2%  ram=688MB
+  [t+174s] 169/179  cpu=62.5%  ram=687MB
+  [t+177s] 172/179  cpu=53.1%  ram=687MB
+  [t+180s] 175/179  cpu=29.7%  ram=687MB
+  [t+183s] 179/179  cpu=53.1%  ram=687MB
+[INFO] Bench done in 183.1s
+[OK] Wrote 179 sheets -> runs\batch_results\acer_nitro5_yolocorner_webgpu_threads_r1_n179.json
+[OK] Wrote 1371 in-browser samples -> runs\resources\acer_nitro5\resources_acer_nitro5_yolocorner_webgpu_threads_r1_n179.csv
+[OK] Wrote 182 system samples -> runs\resources\acer_nitro5\resources_acer_nitro5_yolocorner_webgpu_threads_r1_n179_sys.csv
+[LOG] Finished at 2026-06-19 21:52:42

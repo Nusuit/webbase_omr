@@ -1,0 +1,43 @@
+[LOG] Writing to logs/drive_acer_nitro5_cv_r1.log
+[LOG] Started at 2026-06-19 22:42:28
+[INFO] CDP target: 066ED2BFC3C08D759C066E5D91901CAA (OMR Batch Detect [yolocorner])
+[INFO] Navigating to: http://localhost:8080/batch-detect.html?method=cv&variant=threads
+[STEP] Waiting for window.__runBatch ...
+[SysMonitor] Monitoring 2 renderer process(es): PIDs=[3136, 5612]
+[STEP] Batch started; polling progress ...
+  [t+0s] 0/179
+  [t+3s] 1/179  cpu=204.6%  ram=872MB
+  [t+6s] 8/179  cpu=139.0%  ram=832MB
+  [t+9s] 15/179  cpu=178.0%  ram=832MB
+  [t+12s] 22/179  cpu=146.8%  ram=821MB
+  [t+15s] 30/179  cpu=201.1%  ram=821MB
+  [t+18s] 38/179  cpu=173.3%  ram=822MB
+  [t+21s] 45/179  cpu=173.3%  ram=822MB
+  [t+24s] 53/179  cpu=162.8%  ram=914MB
+  [t+27s] 60/179  cpu=173.4%  ram=878MB
+  [t+30s] 68/179  cpu=140.6%  ram=897MB
+  [t+33s] 75/179  cpu=171.8%  ram=897MB
+  [t+36s] 83/179  cpu=171.8%  ram=892MB
+  [t+39s] 91/179  cpu=185.8%  ram=878MB
+  [t+42s] 99/179  cpu=173.3%  ram=900MB
+  [t+45s] 107/179  cpu=151.5%  ram=900MB
+  [t+48s] 114/179  cpu=165.6%  ram=901MB
+  [t+51s] 122/179  cpu=171.7%  ram=902MB
+  [t+54s] 126/179  cpu=124.6%  ram=903MB
+  [t+57s] 131/179  cpu=138.9%  ram=903MB
+  [t+60s] 135/179  cpu=129.6%  ram=946MB
+  [t+63s] 140/179  cpu=143.7%  ram=946MB
+  [t+66s] 145/179  cpu=164.0%  ram=946MB
+  [t+69s] 150/179  cpu=128.1%  ram=947MB
+  [t+72s] 154/179  cpu=142.1%  ram=948MB
+  [t+75s] 159/179  cpu=126.5%  ram=948MB
+  [t+78s] 163/179  cpu=143.6%  ram=949MB
+  [t+81s] 168/179  cpu=129.6%  ram=930MB
+  [t+84s] 173/179  cpu=162.4%  ram=951MB
+  [t+87s] 178/179  cpu=143.7%  ram=952MB
+  [t+90s] 179/179  cpu=0.0%  ram=915MB
+[INFO] Bench done in 90.1s
+[OK] Wrote 179 sheets -> runs\batch_results\acer_nitro5_cv_threads_r1_n179.json
+[OK] Wrote 466 in-browser samples -> runs\resources\acer_nitro5\resources_acer_nitro5_cv_threads_r1_n179.csv
+[OK] Wrote 89 system samples -> runs\resources\acer_nitro5\resources_acer_nitro5_cv_threads_r1_n179_sys.csv
+[LOG] Finished at 2026-06-19 22:44:05

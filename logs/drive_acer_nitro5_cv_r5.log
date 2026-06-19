@@ -1,0 +1,34 @@
+[LOG] Writing to logs/drive_acer_nitro5_cv_r5.log
+[LOG] Started at 2026-06-19 22:49:09
+[INFO] CDP target: 066ED2BFC3C08D759C066E5D91901CAA (OMR Batch Detect [cv])
+[INFO] Navigating to: http://localhost:8080/batch-detect.html?method=cv&variant=threads
+[STEP] Waiting for window.__runBatch ...
+[SysMonitor] Monitoring 2 renderer process(es): PIDs=[3136, 5612]
+[STEP] Batch started; polling progress ...
+  [t+0s] 0/179
+  [t+3s] 1/179  cpu=207.6%  ram=1039MB
+  [t+6s] 10/179  cpu=178.1%  ram=951MB
+  [t+9s] 19/179  cpu=189.0%  ram=1164MB
+  [t+12s] 28/179  cpu=164.0%  ram=896MB
+  [t+15s] 37/179  cpu=161.3%  ram=1272MB
+  [t+18s] 47/179  cpu=187.4%  ram=1061MB
+  [t+21s] 55/179  cpu=176.4%  ram=850MB
+  [t+24s] 65/179  cpu=187.4%  ram=1336MB
+  [t+27s] 74/179  cpu=190.5%  ram=1042MB
+  [t+30s] 84/179  cpu=174.9%  ram=1528MB
+  [t+33s] 93/179  cpu=215.5%  ram=1238MB
+  [t+36s] 103/179  cpu=187.4%  ram=977MB
+  [t+39s] 112/179  cpu=168.7%  ram=1438MB
+  [t+42s] 121/179  cpu=180.0%  ram=997MB
+  [t+45s] 131/179  cpu=162.4%  ram=1488MB
+  [t+48s] 139/179  cpu=167.1%  ram=1342MB
+  [t+51s] 147/179  cpu=179.5%  ram=955MB
+  [t+54s] 156/179  cpu=157.8%  ram=1248MB
+  [t+57s] 164/179  cpu=182.7%  ram=1396MB
+  [t+60s] 173/179  cpu=146.8%  ram=1299MB
+  [t+63s] 179/179  cpu=206.2%  ram=915MB
+[INFO] Bench done in 63.1s
+[OK] Wrote 179 sheets -> runs\batch_results\acer_nitro5_cv_threads_r5_n179.json
+[OK] Wrote 359 in-browser samples -> runs\resources\acer_nitro5\resources_acer_nitro5_cv_threads_r5_n179.csv
+[OK] Wrote 62 system samples -> runs\resources\acer_nitro5\resources_acer_nitro5_cv_threads_r5_n179_sys.csv
+[LOG] Finished at 2026-06-19 22:50:18
