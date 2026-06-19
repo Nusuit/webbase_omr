@@ -89,7 +89,9 @@ struct RegionData {
     std::vector<Bubble> bubbles;
 };
 
-SheetProcessResult OmrCore::ProcessSheetRgba(std::uint8_t* rgba, int width, int height) const {
+SheetProcessResult OmrCore::ProcessSheetRgba(std::uint8_t* rgba, int width, int height,
+                                             const Roi* marker_hint,
+                                             const double* corners4) const {
   SheetProcessResult out;
   if (!rgba || width <= 0 || height <= 0) { out.status = -1; return out; }
 
@@ -99,7 +101,27 @@ SheetProcessResult OmrCore::ProcessSheetRgba(std::uint8_t* rgba, int width, int 
   const int base_bytes = kBaseWidth * kBaseHeight * 4;
 
   std::vector<std::uint8_t> s_normbuf(base_bytes);
-  bool normalized = NormalizeSheet(rgba, width, height, s_normbuf.data());
+  bool normalized = false;
+  bool used_corner_warp = false;
+  if (corners4) {
+      // YOLO corner-keypoint path: warp directly from the four points.
+      used_corner_warp = NormalizeSheetWithCorners(rgba, width, height, corners4, s_normbuf.data());
+      normalized = used_corner_warp;
+      if (!normalized) {
+          // Degenerate points → fall back to the blob/paper detector.
+          normalized = NormalizeSheet(rgba, width, height, s_normbuf.data());
+      }
+  } else if (marker_hint) {
+      normalized = NormalizeSheetWithHint(
+          rgba, width, height,
+          marker_hint->x,
+          marker_hint->y,
+          marker_hint->x + marker_hint->w,
+          marker_hint->y + marker_hint->h,
+          s_normbuf.data());
+  } else {
+      normalized = NormalizeSheet(rgba, width, height, s_normbuf.data());
+  }
   if (!normalized) {
       if (width == kBaseWidth && height == kBaseHeight) {
           std::memcpy(s_normbuf.data(), rgba, base_bytes);
@@ -114,7 +136,12 @@ SheetProcessResult OmrCore::ProcessSheetRgba(std::uint8_t* rgba, int width, int 
   // 2. Stage 2: Tight crop by corner markers (notebook's crop_by_markers)
   //    The notebook maps the 4 corner registration squares → tight 1700x2400
   //    so that ax/ay anchor points are valid. We must do the same.
-  {
+    //  When the warp came from YOLO corner keypoints the markers are already
+    //  mapped onto the canvas corners, so a second marker re-detection adds
+    //  nothing and is actively harmful on faint (Zalo) sheets, where Stage 2
+    //  locks onto the wrong dark squares and re-crops to a bad quad. Validated
+    //  on N=179: corner-warp + skip-Stage2 = 99.41% vs 81.81% with Stage 2.
+  if (!used_corner_warp) {
     cv::Mat paper(kBaseHeight, kBaseWidth, CV_8UC4, (void*)s_normbuf.data());
     cv::Mat g2, th, cleaned;
     cv::cvtColor(paper, g2, cv::COLOR_RGBA2GRAY);

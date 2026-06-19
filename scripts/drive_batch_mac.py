@@ -78,8 +78,8 @@ def pick_target(cdp_host: str, url_hint: str = ""):
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("platform", choices=["mac"])
-    ap.add_argument("method", choices=["cv", "yolo"])
+    ap.add_argument("platform", choices=["mac", "iphone"])
+    ap.add_argument("method", choices=["cv", "yolo", "yolocorner"])
     ap.add_argument("--cdp-port", type=int, default=9222)
     ap.add_argument("--cdp-host", default="http://localhost")
     ap.add_argument("--base-url", default="http://localhost:8080")

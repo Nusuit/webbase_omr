@@ -15,6 +15,7 @@ Prerequisites (Mobile via USB):
 Usage:
   python scripts/drive_batch.py <platform> <method> [--cdp-port 9222]
       [--base-url http://localhost:8080] [--chrome-pid PID] [--log-file PATH]
+      [--wasm-variant baseline|simd|threads|auto]
 
   platform: any string (e.g. pc, mobile, acer_nitro5)
   method:   cv | yolo
@@ -222,7 +223,7 @@ def pick_target(cdp_host: str, url_hint: str = ""):
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("platform")
-    ap.add_argument("method", choices=["cv", "yolo"])
+    ap.add_argument("method", choices=["cv", "yolo", "corners", "yolocorner"])
     ap.add_argument("--cdp-port", type=int, default=9222)
     ap.add_argument("--cdp-host", default="http://localhost")
     ap.add_argument("--base-url", default="http://localhost:8080")
@@ -233,12 +234,14 @@ def main() -> int:
                     help="Path to log file. Defaults to logs/drive_<platform>_<method>.log")
     ap.add_argument("--yolo-pad", type=float, default=None,
                     help="Forward YOLO bbox expansion fraction to worker-yolo.js")
-    ap.add_argument("--yolo-mask", choices=["mask", "raw"], default=None,
+    ap.add_argument("--yolo-mask", choices=["mask", "raw", "hint"], default=None,
                     help="Forward YOLO preprocessing mode to worker-yolo.js")
     ap.add_argument("--yolo-fallback", choices=["none", "bestdiag"], default=None,
                     help="Forward YOLO diagnostic fallback mode to worker-yolo.js")
     ap.add_argument("--output-tag", default=None,
                     help="Optional output stem suffix instead of <platform>_<method>_n179")
+    ap.add_argument("--wasm-variant", choices=["baseline", "simd", "threads", "auto"], default="auto",
+                    help="Force OMR WASM variant for Web runs. Default: auto.")
     args = ap.parse_args()
 
     # ── Setup log file (tee stdout) ──────────────────────────────────────────
@@ -253,6 +256,8 @@ def main() -> int:
 
     cdp_host = f"{args.cdp_host}:{args.cdp_port}"
     page_params = {"method": args.method}
+    if args.wasm_variant != "auto":
+        page_params["variant"] = args.wasm_variant
     if args.method == "yolo":
         if args.yolo_pad is not None:
             page_params["pad"] = str(args.yolo_pad)

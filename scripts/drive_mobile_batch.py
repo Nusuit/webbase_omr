@@ -60,16 +60,20 @@ class WS:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("method", choices=["cv", "yolo"])
+    ap.add_argument("method", choices=["cv", "yolo", "yolocorner"])
     ap.add_argument("out_csv")
+    ap.add_argument("--variant", choices=["baseline", "simd", "threads"], default=None,
+                    help="Pin WASM variant (passed to worker as ?variant=...).")
     ap.add_argument("--yolo-pad", type=float, default=None)
-    ap.add_argument("--yolo-mask", choices=["mask", "raw"], default=None)
+    ap.add_argument("--yolo-mask", choices=["mask", "raw", "hint"], default=None)
     ap.add_argument("--yolo-fallback", choices=["none", "bestdiag"], default=None)
     ap.add_argument("--out-json", default=None)
     args = ap.parse_args()
     method = args.method
     out_csv = args.out_csv
     page_params = {"method": method}
+    if args.variant is not None:
+        page_params["variant"] = args.variant
     if method == "yolo":
         if args.yolo_pad is not None:
             page_params["pad"] = str(args.yolo_pad)

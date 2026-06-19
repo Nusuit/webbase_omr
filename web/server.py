@@ -74,6 +74,7 @@ class IsolatedHandler(http.server.SimpleHTTPRequestHandler):
 def get_lan_ip():
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.settimeout(0.5)
             s.connect(("8.8.8.8", 80))
             return s.getsockname()[0]
     except Exception:
@@ -101,7 +102,12 @@ def gen_self_signed_cert(ip, cert_path):
 lan_ip = get_lan_ip()
 scheme = "https" if USE_HTTPS else "http"
 
-with socketserver.TCPServer(("", PORT), IsolatedHandler) as httpd:
+class _ThreadingServer(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+
+with _ThreadingServer(("", PORT), IsolatedHandler) as httpd:
     if USE_HTTPS:
         cert_path = os.path.join(tempfile.gettempdir(), f"omr_bench_{PORT}.pem")
         if not os.path.exists(cert_path):

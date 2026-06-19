@@ -41,6 +41,31 @@ OmrFrameResult omr_process_frame_v2(
 // [72..131] suspicious flags for q1..q60
 int omr_process_sheet(std::uint8_t* rgba, int width, int height, int* out_values, int out_len);
 
+int omr_process_sheet_with_hint(
+    std::uint8_t* rgba,
+    int width,
+    int height,
+    int hint_x1,
+    int hint_y1,
+    int hint_x2,
+    int hint_y2,
+    int* out_values,
+    int out_len);
+
+// YOLO corner-keypoint path: (x0,y0)..(x3,y3) are the four corner-marker
+// centres in source-image pixels, in any order. The core sorts them
+// TL/TR/BR/BL and warps directly, skipping blob detection.
+int omr_process_sheet_with_corners(
+    std::uint8_t* rgba,
+    int width,
+    int height,
+    double x0, double y0,
+    double x1, double y1,
+    double x2, double y2,
+    double x3, double y3,
+    int* out_values,
+    int out_len);
+
 // After omr_process_sheet, copies the internal 1700×2400 normalized binary
 // image (BINARY_INV: paper=0, filled=255) into dst.
 // dst must be pre-allocated with at least 1700*2400*4 bytes.

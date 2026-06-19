@@ -7,15 +7,30 @@ const _SIMD_PROBE = new Uint8Array([
 ]);
 const _hasSIMD    = WebAssembly.validate(_SIMD_PROBE);
 const _hasThreads = typeof SharedArrayBuffer !== "undefined";
-const _omrVariant = (_hasThreads && _hasSIMD) ? "omr_threads"
+const _workerParams = new URL(self.location.href).searchParams;
+const _requestedVariant = (_workerParams.get("variant") || "").toLowerCase();
+const _autoVariant = (_hasThreads && _hasSIMD) ? "omr_threads"
                   : _hasSIMD                  ? "omr_simd"
                   :                             "omr";
-console.log(`[worker-cv] SIMD=${_hasSIMD} SAB=${_hasThreads} → /wasm/${_omrVariant}.js`);
+function _resolveVariant(requested) {
+  if (requested === "baseline" || requested === "omr") return "omr";
+  if (requested === "simd" || requested === "omr_simd") {
+    if (!_hasSIMD) console.warn("[worker-cv] requested SIMD but browser does not support WASM SIMD; falling back to omr");
+    return _hasSIMD ? "omr_simd" : "omr";
+  }
+  if (requested === "threads" || requested === "omr_threads") {
+    if (!_hasSIMD || !_hasThreads) console.warn("[worker-cv] requested threads but SIMD/SAB is unavailable; falling back");
+    return (_hasSIMD && _hasThreads) ? "omr_threads" : (_hasSIMD ? "omr_simd" : "omr");
+  }
+  return _autoVariant;
+}
+const _omrVariant = _resolveVariant(_requestedVariant);
+console.log(`[worker-cv] SIMD=${_hasSIMD} SAB=${_hasThreads} requested=${_requestedVariant || "auto"} → /wasm/${_omrVariant}.js`);
 
 importScripts(
   "../js/ort.min.js",
   "./worker-protocol.js?v=20260328-yolo2",
-  "./wasm-bridge.js?v=20260523-ruleE"
+  "./wasm-bridge.js?v=20260617-pthread-main"
 );
 
 // Try the best variant first; fall back to baseline if the file hasn't been built yet.
@@ -24,6 +39,9 @@ importScripts(
 // old C++ behaviour. The worker URL itself is busted in app.js via Date.now().
 let _loadedVariant = _omrVariant;
 self._wasmCacheBust = "v=20260523f";
+function _omrScriptUrl(variant) {
+  return new URL(`/wasm/${variant}.js?${self._wasmCacheBust}`, self.location.origin).href;
+}
 try {
   importScripts(`/wasm/${_omrVariant}.js?${self._wasmCacheBust}`);
 } catch (_e) {
@@ -31,6 +49,7 @@ try {
   console.warn(`[worker-cv] /wasm/${_omrVariant}.js not found — falling back to omr.js`);
   importScripts(`/wasm/omr.js?${self._wasmCacheBust}`);
 }
+self._omrMainScriptUrlOrBlob = _omrScriptUrl(_loadedVariant);
 
 const bridge = new WasmBridge();
 let ready = false;
@@ -370,7 +389,7 @@ self.onmessage = async (event) => {
   if (msg.type === OMR_MSG.PROCESS_SHEET) {
     if (!ready) { self.postMessage({ type: OMR_MSG.ERROR, error: "Worker not ready" }); return; }
     try {
-      const { file, groundTruth } = msg.payload;
+      const { file, groundTruth, corners } = msg.payload;
 
       // ── Same-boundary E2E timing ───────────────────────────────────────────────
       // Timer starts BEFORE decode so the Web boundary matches the Native runner
@@ -406,8 +425,13 @@ self.onmessage = async (event) => {
 
       pipelineStartTs = performance.now();
       const t_cpp_start = pipelineStartTs;
+      // Corner-keypoint validation path: when batch-detect injects precomputed
+      // YOLO corners, warp directly from them; otherwise the standard CV detector.
+      const useCorners = Array.isArray(corners) && corners.length >= 8;
       const { status, result, raw, preview, warpedPreview, previewWidth, previewHeight } =
-        bridge.processSheet(processRgba, processW, processH);
+        useCorners
+          ? bridge.processSheetWithCorners(processRgba, processW, processH, corners)
+          : bridge.processSheet(processRgba, processW, processH);
       const t_cpp_end = performance.now();
 
       const wasmMemAfter = bridge.module ? bridge.module.HEAPU8.byteLength : 0;
@@ -415,7 +439,8 @@ self.onmessage = async (event) => {
 
       const perf = {
         yolo_ms:          0,
-        yolo_detected:    false,
+        yolo_detected:    useCorners,
+        chosen_path:      useCorners ? "corners" : null,
         jpeg_decode_ms:   t_decode_end - t_worker_start,
         rgba_extract_ms:  t_rgba_end - t_decode_end,
         cpp_ms:           t_cpp_end - t_cpp_start,
@@ -425,6 +450,7 @@ self.onmessage = async (event) => {
         wasm_heap_after:  wasmMemAfter,
         cpp_logs:         cppLogs.slice(),
         wasm_variant:     _loadedVariant,
+        wasm_requested_variant: _requestedVariant || "auto",
         simd_supported:   _hasSIMD,
         threads_supported: _hasThreads,
       };

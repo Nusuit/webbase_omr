@@ -551,6 +551,116 @@ bool FindMarkerCorners(const std::uint8_t* gray, int w, int h,
   return true;
 }
 
+std::vector<BlobInfo> FindMarkerCandidateBlobs(const std::uint8_t* gray, int w, int h) {
+  const int n = w * h;
+  std::vector<std::uint8_t> blurred(n), bin(n), tmp(n);
+
+  GaussianBlur5(gray, blurred.data(), w, h);
+
+  const std::uint8_t thresh = OtsuThreshold(blurred.data(), n);
+  BinaryInv(blurred.data(), bin.data(), n, thresh);
+
+  MorphOpen(bin.data(), tmp.data(), w, h);
+  MorphOpen(bin.data(), tmp.data(), w, h);
+
+  const int max_marker_area = std::min(n / 4, 2000);
+  const auto blobs = FindBlobs(bin.data(), gray, w, h, 50, max_marker_area);
+
+  std::vector<BlobInfo> candidates;
+  candidates.reserve(blobs.size());
+  for (const auto& b : blobs) {
+    const int bw = b.x2 - b.x1 + 1;
+    const int bh = b.y2 - b.y1 + 1;
+    const double ar = static_cast<double>(bw) / bh;
+    const double fill = static_cast<double>(b.pixel_count) / (bw * bh);
+    if (ar < 0.7 || ar > 1.4) continue;
+    if (fill < 0.85) continue;
+    if (b.mean_gray > 80.0) continue;
+    candidates.push_back(b);
+  }
+
+  if (candidates.empty()) return candidates;
+
+  std::sort(candidates.begin(), candidates.end(),
+            [](const BlobInfo& a, const BlobInfo& b) {
+              return a.pixel_count > b.pixel_count;
+            });
+
+  const int area_threshold = candidates[0].pixel_count / 2;
+  std::vector<BlobInfo> big_markers;
+  for (const auto& b : candidates) {
+    if (b.pixel_count >= area_threshold) big_markers.push_back(b);
+  }
+  if (big_markers.size() > 20) big_markers.resize(20);
+  return big_markers;
+}
+
+bool FindMarkerCornersNearHint(const std::uint8_t* gray, int w, int h,
+                               double hint_x1, double hint_y1,
+                               double hint_x2, double hint_y2,
+                               Point2d out[4]) {
+  hint_x1 = std::clamp(hint_x1, 0.0, static_cast<double>(w - 1));
+  hint_y1 = std::clamp(hint_y1, 0.0, static_cast<double>(h - 1));
+  hint_x2 = std::clamp(hint_x2, 0.0, static_cast<double>(w - 1));
+  hint_y2 = std::clamp(hint_y2, 0.0, static_cast<double>(h - 1));
+  if (hint_x2 <= hint_x1 || hint_y2 <= hint_y1) return false;
+
+  const std::vector<BlobInfo> candidates = FindMarkerCandidateBlobs(gray, w, h);
+  printf("[FindMarkerCornersNearHint] candidates=%zu hint=(%.1f,%.1f)-(%.1f,%.1f)\n",
+         candidates.size(), hint_x1, hint_y1, hint_x2, hint_y2);
+  if (candidates.size() < 4) return false;
+
+  const Point2d expected[4] = {
+      {hint_x1, hint_y1},
+      {hint_x2, hint_y1},
+      {hint_x2, hint_y2},
+      {hint_x1, hint_y2},
+  };
+  const double box_w = hint_x2 - hint_x1;
+  const double box_h = hint_y2 - hint_y1;
+  const double win_x = std::max(45.0, box_w * 0.30);
+  const double win_y = std::max(45.0, box_h * 0.30);
+  const double largest_area = std::max(1, candidates[0].pixel_count);
+
+  bool used[20] = {};
+  for (int slot = 0; slot < 4; ++slot) {
+    int best_idx = -1;
+    double best_score = 1e18;
+
+    for (int i = 0; i < static_cast<int>(candidates.size()); ++i) {
+      if (i >= 20 || used[i]) continue;
+      const auto& b = candidates[i];
+      const double dx = b.cx - expected[slot].x;
+      const double dy = b.cy - expected[slot].y;
+      if (std::abs(dx) > win_x || std::abs(dy) > win_y) continue;
+
+      const double ndx = dx / win_x;
+      const double ndy = dy / win_y;
+      const double area_bonus = std::min(1.0, b.pixel_count / largest_area) * 0.18;
+      const double dark_bonus = std::max(0.0, (80.0 - b.mean_gray) / 80.0) * 0.08;
+      const double score = std::sqrt(ndx * ndx + ndy * ndy) - area_bonus - dark_bonus;
+      if (score < best_score) {
+        best_score = score;
+        best_idx = i;
+      }
+    }
+
+    if (best_idx < 0) {
+      printf("[FindMarkerCornersNearHint] slot %d has no marker in local window\n", slot);
+      return false;
+    }
+
+    used[best_idx] = true;
+    out[slot] = {candidates[best_idx].cx, candidates[best_idx].cy};
+    printf("[FindMarkerCornersNearHint] slot %d -> marker=(%.1f,%.1f), score=%.3f\n",
+           slot, out[slot].x, out[slot].y, best_score);
+  }
+
+  printf("[FindMarkerCornersNearHint] Result: TL(%.1f,%.1f) TR(%.1f,%.1f) BR(%.1f,%.1f) BL(%.1f,%.1f)\n",
+         out[0].x, out[0].y, out[1].x, out[1].y, out[2].x, out[2].y, out[3].x, out[3].y);
+  return true;
+}
+
 // ─── LAYER 2: Find paper corners as fallback (port of Android findPaperCorners)
 // BINARY + Otsu → MORPH_CLOSE×4 → largest white blob → diagonal extremes.
 bool FindPaperCorners(const std::uint8_t* gray, int w, int h,
@@ -704,6 +814,99 @@ bool NormalizeSheet(const std::uint8_t* src_rgba, int src_w, int src_h,
   printf("[NormalizeSheet] Using fallback: simple resize\n");
   ResizeRgba(src_rgba, src_w, src_h, dst_rgba, kTargetW, kTargetH);
   return true;
+}
+
+bool NormalizeSheetWithHint(const std::uint8_t* src_rgba, int src_w, int src_h,
+                            int hint_x1, int hint_y1, int hint_x2, int hint_y2,
+                            std::uint8_t* dst_rgba) {
+  printf("[NormalizeSheetWithHint] Input: %dx%d hint=(%d,%d)-(%d,%d) -> %dx%d\n",
+         src_w, src_h, hint_x1, hint_y1, hint_x2, hint_y2, kTargetW, kTargetH);
+  if (!src_rgba || src_w <= 0 || src_h <= 0 || !dst_rgba) return false;
+  if (hint_x2 <= hint_x1 || hint_y2 <= hint_y1) {
+    printf("[NormalizeSheetWithHint] Invalid hint; falling back to standard NormalizeSheet\n");
+    return NormalizeSheet(src_rgba, src_w, src_h, dst_rgba);
+  }
+
+  constexpr int kAnalysisW = 800;
+  const int kAnalysisH = src_h * kAnalysisW / src_w;
+  const int n = kAnalysisW * kAnalysisH;
+  std::vector<std::uint8_t> gray_small(n);
+  std::vector<std::uint8_t> rgba_small(n * 4);
+
+  ResizeRgba(src_rgba, src_w, src_h, rgba_small.data(), kAnalysisW, kAnalysisH);
+  RgbaToGray(rgba_small.data(), gray_small.data(), kAnalysisW, kAnalysisH);
+
+  const double sx = static_cast<double>(kAnalysisW) / src_w;
+  const double sy = static_cast<double>(kAnalysisH) / src_h;
+  Point2d corners_small[4];
+
+  bool found = false;
+  if (FindMarkerCornersNearHint(gray_small.data(), kAnalysisW, kAnalysisH,
+                                hint_x1 * sx, hint_y1 * sy,
+                                hint_x2 * sx, hint_y2 * sy,
+                                corners_small)) {
+    if (CornersLookValid(corners_small, kAnalysisW, kAnalysisH)) {
+      printf("[NormalizeSheetWithHint] YOLO-guided marker refinement succeeded\n");
+      found = true;
+    } else {
+      printf("[NormalizeSheetWithHint] Refined corners invalid; falling back\n");
+    }
+  } else {
+    printf("[NormalizeSheetWithHint] Marker refinement failed; falling back\n");
+  }
+
+  if (!found) {
+    return NormalizeSheet(src_rgba, src_w, src_h, dst_rgba);
+  }
+
+  Point2d corners_full[4];
+  for (int i = 0; i < 4; ++i) {
+    corners_full[i].x = corners_small[i].x * src_w / kAnalysisW;
+    corners_full[i].y = corners_small[i].y * src_h / kAnalysisH;
+  }
+
+  double H[9], Hinv[9];
+  if (ComputeHomography(corners_full, kTargetW, kTargetH, H) && InvertHomography(H, Hinv)) {
+    printf("[NormalizeSheetWithHint] Perspective warp succeeded\n");
+    WarpRgba(src_rgba, src_w, src_h, dst_rgba, kTargetW, kTargetH, Hinv);
+    return true;
+  }
+
+  printf("[NormalizeSheetWithHint] Homography failed; falling back to standard NormalizeSheet\n");
+  return NormalizeSheet(src_rgba, src_w, src_h, dst_rgba);
+}
+
+bool NormalizeSheetWithCorners(const std::uint8_t* src_rgba, int src_w, int src_h,
+                               const double pts[8], std::uint8_t* dst_rgba) {
+  if (!src_rgba || src_w <= 0 || src_h <= 0 || !pts || !dst_rgba) return false;
+
+  // Geometric TL/TR/BR/BL ordering: split by the vertical midpoint into a top
+  // and bottom pair, then order each pair left-to-right. This is independent of
+  // the order in which the detector emitted the four corner-marker centres.
+  Point2d p[4] = {{pts[0], pts[1]}, {pts[2], pts[3]},
+                  {pts[4], pts[5]}, {pts[6], pts[7]}};
+  std::sort(p, p + 4, [](const Point2d& a, const Point2d& b) { return a.y < b.y; });
+  Point2d tl = p[0], tr = p[1], bl = p[2], br = p[3];
+  if (tl.x > tr.x) std::swap(tl, tr);
+  if (bl.x > br.x) std::swap(bl, br);
+  Point2d corners[4] = {tl, tr, br, bl};  // TL, TR, BR, BL (ComputeHomography order)
+
+  printf("[NormalizeSheetWithCorners] TL(%.1f,%.1f) TR(%.1f,%.1f) BR(%.1f,%.1f) BL(%.1f,%.1f)\n",
+         tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y);
+
+  if (!CornersLookValid(corners, src_w, src_h)) {
+    printf("[NormalizeSheetWithCorners] Corners failed span check; caller should fall back\n");
+    return false;
+  }
+
+  double H[9], Hinv[9];
+  if (ComputeHomography(corners, kTargetW, kTargetH, H) && InvertHomography(H, Hinv)) {
+    WarpRgba(src_rgba, src_w, src_h, dst_rgba, kTargetW, kTargetH, Hinv);
+    printf("[NormalizeSheetWithCorners] Perspective warp succeeded\n");
+    return true;
+  }
+  printf("[NormalizeSheetWithCorners] Homography failed\n");
+  return false;
 }
 
 }  // namespace omr

@@ -34,7 +34,14 @@ struct SheetProcessResult {
 class OmrCore {
  public:
   FrameProcessResult ProcessRgbaFrame(std::uint8_t* rgba, int width, int height, const Roi& roi) const;
-  SheetProcessResult ProcessSheetRgba(std::uint8_t* rgba, int width, int height) const;
+  // `corners4`, when non-null, points to 8 doubles (x0,y0..x3,y3) giving the
+  // four corner-marker centres in source-image pixels from a YOLO keypoint
+  // detector. Stage 1 then warps directly from these points (no blob
+  // detection); it falls back to marker_hint / blob detection only if the
+  // points are degenerate. `marker_hint` is the older bbox-guided path.
+  SheetProcessResult ProcessSheetRgba(std::uint8_t* rgba, int width, int height,
+                                      const Roi* marker_hint = nullptr,
+                                      const double* corners4 = nullptr) const;
   // Copies the 1700×2400 BINARY_INV preview produced by the last ProcessSheetRgba
   // call into dst (must have dst_len >= 1700*2400*4 bytes).
   // Returns bytes written, or -1 on error.

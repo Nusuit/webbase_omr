@@ -18,20 +18,38 @@ const _SIMD_PROBE = new Uint8Array([
 ]);
 const _hasSIMD    = WebAssembly.validate(_SIMD_PROBE);
 const _hasThreads = typeof SharedArrayBuffer !== "undefined";
-const _omrVariant = (_hasThreads && _hasSIMD) ? "omr_threads"
+const _workerParams = new URL(self.location.href).searchParams;
+const _requestedVariant = (_workerParams.get("variant") || "").toLowerCase();
+const _autoVariant = (_hasThreads && _hasSIMD) ? "omr_threads"
                   : _hasSIMD                  ? "omr_simd"
                   :                             "omr";
-console.log(`[worker-yolo] SIMD=${_hasSIMD} SAB=${_hasThreads} → /wasm/${_omrVariant}.js`);
+function _resolveVariant(requested) {
+  if (requested === "baseline" || requested === "omr") return "omr";
+  if (requested === "simd" || requested === "omr_simd") {
+    if (!_hasSIMD) console.warn("[worker-yolo] requested SIMD but browser does not support WASM SIMD; falling back to omr");
+    return _hasSIMD ? "omr_simd" : "omr";
+  }
+  if (requested === "threads" || requested === "omr_threads") {
+    if (!_hasSIMD || !_hasThreads) console.warn("[worker-yolo] requested threads but SIMD/SAB is unavailable; falling back");
+    return (_hasSIMD && _hasThreads) ? "omr_threads" : (_hasSIMD ? "omr_simd" : "omr");
+  }
+  return _autoVariant;
+}
+const _omrVariant = _resolveVariant(_requestedVariant);
+console.log(`[worker-yolo] SIMD=${_hasSIMD} SAB=${_hasThreads} requested=${_requestedVariant || "auto"} → /wasm/${_omrVariant}.js`);
 
 importScripts(
   "../js/ort.min.js",
   "./worker-protocol.js?v=20260328-yolo2",
-  "./wasm-bridge.js?v=20260523-ruleE"
+  "./wasm-bridge.js?v=20260617-pthread-main"
 );
 
 // Try the best variant first; fall back to baseline if the file hasn't been built yet.
 let _loadedVariant = _omrVariant;
 self._wasmCacheBust = "v=20260523f";
+function _omrScriptUrl(variant) {
+  return new URL(`/wasm/${variant}.js?${self._wasmCacheBust}`, self.location.origin).href;
+}
 try {
   importScripts(`/wasm/${_omrVariant}.js?${self._wasmCacheBust}`);
 } catch (_e) {
@@ -39,6 +57,7 @@ try {
   console.warn(`[worker-yolo] /wasm/${_omrVariant}.js not found — falling back to omr.js`);
   importScripts(`/wasm/omr.js?${self._wasmCacheBust}`);
 }
+self._omrMainScriptUrlOrBlob = _omrScriptUrl(_loadedVariant);
 
 const bridge = new WasmBridge();
 let ready = false;
@@ -61,9 +80,18 @@ const IOU_THRESHOLD     = 0.45;
 const ROI_RATIO = { x: 0.25, y: 0.25, w: 0.5, h: 0.5 };
 const WORKER_PARAMS = new URL(self.location.href).searchParams;
 const YOLO_PAD_PCT = Math.max(0, Math.min(0.5, Number(WORKER_PARAMS.get("pad") || "0.12")));
-const YOLO_MASK_MODE = WORKER_PARAMS.get("mask") || "mask"; // mask | raw
+const YOLO_MASK_MODE = WORKER_PARAMS.get("mask") || "mask"; // mask | raw | hint
 const YOLO_FALLBACK = WORKER_PARAMS.get("fallback") || "none"; // none | bestdiag
 console.log(`[worker-yolo] config pad=${YOLO_PAD_PCT} mask=${YOLO_MASK_MODE} fallback=${YOLO_FALLBACK}`);
+
+// Corner-keypoint detection path (det=corner): a single-class marker_corners
+// model trained at 960 emits the 4 corner-marker boxes; we take their centres
+// and warp directly in C++ (processSheetWithCorners), skipping blob detection
+// and Stage 2. Validated on N=179 at 99.41% (vs CV 99.00%).
+const DET_MODE = (WORKER_PARAMS.get("det") || "region").toLowerCase();
+const CORNER_INPUT_SIZE = 960;
+const CORNER_MODEL = "../models/corner_detect.onnx";
+let cornerSession = null;
 
 // ─── YOLO utilities ───────────────────────────────────────────────────────────
 
@@ -112,6 +140,65 @@ async function _warmupSession(session) {
   } catch(e) {
     console.warn("[YOLO] Warmup error ignored:", e.message);
   }
+}
+
+// ─── Corner-keypoint model (det=corner) ───────────────────────────────────────
+async function ensureCornerModel() {
+  if (cornerSession) return cornerSession;
+  ort.env.wasm.wasmPaths = "/wasm/";
+  ort.env.wasm.numThreads = 1;
+  try {
+    cornerSession = await ort.InferenceSession.create(CORNER_MODEL, { executionProviders: ["webgpu"] });
+    console.log("[CORNER] Backend: WebGPU");
+  } catch (e) {
+    console.warn("[CORNER] WebGPU unavailable, falling back to WASM:", e.message);
+    cornerSession = await ort.InferenceSession.create(CORNER_MODEL, { executionProviders: ["wasm"] });
+    console.log("[CORNER] Backend: WASM (fallback)");
+  }
+  try {
+    const dummy = new ort.Tensor("float32", new Float32Array(1 * 3 * CORNER_INPUT_SIZE * CORNER_INPUT_SIZE),
+                                 [1, 3, CORNER_INPUT_SIZE, CORNER_INPUT_SIZE]);
+    const res = await cornerSession.run({ [cornerSession.inputNames[0]]: dummy });
+    dummy.dispose(); for (const k in res) res[k].dispose();
+  } catch (e) { console.warn("[CORNER] warmup ignored:", e.message); }
+  return cornerSession;
+}
+
+// Returns [x0,y0,x1,y1,x2,y2,x3,y3] (four corner-marker centres in original
+// image pixels), or null if fewer than 4 markers are found.
+async function detectCorners(imageData) {
+  const session = await ensureCornerModel();
+  const { data: lbData, scale, padX, padY } = letterboxImageData(imageData, CORNER_INPUT_SIZE);
+  const tensorData = imageDataToTensor(lbData, CORNER_INPUT_SIZE);
+  const inputTensor = new ort.Tensor("float32", tensorData, [1, 3, CORNER_INPUT_SIZE, CORNER_INPUT_SIZE]);
+  const results = await session.run({ [session.inputNames[0]]: inputTensor });
+
+  // Single-class YOLOv8 output: [1, 5, num_anchors] (cx,cy,w,h,conf)
+  const raw = results[session.outputNames[0]];
+  const numAnchors = raw.dims[2];
+  const d = raw.data;
+  const candidates = [];
+  for (let i = 0; i < numAnchors; i++) {
+    const conf = d[4 * numAnchors + i];
+    if (conf < 0.05) continue;
+    const cx = d[0 * numAnchors + i], cy = d[1 * numAnchors + i];
+    const bw = d[2 * numAnchors + i], bh = d[3 * numAnchors + i];
+    candidates.push([cx - bw / 2, cy - bh / 2, cx + bw / 2, cy + bh / 2, conf]);
+  }
+  inputTensor.dispose();
+  for (const k in results) results[k].dispose();
+
+  const kept = nms(candidates, IOU_THRESHOLD).sort((a, b) => b[4] - a[4]);
+  console.log(`[CORNER] candidates=${candidates.length} afterNMS=${kept.length}`);
+  if (kept.length < 4) return null;
+
+  const pts = [];
+  for (let i = 0; i < 4; i++) {
+    const [x1, y1, x2, y2] = kept[i];
+    const cxLb = (x1 + x2) / 2, cyLb = (y1 + y2) / 2;
+    pts.push((cxLb - padX) / scale, (cyLb - padY) / scale);  // → original image px
+  }
+  return pts;
 }
 
 /** Letterbox-resize source ImageData to squareSize×squareSize. Returns {data, pad} */
@@ -378,10 +465,21 @@ function scoreParsedResult(parsed) {
   return score;
 }
 
-function runCppSheet(rgba, width, height, groundTruth, pathName) {
+function classifyHintRefinement(logs) {
+  const text = (logs || []).map((l) => l.msg || "").join("\n");
+  if (text.includes("YOLO-guided marker refinement succeeded")) return "success";
+  if (text.includes("Refined corners invalid; falling back")) return "invalid_fallback";
+  if (text.includes("Marker refinement failed; falling back")) return "failed_fallback";
+  if (text.includes("[NormalizeSheetWithHint]")) return "called_unknown";
+  return null;
+}
+
+function runCppSheet(rgba, width, height, groundTruth, pathName, markerBox = null, corners = null) {
   const t0 = performance.now();
   const { status, result, raw, preview, warpedPreview, previewWidth, previewHeight } =
-    bridge.processSheet(rgba, width, height);
+    corners   ? bridge.processSheetWithCorners(rgba, width, height, corners)
+    : markerBox ? bridge.processSheetWithHint(rgba, width, height, markerBox)
+              : bridge.processSheet(rgba, width, height);
   const t1 = performance.now();
   const parsed = parseSheetRaw(raw, groundTruth);
   return {
@@ -467,6 +565,42 @@ self.onmessage = async (event) => {
       const t_worker_start = pipelineStartTs;
 
       const imageData = new ImageData(rgba, width, height);
+
+      // ── Corner-keypoint path (det=corner): YOLO 4 corners → C++ direct warp ──
+      if (DET_MODE === "corner") {
+        const t_c_start = performance.now();
+        const corners = await detectCorners(imageData);
+        const t_c_end = performance.now();
+        const run = runCppSheet(rgba, width, height, groundTruth,
+                                corners ? "corners" : "raw", null, corners);
+        const wasmMemAfter2 = bridge.module ? bridge.module.HEAPU8.byteLength : 0;
+        const parsed2 = run.parsed;
+        const perf2 = {
+          yolo_ms:          t_c_end - t_c_start,
+          yolo_detected:    corners !== null,
+          chosen_path:      run.pathName,
+          cpp_ms:           run.cpp_ms,
+          worker_total_ms:  performance.now() - t_worker_start,
+          wasm_heap_before: wasmMemBefore,
+          wasm_heap_after:  wasmMemAfter2,
+          cpp_logs:         cppLogs.slice(),
+          wasm_variant:     _loadedVariant,
+          wasm_requested_variant: _requestedVariant || "auto",
+          simd_supported:   _hasSIMD,
+          threads_supported: _hasThreads,
+        };
+        const transfers2 = [run.result.buffer];
+        if (run.preview) transfers2.push(run.preview.buffer);
+        if (run.warpedPreview) transfers2.push(run.warpedPreview.buffer);
+        self.postMessage({ type: OMR_MSG.SHEET_RESULT, payload: {
+          status: run.status, width, height, buffer: run.result.buffer,
+          preview: run.preview ? run.preview.buffer : null,
+          warpedPreview: run.warpedPreview ? run.warpedPreview.buffer : null,
+          previewWidth: run.previewWidth, previewHeight: run.previewHeight,
+          result: parsed2, perf: perf2 } }, transfers2);
+        return;
+      }
+
       const t_yolo_start = performance.now();
       const markerBox = await detectMarkerRegion(imageData);
       const t_yolo_end = performance.now();
@@ -476,6 +610,9 @@ self.onmessage = async (event) => {
       if (markerBox) {
         if (YOLO_MASK_MODE === "raw") {
           console.log(`[worker] YOLO detected marker box but mask=raw, passing raw image to C++`);
+        } else if (YOLO_MASK_MODE === "hint") {
+          processPath = "yolo_hint";
+          console.log(`[worker] YOLO detected marker box; passing raw image + marker ROI hint to C++`);
         } else {
           const masked = maskImageOutsideBox(imageData, markerBox);
           processRgba = new Uint8ClampedArray(masked.data);
@@ -487,7 +624,8 @@ self.onmessage = async (event) => {
       }
 
       const t_cpp_start = performance.now();
-      let chosenRun = runCppSheet(processRgba, processW, processH, groundTruth, processPath);
+      const hintBox = (processPath === "yolo_hint") ? markerBox : null;
+      let chosenRun = runCppSheet(processRgba, processW, processH, groundTruth, processPath, hintBox);
       let fallbackRun = null;
       if (YOLO_FALLBACK === "bestdiag" && markerBox && processPath === "yolo_mask") {
         fallbackRun = runCppSheet(rgba, width, height, groundTruth, "raw_fallback");
@@ -519,7 +657,9 @@ self.onmessage = async (event) => {
         wasm_heap_before: wasmMemBefore,
         wasm_heap_after:  wasmMemAfter,
         cpp_logs:         cppLogs.slice(),
+        yolo_hint_refine: (processPath === "yolo_hint") ? classifyHintRefinement(cppLogs) : null,
         wasm_variant:     _loadedVariant,
+        wasm_requested_variant: _requestedVariant || "auto",
         simd_supported:   _hasSIMD,
         threads_supported: _hasThreads,
       };

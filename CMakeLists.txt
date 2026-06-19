@@ -13,12 +13,12 @@ set(OPENCV_VARIANT "baseline" CACHE STRING "OpenCV build variant: baseline | sim
 option(ENABLE_THREADS "Add Emscripten pthread support to the omr module" OFF)
 
 if(OPENCV_VARIANT STREQUAL "simd")
-  set(OpenCV_DIR "${CMAKE_SOURCE_DIR}/../opencv_wasm_simd")
+  set(OpenCV_DIR "${CMAKE_SOURCE_DIR}/../opencv_wasm_simd/lib/cmake/opencv4")
   set(OMR_OUTPUT_NAME "omr_simd")
 elseif(OPENCV_VARIANT STREQUAL "threads")
-  set(OpenCV_DIR "${CMAKE_SOURCE_DIR}/../opencv_wasm_threads")
+  set(OpenCV_DIR "${CMAKE_SOURCE_DIR}/../opencv_wasm_threads/lib/cmake/opencv4")
   set(OMR_OUTPUT_NAME "omr_threads")
-  set(ENABLE_THREADS ON)
+  set(ENABLE_THREADS ON CACHE BOOL "Add Emscripten pthread support to the omr module" FORCE)
 else()
   set(OpenCV_DIR "${CMAKE_SOURCE_DIR}/../opencv_wasm_build")
   set(OMR_OUTPUT_NAME "omr")
@@ -61,7 +61,7 @@ set(OMR_LINK_OPTS
   "SHELL:-sEXPORT_NAME=OmrModule"
   "SHELL:-sENVIRONMENT=web,worker"
   "SHELL:-sFILESYSTEM=0"
-  "SHELL:-sEXPORTED_FUNCTIONS=['_omr_process_frame','_omr_process_frame_v2','_omr_process_sheet','_omr_get_last_preview','_omr_get_last_warped','_omr_clear_previews','_malloc','_free']"
+  "SHELL:-sEXPORTED_FUNCTIONS=['_omr_process_frame','_omr_process_frame_v2','_omr_process_sheet','_omr_process_sheet_with_hint','_omr_process_sheet_with_corners','_omr_get_last_preview','_omr_get_last_warped','_omr_clear_previews','_malloc','_free']"
   "SHELL:-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPU8','HEAP32']"
 )
 

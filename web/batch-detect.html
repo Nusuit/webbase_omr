@@ -87,14 +87,28 @@ window.ResourceMonitor = ResourceMonitor;
 
 const PAGE_PARAMS = new URLSearchParams(location.search);
 const METHOD = (PAGE_PARAMS.get("method") || "cv").toLowerCase();
+// Validation path: inject precomputed YOLO corner keypoints (corners_pred.json,
+// keyed by image basename) so the C++ corner-warp entry can be scored on n=179
+// without running ONNX in-browser. The detector quality is validated offline.
+let CORNERS = null;
+const CORNERS_READY = (METHOD === "corners")
+  ? fetch("/corners_pred.json").then(r => r.json()).then(j => { CORNERS = j; })
+      .catch(e => { console.error("corners_pred.json load failed", e); })
+  : Promise.resolve();
 function workerSource() {
-  if (METHOD !== "yolo") return "./js/worker-cv.js";
   const workerParams = new URLSearchParams();
-  ["pad", "mask", "fallback"].forEach((key) => {
+  ["variant"].forEach((key) => {
     if (PAGE_PARAMS.has(key)) workerParams.set(key, PAGE_PARAMS.get(key));
   });
+  if (METHOD === "yolo") ["pad", "mask", "fallback"].forEach((key) => {
+    if (PAGE_PARAMS.has(key)) workerParams.set(key, PAGE_PARAMS.get(key));
+  });
+  // yolocorner: in-browser corner-keypoint model (960, WebGPU) → C++ direct warp.
+  if (METHOD === "yolocorner") workerParams.set("det", "corner");
   const query = workerParams.toString();
-  return "./js/worker-yolo.js" + (query ? `?${query}` : "");
+  const useYoloWorker = (METHOD === "yolo" || METHOD === "yolocorner");
+  const workerFile = useYoloWorker ? "./js/worker-yolo.js" : "./js/worker-cv.js";
+  return workerFile + (query ? `?${query}` : "");
 }
 const WORKER_SRC = workerSource();
 document.title = `OMR Batch Detect [${METHOD}]`;
@@ -158,9 +172,14 @@ function processOne(url){
           yolo_detected: p.perf ? !!p.perf.yolo_detected : false,
           yolo_pad_pct: p.perf && Number.isFinite(p.perf.yolo_pad_pct) ? p.perf.yolo_pad_pct : null,
           yolo_mask_mode: p.perf ? p.perf.yolo_mask_mode || null : null,
+          yolo_hint_refine: p.perf ? p.perf.yolo_hint_refine || null : null,
           yolo_fallback: p.perf ? p.perf.yolo_fallback || null : null,
           yolo_chosen_path: p.perf ? p.perf.chosen_path || null : null,
-          yolo_fallback_used: p.perf ? !!p.perf.fallback_used : false
+          yolo_fallback_used: p.perf ? !!p.perf.fallback_used : false,
+          wasm_variant: p.perf ? p.perf.wasm_variant || null : null,
+          wasm_requested_variant: p.perf ? p.perf.wasm_requested_variant || null : null,
+          simd_supported: p.perf ? p.perf.simd_supported : null,
+          threads_supported: p.perf ? p.perf.threads_supported : null
         };
         (r.answers || []).forEach((answer, idx) => {
           out[`auto_q${String(idx + 1).padStart(2, "0")}`] =
@@ -174,7 +193,11 @@ function processOne(url){
       }
     };
     worker.addEventListener("message", handler);
-    worker.postMessage({ type: OMR_MSG.PROCESS_SHEET, payload: { width: 0, height: 0, file, groundTruth: null } });
+    let corners = null;
+    if (METHOD === "corners" && CORNERS) {
+      corners = CORNERS[decodeURIComponent(url.split("/").pop())] || null;
+    }
+    worker.postMessage({ type: OMR_MSG.PROCESS_SHEET, payload: { width: 0, height: 0, file, groundTruth: null, corners } });
   });
 }
 
@@ -184,6 +207,8 @@ async function run(){
   L("[init] fetching manifest: " + manifestUrl);
   const manifest = await (await fetch(manifestUrl)).json();
   L("[init] " + manifest.length + " images. Initializing worker...");
+  await CORNERS_READY;
+  if (METHOD === "corners") L("[init] corners loaded: " + (CORNERS ? Object.keys(CORNERS).length : 0) + " sheets");
   await initWorker();
 
   // ── Warm-up (discarded) — matches the Native runner's 5-sheet warmup so the
