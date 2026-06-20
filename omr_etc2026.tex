@@ -50,23 +50,24 @@ Huy Kien Phan & Minh Chau Truong & Thanh Binh Nguyen
 
 \begin{abstract}
 Browser-based Optical Mark Recognition (OMR) can keep student answer
-sheets on-device and avoid application installation, but its practical
-performance depends on more than neural-network inference. This paper
-benchmarks a complete Web Edge OMR pipeline that combines WebAssembly
-(\wasm{}) computer vision with WebGPU YOLO inference, and compares it
-with a Native Android baseline on a reviewed 179-sheet set across six
-Web hosts and one mobile device. The Web CV path reaches 99.00\%
-question accuracy, and the YOLO handoff study shows that detector
-localization must be validated against the downstream fixed-template
-recognizer rather than treated as an automatic accuracy gain. The main
-result is stage attribution: WebGPU makes YOLO inference secondary,
-while deterministic CV running through \wasm{} dominates end-to-end
-latency. On the current $N{=}179$ set, the same-boundary CV
-\texttt{cpp\_ms} gap between Mobile Web and Native is $7.0\times$, and on
-the same processing boundary Mobile Web YOLO \texttt{cpp\_ms} remains
-$2.83\times$ slower than Native NNAPI. These
-results show that competitive Web Edge OMR depends primarily on
-reducing \wasm{} CV overhead, not further accelerating YOLO inference.
+sheets on the device and needs no application install, but how its cost
+distributes across processing stages and platforms has not been measured.
+This paper contributes a cross-platform benchmark of a complete Web Edge
+OMR pipeline that pairs WebAssembly (\wasm{}) computer vision with WebGPU
+YOLO inference, measured against a Native Android baseline on a
+human-reviewed corpus of 179 answer sheets and seven Web hosts. We report
+recognition accuracy, per-stage latency, and resource use for two
+interchangeable configurations: a CV-only pipeline at 99.00\% question
+accuracy, and a YOLO corner-keypoint detector that feeds four predicted
+markers into the homography and reaches 99.43\% across four devices; for
+reference, consuming the same detector as a bounding-box crop measures
+63.70--74.40\%. The latency data localize the cost: on the same Redmi
+device the \wasm{} CV core is $6.1\times$ slower than Native ($466$ vs
+$77$\,ms), against only $3.6\times$ between WebGPU and NNAPI inference.
+These measurements indicate that WebGPU has already made YOLO inference a
+secondary cost, while the deterministic CV stage executed through \wasm{}
+governs end-to-end latency, so a competitive Web Edge OMR depends on
+reducing \wasm{} CV overhead rather than on accelerating the detector.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -86,46 +87,51 @@ systems~\cite{patel2015,okorie2022}. Native mobile applications avoid
 data transmission but require platform-specific packaging, app-store
 distribution, and per-platform maintenance overhead.
 
-Recent advances in \wasm{} and WebGPU enable computer-vision and
-deep-learning workloads to execute directly inside modern web browsers
-without plugins or installation. This creates a third deployment model:
+Recent maturation of \wasm{} and WebGPU now allows computer-vision and
+deep-learning workloads to execute directly inside modern browsers
+without plugins or installation, which enables a third deployment model:
 a fully client-side pipeline in which answer-sheet images are processed
-entirely within the browser and never transmitted to any server. The
-same URL-deployed code bundle runs across desktop and mobile browsers,
-removing both the data-exposure risk of server-side grading and the
-installation friction of native applications.
+within the browser and never leave the device. Because a single
+URL-deployed bundle serves both desktop and mobile browsers, this model
+avoids the data-exposure risk inherent in server-side grading while also
+removing the installation friction of a native application.
 
-Realizing this model requires two heterogeneous execution paths within
-the browser sandbox. Classical image-processing stages---perspective
-rectification, adaptive thresholding, and fixed-grid bubble
-reading---are compiled from C\texttt{++}/OpenCV to \wasm{} and execute on
-the CPU. Neural-network inference for sheet-region localization uses ONNX
-Runtime Web with a WebGPU backend. These two paths operate under
-different browser APIs and on different hardware, so their relative cost
-determines whether the combined pipeline is competitive with native
-execution.
+In the browser these workloads map onto two different substrates. The
+classical image-processing stages, namely perspective rectification,
+adaptive thresholding, and fixed-grid bubble reading, are compiled from
+C\texttt{++}/OpenCV to \wasm{} and run on the CPU, whereas sheet-region
+localization can optionally be offloaded to neural inference through ONNX
+Runtime Web on a WebGPU backend. A deployment may thus run a CV-only
+pipeline or add a YOLO detector for the localization step; because the two
+substrates use different browser APIs and hardware, it is their relative
+cost rather than either component in isolation that determines whether a
+given configuration can rival native execution. This benchmark measures
+both.
 
-This paper studies whether WebGPU inference is enough to make a Web
-Edge OMR pipeline competitive with Native Android. The answer is no
-under the measured workload: WebGPU reduces YOLO latency, but the
-deterministic CV/\wasm{} stage dominates end-to-end behavior. Native
-Android remains the lower-latency deployment; Web Edge is the
-privacy-preserving and URL-deployed trade-off whose competitiveness
-depends on bounding the \wasm{} CV stage.
+This paper accordingly asks whether WebGPU inference, on its own, is
+sufficient to make a Web Edge OMR pipeline competitive with Native
+Android. Under the measured workload the answer is negative: WebGPU does
+reduce YOLO latency, but the deterministic CV/\wasm{} stage then comes to
+dominate end-to-end behavior. This leaves Native Android as the
+lower-latency deployment, while Web Edge stands as the privacy-preserving
+and URL-deployed alternative whose competitiveness depends on bounding
+that \wasm{} CV stage.
 
 The paper makes three contributions:
 \begin{enumerate}[leftmargin=*, itemsep=1pt, topsep=2pt]
   \item A reviewed cross-platform OMR benchmark on a 179-sheet set with
-  supervised accuracy, latency, and resource measurements across six Web
+  supervised accuracy, latency, and resource measurements across seven Web
   Edge hosts and one Native Android baseline.
   \item A stage-attribution result showing that \wasm{} OMR, not YOLO
-  inference, is the dominant bottleneck: the same-round CV
-  \texttt{cpp\_ms} gap between Mobile Web and Native is $7.0\times$, and
-  Mobile Web YOLO \texttt{cpp\_ms} is $2.83\times$ the Native NNAPI
-  boundary.
-  \item A YOLO handoff analysis: raw handoff preserves the 99.00\% CV
-  recognition score, but detector hard masks drop to 63.70\% and
-  74.40\%, so bbox-guided cropping must be validated separately.
+  inference, is the dominant bottleneck: on the same Redmi device the CV
+  \texttt{cpp\_ms} gap between Mobile Web and Native is $6.1\times$
+  ($466$ vs $77$\,ms), whereas the WebGPU-versus-NNAPI inference gap is
+  only $3.6\times$ ($541$ vs $150$\,ms).
+  \item A corner-keypoint formulation that turns YOLO into a validated
+  primary detector: feeding the four predicted corner markers directly to
+  the homography reaches 99.43\% across four devices, exceeding the
+  99.00\% CV baseline, whereas the naive bounding-box mask of the same
+  detector collapses to 63.70--74.40\%.
 \end{enumerate}
 
 \section{Related Work}
@@ -151,33 +157,33 @@ unclear how inference cost relates to the surrounding CV pipeline on
 constrained devices.
 
 \paragraph{Browser-based edge computing}
-\wasm{} and WebGPU enable privacy-preserving client-side execution in
-modern browsers, with neural inference exposed through ONNX Runtime
-Web~\cite{microsoft2021}. Jangda et al.~\cite{jangda2019} report that
-\wasm{} is on average 45\% slower than native execution on
-compute-intensive benchmarks, indicating potential overhead for
-C\texttt{++} image-processing workloads compiled to \wasm{}. Wang et
-al.~\cite{wang2024} find browser DL inference to be $16.9\times$ slower
-than native on CPU and $4.9\times$ on GPU, with WebGPU providing the
-best browser-side performance among the evaluated back-ends.
-Nevertheless, these evaluations focus on isolated workloads rather than
-complete computer-vision pipelines. The emerging W3C WebNN
-API~\cite{webnn2024} provides a higher-level hardware-abstraction layer
-for neural-network acceleration in the browser, but the current draft
-remains a work in progress. Consequently, the interaction between
-\wasm{}-based image processing and WebGPU inference in real applications
-remains insufficiently understood.
+\wasm{} and WebGPU together enable privacy-preserving client-side
+execution in modern browsers, with neural inference exposed through ONNX
+Runtime Web~\cite{microsoft2021}. Quantitative evidence on the associated
+overhead is already available: Jangda et al.~\cite{jangda2019} report
+that \wasm{} runs on average 45\% slower than native code on
+compute-intensive benchmarks, a margin that is directly relevant to
+C\texttt{++} image-processing workloads compiled to \wasm{}, and Wang et
+al.~\cite{wang2024} measure browser deep-learning inference at
+$16.9\times$ slower than native on CPU and $4.9\times$ on GPU, with
+WebGPU emerging as the strongest browser-side back-end. These studies,
+however, characterize isolated kernels rather than complete
+computer-vision pipelines. A higher-level abstraction is also emerging in
+the W3C WebNN API~\cite{webnn2024}, yet it remains a draft, so the
+practical interaction between \wasm{}-based image processing and WebGPU
+inference within a full application is still poorly understood.
 
 \paragraph{Research gap}
-Existing work studies either OMR accuracy or browser inference
-performance in isolation. To our knowledge, no prior study has evaluated
-a fully client-side browser OMR pipeline in which both computer vision
-and neural inference are executed locally without transmitting
-answer-sheet data to external servers. Furthermore, it remains unclear
-whether end-to-end latency is dominated by neural inference or by
-\wasm{}-executed computer vision stages. This paper addresses these gaps
-through controlled per-stage profiling of a YOLOv8n-based browser OMR
-system across multiple execution back-ends and deployment configurations.
+Prior work thus examines either OMR accuracy or browser inference
+performance, but rarely both within one system. We are not aware of a
+study that evaluates a fully client-side browser OMR pipeline in which
+computer vision and neural inference both execute locally, without any
+transmission of answer-sheet data to external servers. It likewise
+remains open whether end-to-end latency on such a pipeline is governed by
+neural inference or by the \wasm{}-executed computer-vision stages. The
+present paper closes these gaps through controlled per-stage profiling of
+a YOLOv8n-based browser OMR system across several execution back-ends and
+deployment configurations.
 
 \section{System Architecture and Methods}
 
@@ -295,116 +301,167 @@ system across multiple execution back-ends and deployment configurations.
 \end{figure}
 
 \subsection{Cross-Platform System Architecture}
-The system adopts a layered runtime architecture for on-device OMR,
-illustrated in Fig.~\ref{fig:arch}(a). Image data acquired from a camera
-stream or uploaded file is first received by the JavaScript main thread,
-which handles user interaction and data acquisition. The image is then
-transferred to a dedicated Web Worker so that computation does not block
-UI responsiveness. Within the worker, an Algorithm Dispatcher selects
-either a conventional CV-only pipeline or a hybrid YOLO$+$CV pipeline. In
-the hybrid configuration, object localization is performed by an
-ONNX-based YOLO model on a WebGPU backend, while image processing and
-grading run in a \wasm{} OMR core built on OpenCV.js. Localization
-outputs (bounding boxes or masks) are forwarded to the \wasm{} module, so
-both pipelines share the same grading workflow. The WebGPU and \wasm{}
-backends operate within the OS/Browser sandbox, which manages scheduling,
-memory, and security while mapping work onto the available CPU, GPU, and
-NPU. This layered design separates application control, algorithm
-execution, and hardware abstraction, providing a unified implementation
-across heterogeneous platforms.
+The system is organized as the layered runtime shown in
+Fig.~\ref{fig:arch}(a), where each layer hides the one beneath it so that
+the same application code runs unchanged on heterogeneous hardware. At the
+top, the JavaScript main thread owns user interaction and image
+acquisition from a camera stream or an uploaded file, but it delegates all
+computation to a dedicated Web Worker so that heavy processing never
+blocks UI responsiveness. Within the worker, an Algorithm Dispatcher
+selects between a conventional CV-only pipeline and a hybrid YOLO$+$CV
+pipeline; in the hybrid case it drives an ONNX YOLO model on a WebGPU
+backend for localization, while the \wasm{} OMR core built on OpenCV.js
+performs the actual recognition and grading. Since the dispatcher feeds
+any localization output into that same \wasm{} core, the two pipelines
+remain interchangeable at the recognition stage. Both back-ends ultimately
+execute inside the OS and browser sandbox, which mediates scheduling,
+memory, and security before mapping the work onto whatever CPU, GPU, or
+NPU the device exposes. This separation between application control,
+algorithm execution, and hardware access is what lets a single codebase
+target desktop and mobile platforms without modification.
 
 \subsection{Pipeline}
 
-Fig.~\ref{fig:arch} separates the runtime stack from the algorithmic
-flow. The worker executes either a CV-only path or a YOLO$+$CV path.
-The CV path performs grayscale/blur preprocessing, marker or paper
-boundary detection, homography into a canonical $1700\times2400$
-template, adaptive thresholding, and fixed-grid bubble-density reading.
-The YOLO path fine-tunes YOLOv8n for four localization classes
-(\texttt{marker\_corners}, \texttt{id\_keycode},
-\texttt{questions\_1\_20}, \texttt{questions\_21\_60}); inference uses a
-$640\times640$ letterboxed tensor, confidence filtering, and NMS before
-passing a retained region to the same CV recognizer.
+Fig.~\ref{fig:arch}(b) traces a single sheet from capture to score along
+a predominantly linear spine, comprising the Input Frame, JS Decode \&
+Prep, Method Selection, a detect stage, Fixed Grid Bubble Detection, and
+Grade Output. Detection is the only stage that forks: it splits into a CV
+branch and a YOLO branch, both of which converge again before grading so
+that the remainder of the pipeline is identical in either configuration.
 
-The CV recognizer is intentionally deterministic. Marker candidates are
-derived from thresholded connected components and geometric filters; if
-the marker route is unreliable, a paper-boundary fallback estimates the
-sheet corners. The selected quadrilateral defines a homography into the
-template coordinate system, after which bubble centers are fixed by the
-known grid. Each option is scored by foreground density inside a circular
-sampling window and then normalized at the row level. This design makes
-the algorithm fast and reproducible, but also means that small geometric
-changes introduced before the homography stage can propagate into the
-entire answer grid.
+The main thread first hands the worker a raw frame or uploaded image,
+here at $1{,}145\times2{,}560$\,px. \emph{JS Decode \& Prep} renders this
+image onto a canvas and derives the two artifacts that the downstream
+stages require, namely an RGBA pixel buffer for the \wasm{} core and,
+whenever the hybrid path is selected, a $640\times640$ letterboxed tensor
+for YOLO. \emph{Method Selection} then routes the image into one of the
+two detect branches. Because each branch performs the single task of
+placing the answer grid at known coordinates and both subsequently feed
+the same recognizer, the chosen branch alters only how the sheet is
+located, never how an answer is ultimately read.
 
-YOLO is therefore used as a localization stage rather than as a direct
-answer classifier. It can identify regions such as the marker corners
-and question blocks, but the answer string remains the output of the CV
-recognizer. This separation is useful for benchmarking because it lets
-the paper distinguish three cases: CV-only recognition, YOLO inference
-with raw handoff, and YOLO hard masks that alter the image entering the
-recognizer. The accuracy ablation in Section~\ref{sec:results-recognition}
-follows directly from these handoff modes.
+On the CV branch, the \wasm{} core recovers the page geometry without
+external guidance. The \emph{Normalize} stage thresholds the image,
+extracts connected components, and retains the four corner registration
+markers by filtering candidate blobs on area, aspect ratio, and fill;
+when that marker route proves unreliable, it instead falls back to the
+white paper boundary. From the four resulting reference points it
+estimates a homography onto a canonical $1700\times2400$ template, which
+the \emph{Marker Crop} stage applies so that the answer grid is brought
+to fixed positions.
 
-This split is imposed by the Web platform. OpenCV.js exposes the CV
-pipeline through \wasm{}, while ONNX Runtime Web can execute YOLO via
-WebGPU. Thus WebGPU accelerates learned localization but not
-homography, thresholding, or grading. Native Android uses OpenCV through
-Kotlin/JNI and ONNX Runtime Android with CPU 1T, CPU 4T, and NNAPI
-providers. Native Android is used only as a latency/resource baseline:
-the current Android benchmark does not export per-question Native YOLO
-labels aligned to the reviewed ground truth, so no Native accuracy
-claim is made.
+On the YOLO branch, the image is first \emph{letterboxed} into a
+$640\times640$ square, that is, scaled to fit while preserving its aspect
+ratio and padding the leftover margin, and a YOLOv8n model fine-tuned for
+four classes (\texttt{marker\_corners}, \texttt{id\_keycode},
+\texttt{questions\_1\_20}, and \texttt{questions\_21\_60}) then runs on
+this square input through the WebGPU backend. The \emph{NMS + BBox Map}
+stage removes low-confidence boxes, suppresses overlapping detections, and
+maps the kept region from the letterboxed frame back to original image
+coordinates, after which \emph{Mask Region} crops to that region and
+forwards it to the \emph{same} \wasm{} core, re-entering the CV branch
+precisely at the warp step. YOLO thus contributes localization alone,
+since the answer string is invariably decoded by the CV recognizer rather
+than by the detector.
 
-The benchmark treats runtime differences as part of the deployment
-environment. OpenCV.js and OpenCV Android share source-level algorithmic
-stages but not binary implementation details: OpenCV version, memory
-layout, SIMD scheduling, floating-point ordering, and image-buffer
-marshalling can differ. The same exported ONNX model is used for Web and
-Native inference to avoid framework-conversion variance, but the
-execution providers are intentionally platform-native: WebGPU in the
-browser and CPU/NNAPI on Android.
+These detections can be consumed in two ways, and
+Section~\ref{sec:results-recognition} shows the choice to be decisive. The
+bounding-box variant just described masks or crops the image to the
+detected region. A corner-keypoint variant instead trains YOLO to emit
+the four corner registration markers and passes their centres directly to
+the homography, which lets the \wasm{} core skip both blob detection and
+the second marker re-detection; this variant is the one evaluated as the
+primary detector in our results.
 
-\subsection{Platform-Specific Optimization and Deployment}
-The two deployment targets offer complementary trade-offs. The Web Edge
-implementation employs OpenCV.js and WebGPU, enabling cross-platform
-execution and browser deployment without installation; however, browser
-sandboxing introduces additional overhead and limits direct access to
-hardware accelerators. The Native Android implementation instead uses the
-OpenCV Android SDK and ONNX Runtime Android, allowing direct hardware
-acceleration through frameworks such as NNAPI and thus lower inference
-latency, at the cost of increased packaging and per-platform maintenance
-complexity. Unlike conventional cloud-based mobile OMR, both deployments
-perform all processing locally on the device, eliminating network
-latency, enabling offline operation, and avoiding data transmission to
-external servers; compared with server-side OMR, this edge-computing
-approach also removes the need for dedicated server infrastructure and
-reduces operational cost.
+Once the two branches have rejoined on a common rectified crop,
+\emph{Adaptive Threshold} performs local blurring and thresholding, and
+\emph{Fixed Grid Bubble Detection} reads the answers. As the sheet now
+resides in template coordinates, the grid fixes every bubble center in
+advance, so that each option can be scored by the foreground density
+inside a circular sampling window and the scores can be normalized within
+each row, which prevents a uniformly dark or faint scan from biasing the
+decision. The final \emph{Grade Output} stage emits the decoded answer
+string together with validity and suspicious-mark flags and the per-stage
+timers reported throughout this paper.
+
+This linear dependence carries a consequence that the accuracy results in
+Section~\ref{sec:results-recognition} make concrete. Because the
+recognizer is deterministic, any geometric error introduced before the
+homography does not remain local but instead displaces the entire grid,
+which is precisely why detector-guided cropping must be regarded as an
+integral part of the recognition algorithm rather than a harmless
+preprocessing step.
+
+% NOTE(yolo-role): RESOLVED 2026-06-19. Corner-keypoint is now the
+% validated primary detector (99.43%, Table II + Table hybrid); bbox-mask
+% kept as the cautionary ablation. Fig 1(b) still draws the bbox flow;
+% redraw the YOLO branch as corner-keypoints if a figure revision is done.
+
+\subsection{Deployment Trade-offs}
+The two targets are complementary in their trade-offs. Web Edge, built on
+OpenCV.js and WebGPU, executes across platforms and deploys directly from
+a URL without installation, although it pays for this portability through
+browser sandboxing and only indirect access to hardware accelerators.
+Native Android, built on the OpenCV Android SDK and ONNX Runtime Android,
+instead reaches the hardware directly through providers such as NNAPI and
+thereby achieves lower inference latency, at the cost of application
+packaging and per-platform maintenance. What the two targets share is
+nonetheless more consequential for this study than where they differ,
+since both perform all computation on the device: neither transmits
+answer-sheet data, neither requires a network connection at inference
+time, and neither depends on server infrastructure. It is this common
+on-device property that makes a like-for-like latency comparison between
+them meaningful.
 
 \section{Experimental Setup}
 
-The $N{=}179$ system set contains five sub-datasets
-(\texttt{dataset\_1}=48, \texttt{dataset\_2}=47,
-\texttt{dataset\_3}=35, \texttt{dataset\_4}=45,
-\texttt{dataset\_5}=4) captured at $1{,}145\times2{,}560$\,px on a
-Redmi Note~13 Pro+. A human-reviewed CSV under
-\texttt{runs/accuracy\_eval/} marks invalid trailing questions as
-\texttt{NA}, yielding 9,488 valid question labels and 47,440 binary
-A/B/C/D/E bubble decisions. YOLO training uses 56 manually annotated
-sheets (45 train, 11 validation) with the default Ultralytics YOLOv8n
-recipe and a single exported ONNX model shared by Web and Native.
+% NOTE(N=179 = student sheets evaluated for accuracy; 6 answer keys are
+% the GT source and excluded from the count — clarified in text below.)
+The $N{=}179$ evaluation set is the student answer sheets (the
+``B\`ai l\`am'' images) drawn from five sub-datasets
+(\texttt{dataset\_1}=48, \texttt{dataset\_2}=47, \texttt{dataset\_3}=35,
+\texttt{dataset\_4}=45, \texttt{dataset\_5}=4), each captured at
+$1{,}145\times2{,}560$\,px on a Redmi Note~13 Pro+. These 179 sheets
+carry the 9,488 valid question labels and 47,440 binary A/B/C/D/E
+decisions behind every accuracy figure in this paper; a human-reviewed
+CSV under \texttt{runs/accuracy\_eval/} marks invalid trailing questions
+as \texttt{NA}. The corpus also holds six answer-key sheets (two for
+\texttt{dataset\_1}, one for each of the others). These keys are the
+ground-truth source and are themselves full sheets the pipeline has to
+localize, but they are not part of the 179-sheet accuracy count. The
+corner-keypoint detector evaluated as the primary localizer is trained on
+186 manually annotated sheets (158 train, 28 validation) under the default
+Ultralytics YOLOv8n recipe and exported to ONNX for in-browser WebGPU
+inference; the earlier four-class region detector, used only for the
+bounding-box ablation and on Native, was trained on 56 sheets and shared
+as a single ONNX model by Web and Native.
 
-Six Web hosts replay the same $N{=}179$ images: a desktop reference
-(i5-14600K/RTX 4070 Ti SUPER), ASUS Vivobook (i5-13500H), Acer Nitro~5
-(i5-10300H), MacBook Air M1, iPhone~16 Safari/WebKit, and Redmi
-Note~13 Pro+ Chrome/Blink. The Native Android baseline runs on the same
-Redmi device. Web latency rows report worker-side \texttt{cpp\_ms};
-Native rows report file-based \texttt{e2e\_ms}. Same-boundary
-statistical tests use \texttt{cpp\_ms} on both Web and Native.
-Resources use the instrument available on each host: \texttt{psutil}
-for Windows Chrome, an in-page timer-lag proxy for browser hosts where
-process sampling is unavailable, and an Android in-app sampler for
-Native.
+The Native Android baseline runs the same algorithmic stages through
+platform-native runtimes: OpenCV via Kotlin/JNI for the CV core, and ONNX
+Runtime Android for inference with CPU single-thread, CPU four-thread,
+and NNAPI providers. It is a latency and resource reference only. Because
+the current Android build does not export per-question labels aligned to
+the reviewed ground truth, we make no Native accuracy claim. Web and
+Native share these stages at the source level but not in compiled form:
+OpenCV version, memory layout, SIMD scheduling, floating-point ordering,
+and image-buffer marshalling all differ between OpenCV.js and OpenCV
+Android, so that identical inputs need not produce bit-identical outputs.
+To keep the inference component itself comparable, both targets load the
+same ONNX model and vary only the execution provider, which is WebGPU in
+the browser and either CPU or NNAPI on Android.
+
+Seven Web hosts replay the identical $N{=}179$ images: a desktop
+reference (i5-14600K / RTX 4070 Ti SUPER), an ASUS Vivobook (i5-13500H),
+an Acer Nitro~5 (i5-10300H), a MacBook Air M1, an iPhone~16
+(Safari/WebKit), a Poco Pad M1 Android tablet (Chrome/Blink), and the
+Redmi Note~13 Pro+ (Chrome/Blink), with the Native baseline running on
+that same Redmi device. Web latency rows report worker-side
+\texttt{cpp\_ms} whereas Native rows report file-based \texttt{e2e\_ms},
+so that same-boundary tests are restricted to \texttt{cpp\_ms} on both
+sides. Resource sampling relies on whichever instrument each host
+exposes, namely \texttt{psutil} for Windows Chrome, an in-page
+timer-lag proxy where direct process sampling is unavailable, and an
+in-app sampler on Native.
 
 \begin{table}[t]
 \caption{Benchmark artifacts and metric boundaries.}
@@ -431,15 +488,14 @@ comparisons. Web browser wall-time is not exported by the current batch
 logs.}
 \end{table}
 
-Table~\ref{tab:metrics} summarizes the evidence boundary for each
-claim. Accuracy is a direct supervised comparison against the
-human-reviewed CSV. Web \texttt{cpp\_ms} starts after image data reaches
-the worker and excludes main-thread decode and UI work; Native
-\texttt{e2e\_ms} includes file decode, processing, and debug write. The
-paper therefore avoids presenting the Web-vs-Native rows as a strict
-full-E2E race. When a same-boundary ratio is needed, both sides use
-\texttt{cpp\_ms}; when deployment latency is discussed, the boundary is
-stated in the caption or text.
+Table~\ref{tab:metrics} fixes the evidence boundary for each claim.
+Accuracy is a direct supervised comparison against the human-reviewed
+CSV. Web \texttt{cpp\_ms} starts once image data reaches the worker and
+excludes main-thread decode and UI work, while Native \texttt{e2e\_ms}
+includes file decode, processing, and a debug write. We therefore do not
+present the Web-vs-Native rows as a strict full-E2E race: a same-boundary
+ratio always uses \texttt{cpp\_ms} on both sides, and where deployment
+latency is discussed the boundary is named in the caption or text.
 
 \section{Results and Discussion}
 
@@ -448,30 +504,33 @@ stated in the caption or text.
 
 Table~\ref{tab:accuracy} reports supervised exact-match recognition on
 the reviewed $N{=}179$ artifact. Traditional CV correctly recognizes
-9,393 of 9,488 valid questions (99.00\%) and exactly matches all valid
-questions on 137 of 179 sheets. The YOLO raw-handoff row is identical
-by construction: YOLO is executed, but the downstream C\texttt{++}
-recognizer receives the same unmasked image as CV-only. In contrast,
-the configurations that actually consume YOLO hard masks drop to
-63.70\% (12\% bbox expansion) and 74.40\% (20\%), showing that
-detector-assisted cropping can destabilize the fixed-template grid.
-At the bubble level, the reviewed artifact gives Precision 0.992,
-Recall 0.994, and F1 0.993 for CV and raw-handoff YOLO.
+9,393 of the 9,488 valid questions, a question-level accuracy of 99.00\%,
+and reproduces every valid answer on 137 of the 179 sheets. Replacing the
+CV sheet-localization stage with a YOLO corner-keypoint detector, which
+emits the four corner registration markers and feeds their centres
+directly to the homography, raises accuracy to 99.43\% (9,434/9,488) and
+increases the number of fully correct sheets to 153 of 179. The detector
+thus operates as a genuine primary localizer rather than a preprocessor,
+and it does so reproducibly: the same configuration returns 99.43\% on
+every repeated run on the mobile devices.
 
-This negative result is important for interpreting YOLO's role. The
-raw-handoff row should not be read as a detector-driven accuracy gain:
-it executes the detector but intentionally leaves the recognizer input
-unchanged. It is included to keep the latency pipeline complete while
-avoiding a recognition algorithm change. A separate handoff audit under
-\texttt{runs/accuracy\_eval/yolo\_detection\_n179/} shows that this
-raw path completed on all 179 sheets with zero fallback, while the
-detector flag itself is true for 154 sheets. The hard-mask rows are the
-actual detector-consuming variants, and their large drop shows that a
-detector run is not sufficient for fixed-template OMR.
-Small changes to the crop boundary alter marker refinement and the
-downstream bubble grid, especially on lightly filled or marginally
-photographed sheets. For this reason, bbox-guided cropping is treated
-as a separate recognition algorithm rather than a harmless preprocessor.
+The size of this gain depends entirely on how the detections are
+consumed. When the identical detector output is instead applied as a hard
+bounding-box mask, accuracy collapses to 63.70\% at a 12\% box expansion
+and to 74.40\% at 20\%, because an imperfect crop perturbs the subsequent
+marker re-detection and, through it, the entire fixed grid. The
+raw-handoff configuration isolates this mechanism: it executes the
+detector but leaves the recognizer input unchanged, so it reproduces the
+CV baseline exactly and confirms that merely running YOLO is by itself
+neither helpful nor harmful. The corner-keypoint path avoids the collapse
+precisely because it provides an exact four-point geometry and bypasses
+the second marker re-detection that destabilizes the mask path; the
+benefit is largest on the lightly filled or marginally photographed
+sheets where the mask variants fail most often. At the bubble level, the
+CV and raw-handoff pipelines attain a Precision of 0.992, a Recall of
+0.994, and an F1 of 0.993 over the 47,440 binary decisions, and the
+corner-keypoint pipeline matches this baseline while exceeding it on the
+question- and sheet-level metrics above.
 
 \begin{table}[t]
 \caption{Supervised question-level recognition accuracy on the reviewed
@@ -486,7 +545,8 @@ $N{=}179$ set.}
 & \textbf{Sheet Exact} & \textbf{GT Blank}
 & \textbf{Pred Blank} & \textbf{Pred Multi} \\
 \midrule
-Traditional CV              & \textbf{99.00\%} & \textbf{9{,}393}/9{,}488 & \textbf{137}/179 & 44 & 42  & 18 \\
+YOLO corner keypoints       & \textbf{99.43\%} & \textbf{9{,}434}/9{,}488 & \textbf{153}/179 & 44 & 21  & 12 \\
+Traditional CV              & 99.00\%          & 9{,}393/9{,}488          & 137/179          & 44 & 42  & 18 \\
 YOLO + CV, raw handoff      & 99.00\%          & 9{,}393/9{,}488          & 137/179          & 44 & 42  & 18 \\
 YOLO + CV, hard mask (12\%) & 63.70\%          & 6{,}044/9{,}488          & 84/179           & 44 & 987 & 231 \\
 YOLO + CV, hard mask (20\%) & 74.40\%          & 7{,}059/9{,}488          & 101/179          & 44 & 614 & 199 \\
@@ -494,21 +554,34 @@ YOLO + CV, hard mask (20\%) & 74.40\%          & 7{,}059/9{,}488          & 101/
 \end{tabular}}
 \vspace{2pt}
 \parbox{\columnwidth}{\footnotesize
-Artifacts are under \texttt{runs/accuracy\_eval/} and the Redmi YOLO
-raw-handoff batch JSON. Bubble-level CV/raw-handoff metrics are
+Corner-keypoint is the in-browser YOLO 4-corner detector feeding a direct
+homography (median over five runs per device, identical on the mobile
+devices). Hard-mask and raw-handoff rows share the same detector but
+consume it differently. Bubble-level CV/raw-handoff metrics are
 P=0.992, R=0.994, F1=0.993 over 47,440 binary decisions.}
 \end{table}
 
 \subsection{Cross-Platform Latency}
 \label{sec:latency}
+Fig.~\ref{fig:latency} and Tables~\ref{tab:hybrid}--\ref{tab:latency}
+report the deployment benchmark, which confirms that WebGPU has already
+reduced machine-learning inference to a secondary cost and that the
+residual Web-versus-Native gap originates in the deterministic CV stage
+rather than in the detector.
 
-Table~\ref{tab:latency} and Fig.~\ref{fig:latency} report the
-deployment benchmark. WebGPU makes ML inference secondary: warm YOLO
-inference falls from $1{,}170$\,ms to $142$\,ms on the desktop reference
-profile, but Mobile Web YOLO raw-handoff still reports $669\pm30$\,ms
-\texttt{cpp\_ms} and $998\pm75$\,ms worker-total time. Native Android
-on the same Redmi device reaches $264\pm17$\,ms file-based E2E with
-NNAPI.
+The clearest evidence is a same-device, same-boundary comparison on the
+Redmi. For the CV core, measured as the \texttt{cpp\_ms} of the
+C\texttt{++}/OpenCV OMR stage, Native Android requires only $77$\,ms
+whereas the Mobile Web build requires $466$\,ms, a $6.1\times$ gap that
+arises solely from executing the same algorithm through \wasm{}. The
+learned stage behaves very differently: WebGPU YOLO inference on the Redmi
+takes $541$\,ms against $150$\,ms for the Native NNAPI provider, a
+$3.6\times$ gap that is far smaller than the $16.9\times$ CPU slowdown
+reported for browser deep-learning inference in prior
+work~\cite{wang2024}, which shows that WebGPU is already an effective
+accelerator. Since the CV gap exceeds the inference gap and the CV stage
+runs on every sheet irrespective of the detector, the first-order lever
+for Web Edge latency is the \wasm{} CV runtime, not the detector back-end.
 
 \begin{figure}[!b]
   \centering
@@ -519,101 +592,119 @@ NNAPI.
   \label{fig:latency}
 \end{figure}
 
-The reason is the deterministic CV stage. In the Mobile Web
-SIMD$+$Threads stage-decomposition profile ($N{=}43$, Chrome v120,
-original measurement round), \wasm{} OMR takes $1{,}124$\,ms, whereas
-native C\texttt{++}/OpenCV OMR measured on the current artifact
-takes $\approx 88$\,ms. The $12.8\times$ ratio is therefore
-an upper bound; a same-round, same-boundary comparison on the current
-$N{=}179$ set (Mobile Web CV \texttt{cpp\_ms} $615\pm23$ versus Native CV
-\texttt{cpp\_ms} $88\pm9$) still gives a $7.0\times$ gap. On the same
-processing boundary, Mobile Web
-YOLO \texttt{cpp\_ms} ($669\pm30$\,ms) versus the Native NNAPI
-\texttt{cpp\_ms} portion ($236\pm15$\,ms) of the $264$\,ms E2E row in
-Table~\ref{tab:latency} gives $2.83\times$ after excluding JPEG decode
-and debug write. Same-boundary \texttt{cpp\_ms} Welch tests are
-significant for every Web-vs-Native provider pair.
+The full Native budget reinforces this attribution
+(Table~\ref{tab:stage-mini}). The Native CV pipeline completes in
+$108$\,ms of file-based end-to-end time, of which $77$\,ms is the
+C\texttt{++} \texttt{cpp} core and the remainder is JPEG decode and a
+debug write, while the Native YOLO pipeline completes in $252$\,ms under
+NNAPI, $360$\,ms on four CPU threads, and $470$\,ms on a single thread.
+Its dominant term is the C\texttt{++} normalize stage rather than ONNX
+inference, whose measured cost is $150$\,ms under NNAPI. Native Android
+therefore remains the lower-latency deployment, but it carries no
+GT-validated accuracy, since its recognition pipeline is not aligned to
+the reviewed labels and is used here only as a latency and resource
+reference. SIMD and multithreading narrow the \wasm{} gap without closing
+it: even with both enabled, the Web CV core stays several times slower
+than its native counterpart, which again identifies the \wasm{} runtime,
+and not the detector, as the factor that governs Web Edge competitiveness.
 
-SIMD and threading reduce, but do not remove, the bottleneck. The
-OpenCV.js SIMD$+$Threads build reduces OMR by $18.7\times$ on the
-desktop reference host and by $12.7\times$ on the Redmi stage profile.
-Yet if the Mobile Web YOLO profile simply substituted native OMR speed
-($\approx 88$\,ms) for \wasm{} OMR ($1{,}124$\,ms), Web YOLO E2E would be
-$\approx 387$\,ms, only $1.46\times$ above Native NNAPI. This
-counterfactual shows that CV/\wasm{} execution, not YOLO, drives the
-remaining pipeline-level gap.
-
-Table~\ref{tab:stage-mini} makes the stage attribution explicit. The
-desktop rows show that SIMD$+$Threads can move OpenCV.js from an
-unusable warm profile toward sub-second processing. The Redmi rows show
-why that improvement still does not close the deployment gap: WebGPU
-YOLO inference is within a factor of two of NNAPI ORT time
-($299$ vs.\ $158$\,ms), but the CV stage remains more than an order of
-magnitude slower in the older Mobile Web profile. Thus replacing the
-detector backend alone can only shift a secondary term once WebGPU is
-enabled; the first-order term is the OMR implementation boundary.
+Within the browser, the corner-keypoint hybrid reshapes the cost
+structure rather than merely adding to it. Table~\ref{tab:hybrid}
+contrasts the CV-only and corner-keypoint pipelines on four
+representative devices, each reported as a five-run median, and three
+effects recur. First, the hybrid lifts accuracy to 99.43--99.44\% on
+every device while CV holds at 99.00\%. Second, because YOLO executes on
+the GPU, the hybrid roughly halves renderer CPU occupancy, for example
+from $195\%$ to $91\%$ on the Vivobook and from $158\%$ to $45\%$ on the
+Nitro~5. Third, end-to-end worker time rises by a near-constant
+$\approx 300$\,ms, the cost of the WebGPU inference, yet the C\texttt{++}
+\texttt{cpp\_ms} itself falls on the weaker devices because the corner
+path skips both blob detection and the second marker re-detection, for
+instance from $466$ to $401$\,ms on the Redmi and from $392$ to
+$234$\,ms on the Nitro~5. The hybrid thus exchanges a higher but
+GPU-bounded latency for higher accuracy and markedly lower CPU pressure.
 
 \begin{table}[t]
-\caption{Stage-attribution profiles used to interpret the deployment
-latency. Stage rows are context-specific profiles, not a pooled
-benchmark; they identify which stage dominates after WebGPU is enabled.}
-\label{tab:stage-mini}
+\caption{CV-only versus corner-keypoint hybrid across four devices
+($N{=}179$, five-run median; threads + WebGPU).}
+\label{tab:hybrid}
 \centering
-\setlength{\tabcolsep}{2.5pt}
+\scriptsize
+\setlength{\tabcolsep}{3pt}
 \resizebox{\columnwidth}{!}{%
-\begin{tabular}{llccc}
+\begin{tabular}{llccccc}
 \toprule
-\textbf{Host/context} & \textbf{Runtime} & \textbf{YOLO/ORT} & \textbf{OMR} & \textbf{Total} \\
+\textbf{Device} & \textbf{Pipeline} & \textbf{Q Acc.}
+& \textbf{cpp} & \textbf{YOLO} & \textbf{worker} & \textbf{CPU/RAM pk} \\
 \midrule
-Desktop warm frame & \wasm{} only & $1{,}170$ & $8{,}175$ & $9{,}360$ \\
-Desktop $N{=}54$ & WebGPU+SIMD+Threads & $81\pm12$ & $438\pm11$ & $643\pm23$ \\
-Redmi $N{=}43$ & WebGPU+SIMD+Threads & $299\pm50$ & $\approx 1{,}124$ & $1{,}423\pm163$ \\
-Redmi $N{=}179$ & Native NNAPI & $158\pm11$ & $106\pm11$ & $264\pm17$ \\
+Vivobook & CV     & 99.00\% & 308 & --  & 344 & 384\%/1889 \\
+(laptop) & Hybrid & \textbf{99.43\%} & 457 & 188 & 647 & 274\%/2523 \\
+Nitro~5  & CV     & 99.00\% & 392 & --  & 451 & 217\%/1645 \\
+(laptop) & Hybrid & \textbf{99.43\%} & 234 & 482 & 718 & 247\%/1293 \\
+Redmi    & CV     & 99.00\% & 466 & --  & 634 & 287\%/230 \\
+(phone)  & Hybrid & \textbf{99.43\%} & 401 & 541 & 944 & 174\%/253 \\
+Poco Pad & CV     & 99.00\% & 332 & --  & 389 & 203\%/212 \\
+(tablet) & Hybrid & \textbf{99.44\%} & 250 & 444 & 695 & 119\%/240 \\
 \bottomrule
 \end{tabular}}
 \vspace{2pt}
 \parbox{\columnwidth}{\footnotesize
-Times are milliseconds. Desktop and Redmi Web rows are stage profiles;
-the Native row is the current file-based headless run. Native total is
-E2E and includes JPEG decode plus debug write; Native OMR is
-\texttt{cpp\_ms}. Stage timers do not necessarily sum to Total because
-browser scheduling, GPU dispatch, and post-processing are outside the
-YOLO/ORT and OMR timer boundaries.}
+Times in ms. CPU/RAM-peak units differ by instrument (Windows laptops:
+\texttt{psutil} renderer CPU\% and RSS-MB; Android: in-app sampler CPU\%
+out of $800$ and PSS-MB), so CPU/RAM should be compared only within a
+device. ``Hybrid'' is the in-browser YOLO corner-keypoint detector on
+WebGPU feeding a direct homography.}
 \end{table}
 
 \begin{table}[t]
-\caption{Per-sheet latency across seven host configurations
-($N{=}179$). Web rows report \texttt{cpp\_ms}; Native rows report
-file-based \texttt{e2e\_ms}.}
+\caption{Native Redmi latency by configuration ($N{=}179$, median ms).
+Verified on 2026-06-19; recognition is not GT-aligned (latency baseline only).}
+\label{tab:stage-mini}
+\centering
+\setlength{\tabcolsep}{4pt}
+\resizebox{0.82\columnwidth}{!}{%
+\begin{tabular}{lccc}
+\toprule
+\textbf{Configuration} & \textbf{ORT infer} & \textbf{cpp} & \textbf{e2e} \\
+\midrule
+CV          & --  & 77  & 108 \\
+YOLO NNAPI  & 150 & 224 & 252 \\
+YOLO CPU-4T & 208 & 320 & 360 \\
+YOLO CPU-1T & 321 & 433 & 470 \\
+\bottomrule
+\end{tabular}}
+\vspace{2pt}
+\parbox{\columnwidth}{\footnotesize
+\texttt{cpp} is the C\texttt{++} OMR core; \texttt{e2e} adds JPEG decode
+and a debug write. ORT is the measured ONNX Runtime inference time;
+stages overlap with image preparation, so the columns are not strictly
+additive.}
+\end{table}
+
+\begin{table}[t]
+\caption{Earlier-round Web latency (\texttt{cpp\_ms}) for the hosts not
+yet re-measured under the corner-keypoint protocol. The four devices with
+the validated CV-vs-hybrid comparison are in Table~\ref{tab:hybrid} and
+Native Redmi in Table~\ref{tab:stage-mini}.}
 \label{tab:latency}
 \centering
-\resizebox{\columnwidth}{!}{%
+\resizebox{0.92\columnwidth}{!}{%
 \begin{tabular}{llcc}
 \toprule
 \textbf{Platform} & \textbf{Stack} & \textbf{CV (ms)} & \textbf{YOLO (ms)} \\
 \midrule
-\multicolumn{4}{l}{\textit{Web Edge --- WebGPU+SIMD+Threads unless noted}} \\
 Desktop reference & Win/Blink & $248\pm15$ & $246\pm18$ \\
-Laptop (Vivobook) & Win/Blink & $585\pm124$ & $628\pm161$ \\
-Laptop (Nitro~5)  & Win/Blink & $427\pm35$ & $423\pm40$ \\
 Mac (M1)          & macOS/Blink & $240\pm16$ & $240\pm22$ \\
-Mobile (Redmi)    & Android/Blink & $615\pm23$ & $669\pm30$ \\
 iPhone~16         & iOS/WebKit/SIMD only & $\mathbf{160\pm14}$ & $\mathbf{165\pm18}$ \\
-\midrule
-\multicolumn{4}{l}{\textit{Native Android on Redmi}} \\
-\multirow{3}{*}{Native Android} & CPU 1T & $118\pm14$ & $509\pm38$ \\
-                                & CPU 4T & n/a & $375\pm29$ \\
-                                & NNAPI  & n/a & $\mathbf{264\pm17}$ \\
 \bottomrule
 \end{tabular}}
 \vspace{2pt}
 \parbox{\columnwidth}{\footnotesize
-The Redmi Web YOLO row is the raw-handoff run; its worker-total timer
-including inference is $998\pm75$\,ms. Web browser wall-time is not
-exported in the current batch JSON. Native E2E includes JPEG decode,
-processing, and debug write. The Vivobook row is a five-run
-High-Performance mean$\pm$std (Sec.~\ref{sec:threats}); other Web rows
-are single runs.}
+These three hosts are reported from the earlier measurement round (CV and
+bbox-guided YOLO) and are pending re-measurement under the corner-keypoint
+protocol. The YOLO column here is the bbox path, not the corner-keypoint
+hybrid of Table~\ref{tab:hybrid}. Web browser wall-time is not exported by
+the batch logs.}
 \end{table}
 
 \FloatBarrier
@@ -621,16 +712,18 @@ are single runs.}
 \subsection{System Resource Usage}
 \label{sec:resources}
 
-Resources remain bounded over the continuous run
-(Table~\ref{tab:resources}, Fig.~\ref{fig:cross_platform}). CPU units
-are instrument-specific:
-Windows rows use renderer-process CPU\%, Mac/iOS/Android Web rows use
-the in-page event-loop proxy, and Native rows use an Android sampler out
-of $800\%$ on the 8-core SoC. The highest observed Web peak is
-$\approx 1.3$\,GB on the desktop reference/Vivobook-class Windows
-Chrome hosts; Native peaks at 702\,MB for CV and 645\,MB for YOLO.
-These numbers support feasibility on mid-range devices, but they should
-not be interpreted as direct CPU-efficiency ratios across instruments.
+Resource consumption remains bounded across the continuous run
+(Table~\ref{tab:resources}, Fig.~\ref{fig:cross_platform}), although the
+CPU figures must be read with care because the unit is
+instrument-specific: Windows rows report renderer-process CPU\%, the
+Mac, iOS, and Android Web rows report the in-page event-loop proxy, and
+the Native rows report an Android sampler scaled out of $800\%$ on the
+eight-core SoC. The largest Web memory peak observed is approximately
+$1.3$\,GB, on the desktop reference and Vivobook-class Windows Chrome
+hosts, whereas the Native build peaks at $514$\,MB for CV and $622$\,MB
+for YOLO. While these values establish that the pipeline is feasible on
+mid-range hardware, they are deliberately not presented as direct
+CPU-efficiency ratios, since no single instrument spans all platforms.
 
 \begin{table}[!t]
 \caption{Resource summary over the $N{=}179$ continuous run. CPU cells
@@ -651,16 +744,19 @@ Vivobook & $96.8/225.2\%$ & $85.3/156.9\%$ & $1{,}137/1{,}001$ & psutil \\
 Nitro~5 & $74.7/204.6\%$ & $74.1/98.4\%$ & $1{,}145/1{,}071$ & psutil \\
 M1 Mac & $0.59/0.89$ & $0.67/0.85$ & $1{,}073/248$ & proxy \\
 iPhone~16 & $0.04/0.84$ & $0.21/0.83$ & $147/147$ & proxy \\
-Redmi Web & $0.65/1.40$ & $0.54/1.74$ & $147/147$ & proxy \\
-Native & $360/462\%$ & $237/525\%$ & $702/645$ & sampler \\
+Poco Pad M1 & $169/203\%$ & $83/119\%$ & $212/240$ & sampler \\
+Redmi Web & $202/287\%$ & $121/174\%$ & $230/253$ & sampler \\
+Native & $341/431\%$ & $98/393\%$ & $514/622$ & sampler \\
 \bottomrule
 \end{tabular}}
 \vspace{1pt}
 \parbox{\columnwidth}{\footnotesize
-RAM values are MB peak RSS or browser-exposed heap/\wasm{} memory. Safari
-does not expose full JavaScript heap telemetry; Mac/iPhone memory is
-therefore a lower-bound proxy. Native YOLO aggregates CPU-1T, CPU-4T,
-and NNAPI samples from the same headless run.}
+Windows hosts use \texttt{psutil} renderer CPU\% and RSS-MB; Mac/iPhone
+use an in-page event-loop proxy (Safari hides full heap telemetry, so
+that memory is a lower bound); Android Web and Native use an adb/in-app
+sampler reported as CPU\% out of $800$ and PSS-MB. Android-Web CV/YOLO
+columns are CV-only versus the corner-keypoint hybrid; Native YOLO is the
+NNAPI provider. Units are not comparable across instruments.}
 \end{table}
 
 \begin{figure}[t]
@@ -672,14 +768,15 @@ and NNAPI samples from the same headless run.}
   \label{fig:cross_platform}
 \end{figure}
 
-The resource traces also explain why lower browser CPU readings should
-not be mistaken for higher throughput. The Web worker often remains near
-a narrow single-core execution envelope because the deterministic CV
-core is compiled into \wasm{} and serialized through its memory model.
-Native OpenCV uses more sampled CPU, but converts those bursts into
-lower latency through native threading and direct memory access. Resource
-boundedness therefore supports deployability, while latency
-competitiveness still depends on reducing the \wasm{} CV cost.
+These traces also clarify why a lower browser CPU reading should not be
+mistaken for higher throughput. The Web worker tends to stay within a
+narrow, near single-core execution envelope precisely because the
+deterministic CV core is compiled into \wasm{} and serialized through its
+memory model, whereas Native OpenCV draws more sampled CPU but converts
+those bursts into lower latency by means of native threading and direct
+memory access. The implication is consistent with the latency analysis:
+bounded resource use confirms deployability, yet competitiveness in
+latency continues to depend on reducing the \wasm{} CV cost itself.
 
 \subsection{Threats to Validity}
 \label{sec:threats}
@@ -696,36 +793,40 @@ competitiveness still depends on reducing the \wasm{} CV cost.
   floating-point ordering, memory layout, and crop-pipeline differences
   can change recognition outputs; Native per-question YOLO labels are
   not exported in the current benchmark.
-  \item The YOLO detector is trained on only 56 sheets with an
-  11-image validation split (held-out $\mathrm{mAP}@0.5\approx 0.99$).
-  The hard-mask ablation shows that a localized bbox can still degrade
-  recognition, so bbox-guided cropping should be treated as a separate
-  algorithm until validated.
+  \item The corner-keypoint detector is trained on 186 sheets
+  (held-out $\mathrm{mAP}@0.5\approx 0.99$) drawn from one fixed-template
+  collection, so its 99.43\% result is established for this layout rather
+  than for arbitrary forms. The bbox-mask ablation remains a caution that
+  the same detector can still degrade recognition when its output is
+  consumed as a crop instead of as corner points.
   \item Web latency on thermally constrained laptops is sensitive to the
   host power plan and thermal state. On the Vivobook (i5-13500H) we
   observed up to a $\approx 2\times$ spread in per-sheet \texttt{cpp\_ms}
   across repeated High-Performance runs, driven by CPU/GPU clock
   throttling rather than algorithmic change (recognition outputs are
-  bit-identical across runs). The Vivobook row is therefore reported as a
-  five-run mean$\pm$std, and the headline Web-vs-Native comparison uses
-  the same Redmi device, whose figures reproduced within $\pm5\%$, to
-  avoid this confound.
+  bit-identical across runs). Every device in Table~\ref{tab:hybrid} is
+  therefore reported as a five-run median, and the Web-versus-Native
+  comparison is drawn on the same Redmi device to avoid this confound.
 \end{enumerate}
 
 \section{Conclusion}
 
-This benchmark shows that Web Edge OMR is accurate and deployable, but
-its latency is governed by stage balance rather than inference alone.
-The reviewed Web CV path reaches 99.00\% question accuracy, and YOLO raw
-handoff preserves that score, but hard-mask crops fall to 63.70\% and
-74.40\%. WebGPU makes YOLO secondary; the remaining gap is dominated by
-\wasm{} OMR ($1{,}124$\,ms in the stage profile versus $\approx 88$\,ms
-native). If that stage matched native speed, Web YOLO E2E would be
-$\approx 387$\,ms, or $1.46\times$ Native NNAPI. Native Android therefore
-remains the lower-latency deployment, while Web Edge is the
-privacy-preserving, installation-free option whose competitiveness
-depends on browser-accessible CV acceleration and \wasm{} runtime
-efficiency.
+Web Edge OMR proves to be both accurate and deployable, yet its latency
+is determined by how the stages balance rather than by inference alone.
+The reviewed Web CV path reaches 99.00\% question accuracy, and a YOLO
+corner-keypoint detector that feeds four predicted markers straight into
+the homography raises this to 99.43\% across four devices, turning YOLO
+into a validated primary localizer; consuming the same detector as a hard
+crop instead collapses accuracy to 63.70--74.40\%, which shows that the
+formulation, not the detector, is what matters. On latency, once WebGPU
+has reduced inference to a secondary cost, the dominant term is the
+\wasm{} CV stage: on the same Redmi device its $466$\,ms is $6.1\times$
+the $77$\,ms native core, a far larger gap than the $3.6\times$ between
+WebGPU and NNAPI inference. Native Android therefore remains the faster
+deployment, while Web Edge exchanges that latency for validated accuracy,
+privacy, and installation-free reach. Closing the remaining gap is
+ultimately a question of browser-accessible CV acceleration and a leaner
+\wasm{} runtime rather than of a faster detector.
 
 \begin{thebibliography}{11}
 
