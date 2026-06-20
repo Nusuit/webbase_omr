@@ -104,10 +104,32 @@ SheetProcessResult OmrCore::ProcessSheetRgba(std::uint8_t* rgba, int width, int 
   bool normalized = false;
   bool used_corner_warp = false;
   if (corners4) {
-      // YOLO corner-keypoint path: warp directly from the four points.
-      used_corner_warp = NormalizeSheetWithCorners(rgba, width, height, corners4, s_normbuf.data());
-      normalized = used_corner_warp;
-      if (!normalized) {
+      // YOLO corner-keypoint path: warp directly from the four points using
+      // OpenCV's (SIMD-optimized) warpPerspective instead of the scalar
+      // hand-written WarpRgba. Sort the points TL/TR/BR/BL, sanity-check the
+      // quad span, then map onto the canonical 1700x2400 template.
+      cv::Point2f p[4] = {
+          {(float)corners4[0], (float)corners4[1]}, {(float)corners4[2], (float)corners4[3]},
+          {(float)corners4[4], (float)corners4[5]}, {(float)corners4[6], (float)corners4[7]}};
+      std::sort(p, p + 4, [](const cv::Point2f& a, const cv::Point2f& b){ return a.y < b.y; });
+      cv::Point2f tl = p[0], tr = p[1], bl = p[2], br = p[3];
+      if (tl.x > tr.x) std::swap(tl, tr);
+      if (bl.x > br.x) std::swap(bl, br);
+      const float W = (float)kBaseWidth, H = (float)kBaseHeight;
+      const bool ok = (tr.x - tl.x > 0.15f * W) && (br.x - bl.x > 0.15f * W) &&
+                      (bl.y - tl.y > 0.15f * H) && (br.y - tr.y > 0.15f * H);
+      if (ok) {
+          cv::Mat src(height, width, CV_8UC4, (void*)rgba);
+          std::vector<cv::Point2f> srcp = {tl, tr, br, bl};
+          std::vector<cv::Point2f> dstp = {
+              {0.0f, 0.0f}, {W - 1, 0.0f}, {W - 1, H - 1}, {0.0f, H - 1}};
+          cv::Mat M = cv::getPerspectiveTransform(srcp, dstp);
+          cv::Mat warped;
+          cv::warpPerspective(src, warped, M, cv::Size(kBaseWidth, kBaseHeight));
+          std::memcpy(s_normbuf.data(), warped.data, static_cast<std::size_t>(base_bytes));
+          used_corner_warp = true;
+          normalized = true;
+      } else {
           // Degenerate points → fall back to the blob/paper detector.
           normalized = NormalizeSheet(rgba, width, height, s_normbuf.data());
       }
