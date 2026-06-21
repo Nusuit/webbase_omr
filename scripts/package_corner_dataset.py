@@ -19,18 +19,23 @@ import xml.etree.ElementTree as ET
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DSROOT = os.path.join(ROOT, "Dataset_OMR_classified")
 FULLLABEL_IMG = os.path.join(ROOT, "full_label_yolo", "images")
-EXPORT_GLOB = os.path.join(ROOT, "yolo_label_with_4_corners_*")
+EXPORT_GLOBS = [os.path.join(ROOT, "yolo_label_with_4_corners_*"),
+                os.path.join(ROOT, "dapan_yolo_*"),
+                os.path.join(ROOT, "dapand2")]
 CORNER_NAME = "marker_corners"
 random.seed(42)
 
 
 def build_image_index():
+    # ONLY the curated dataset (dataset_1..5 student sheets + answer keys).
+    # full_label_yolo / archive are deliberately excluded: they leak legacy
+    # session photos (IMG_20260320_1536xx) that are neither eval sheets nor
+    # answer keys, inflating the train set past the clean 179+6=185.
     idx = {}
-    for root in (DSROOT, FULLLABEL_IMG):
-        for p in glob.glob(os.path.join(root, "**", "*.jpg"), recursive=True):
-            if "Trash" in p or "_legacy" in p:
-                continue
-            idx.setdefault(os.path.basename(p), p)
+    for p in glob.glob(os.path.join(DSROOT, "**", "*.jpg"), recursive=True):
+        if "Trash" in p or "_legacy" in p:
+            continue
+        idx.setdefault(os.path.basename(p), p)
     return idx
 
 
@@ -95,7 +100,7 @@ def parse_cvat_xml(folder):
 def discover():
     """Merge all export folders -> {stem: boxes}. Later folders win on conflict."""
     merged = {}
-    folders = sorted(glob.glob(EXPORT_GLOB))
+    folders = sorted(g for pat in EXPORT_GLOBS for g in glob.glob(pat))
     for f in folders:
         if not os.path.isdir(f):
             continue

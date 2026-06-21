@@ -1,0 +1,611 @@
+<?xml version="1.0" encoding="utf-8"?>
+<annotations>
+  <version>1.1</version>
+  <meta>
+    <task>
+      <id>2303863</id>
+      <name>OMR_131_sheets</name>
+      <size>30</size>
+      <mode>annotation</mode>
+      <overlap>0</overlap>
+      <bugtracker></bugtracker>
+      <created>2026-06-03 14:01:45.138531+00:00</created>
+      <updated>2026-06-18 09:43:13.721960+00:00</updated>
+      <subset>default</subset>
+      <start_frame>0</start_frame>
+      <stop_frame>29</stop_frame>
+      <frame_filter></frame_filter>
+      <segments>
+        <segment>
+          <id>4071784</id>
+          <start>0</start>
+          <stop>29</stop>
+          <url>https://app.cvat.ai/api/tasks/2303863/dataset/export/api/jobs/4073533</url>
+        </segment>
+      </segments>
+      <owner>
+        <username>kien09</username>
+        <email>huykien283@gmail.com</email>
+      </owner>
+      <assignee></assignee>
+      <labels>
+        <label>
+          <name>paper_region</name>
+          <color>#61c754</color>
+          <type>any</type>
+          <attributes>
+          </attributes>
+        </label>
+        <label>
+          <name>info_region</name>
+          <color>#ce522b</color>
+          <type>any</type>
+          <attributes>
+          </attributes>
+        </label>
+        <label>
+          <name>q_1_20</name>
+          <color>#c93ae7</color>
+          <type>any</type>
+          <attributes>
+          </attributes>
+        </label>
+        <label>
+          <name>q_21_60</name>
+          <color>#615ae2</color>
+          <type>any</type>
+          <attributes>
+          </attributes>
+        </label>
+        <label>
+          <name>marker_corners</name>
+          <color>#e532c4</color>
+          <type>any</type>
+          <attributes>
+          </attributes>
+        </label>
+      </labels>
+    </task>
+    <dumped>2026-06-18 10:02:00.590099+00:00</dumped>
+  </meta>
+  <image id="0" name="z7860194785473_006804133607e596cb2f6eb48491f169.jpg" width="1796" height="2560">
+    <box label="marker_corners" source="manual" occluded="0" xtl="1556.94" ytl="2232.33" xbr="1604.28" ybr="2278.76" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="358.50" ytl="1607.50" xbr="1488.70" ybr="2193.00" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="311.40" ytl="368.50" xbr="1579.80" ybr="2254.00" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="947.40" ytl="1018.50" xbr="1488.70" ybr="1604.05" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="360.60" ytl="1039.06" xbr="834.60" ybr="1579.79" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="286.08" ytl="2227.78" xbr="331.60" ybr="2276.94" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1555.03" ytl="346.25" xbr="1600.55" ybr="392.68" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="286.63" ytl="347.72" xbr="330.87" ybr="394.06" z_order="0">
+    </box>
+  </image>
+  <image id="1" name="z7860194785511_38b4974149f6001fdc046b61e9242f00.jpg" width="1791" height="2560">
+    <box label="marker_corners" source="manual" occluded="0" xtl="1559.23" ytl="346.34" xbr="1603.04" ybr="390.15" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1559.23" ytl="2233.95" xbr="1603.04" ybr="2277.76" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="285.00" ytl="2233.95" xbr="332.47" ybr="2281.42" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="303.29" ytl="368.32" xbr="1586.68" ybr="2257.65" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="281.35" ytl="346.34" xbr="325.16" ybr="390.15" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="361.17" ytl="1045.80" xbr="830.95" ybr="1583.62" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="943.29" ytl="1015.12" xbr="1487.96" ybr="1610.85" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="357.76" ytl="1607.45" xbr="1487.96" ybr="2206.59" z_order="0">
+    </box>
+  </image>
+  <image id="2" name="z7860224931462_89dc8e39fd2e232f76af54839e9312b9.jpg" width="1816" height="2560">
+    <box label="marker_corners" source="manual" occluded="0" xtl="239.99" ytl="2188.24" xbr="281.02" ybr="2232.42" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="256.30" ytl="320.66" xbr="1526.09" ybr="2210.00" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="324.40" ytl="994.69" xbr="787.37" ybr="1532.56" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="899.71" ytl="967.46" xbr="1444.39" ybr="1559.80" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="321.00" ytl="1559.80" xbr="1444.39" ybr="2152.10" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1505.38" ytl="2191.40" xbr="1546.40" ybr="2235.57" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1515.68" ytl="298.45" xbr="1558.11" ybr="345.60" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="254.61" ytl="305.52" xbr="299.40" ybr="347.95" z_order="0">
+    </box>
+  </image>
+  <image id="3" name="z7860224951682_974043c5753cee1a27463d45d8727b42.jpg" width="1815" height="2560">
+    <box label="q_1_20" source="manual" occluded="0" xtl="904.14" ytl="970.86" xbr="1459.03" ybr="1566.60" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="243.83" ytl="2196.26" xbr="286.26" ybr="2238.69" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="260.33" ytl="303.47" xbr="305.12" ybr="352.97" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1519.05" ytl="296.40" xbr="1566.20" ybr="343.54" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="277.76" ytl="324.06" xbr="1540.73" ybr="2220.21" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="322.02" ytl="998.10" xbr="795.20" ybr="1539.37" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="322.02" ytl="1566.60" xbr="1459.03" ybr="2155.53" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1507.27" ytl="2193.90" xbr="1549.70" ybr="2238.69" z_order="0">
+    </box>
+  </image>
+  <image id="4" name="z7860224951725_c701a3049ba1e152c55946a86c99f047.jpg" width="1815" height="2560">
+    <box label="q_21_60" source="manual" occluded="0" xtl="325.42" ytl="1563.20" xbr="1452.22" ybr="2155.53" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1507.27" ytl="2191.55" xbr="1549.70" ybr="2241.05" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1521.41" ytl="303.47" xbr="1563.84" ybr="350.61" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="262.69" ytl="305.83" xbr="302.76" ybr="348.26" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="907.54" ytl="964.05" xbr="1452.22" ybr="1563.20" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="325.42" ytl="994.69" xbr="795.20" ybr="1539.37" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="277.76" ytl="317.25" xbr="1533.92" ybr="2227.02" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="246.19" ytl="2193.90" xbr="290.98" ybr="2236.33" z_order="0">
+    </box>
+  </image>
+  <image id="5" name="z7860224951904_0ec34dbbc533124d45aeb8396866660c.jpg" width="1820" height="2560">
+    <box label="q_21_60" source="manual" occluded="0" xtl="326.44" ytl="1570.00" xbr="1456.64" ybr="2162.34" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="275.38" ytl="313.85" xbr="1541.75" ybr="2220.21" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="242.66" ytl="2193.90" xbr="289.80" ybr="2241.05" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1506.09" ytl="2193.90" xbr="1553.23" ybr="2241.05" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1524.95" ytl="301.11" xbr="1569.73" ybr="343.54" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="261.51" ytl="301.11" xbr="301.58" ybr="345.90" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="326.44" ytl="994.69" xbr="799.63" ybr="1539.40" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="908.56" ytl="964.05" xbr="1456.64" ybr="1570.00" z_order="0">
+    </box>
+  </image>
+  <image id="6" name="z7860224951915_f130524de5cd7d9ea76d117a77eb63a4.jpg" width="1813" height="2560">
+    <box label="marker_corners" source="manual" occluded="0" xtl="1499.02" ytl="2193.90" xbr="1543.80" ybr="2241.05" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="235.58" ytl="2189.19" xbr="280.37" ybr="2233.98" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="324.40" ytl="1563.20" xbr="1444.39" ybr="2155.53" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="896.31" ytl="970.86" xbr="1444.40" ybr="1563.20" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="324.40" ytl="998.10" xbr="790.78" ybr="1535.96" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="266.53" ytl="324.06" xbr="1532.90" ybr="2213.40" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="254.44" ytl="308.18" xbr="296.87" ybr="350.61" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1515.52" ytl="298.76" xbr="1560.30" ybr="345.90" z_order="0">
+    </box>
+  </image>
+  <image id="7" name="z7860224951941_490e979af8162629e6111f5638164b34.jpg" width="1817" height="2560">
+    <box label="q_1_20" source="manual" occluded="0" xtl="901.76" ytl="981.07" xbr="1446.43" ybr="1576.81" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="265.17" ytl="330.87" xbr="1538.34" ybr="2244.04" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="316.23" ytl="1011.71" xbr="789.42" ybr="1556.39" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="316.23" ytl="1576.81" xbr="1446.43" ybr="2175.95" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="244.78" ytl="312.90" xbr="287.21" ybr="355.33" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1520.00" ytl="298.76" xbr="1564.78" ybr="343.54" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1505.85" ytl="2200.98" xbr="1553.00" ybr="2252.83" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="237.71" ytl="2219.83" xbr="284.85" ybr="2264.62" z_order="0">
+    </box>
+  </image>
+  <image id="8" name="z7860224954471_a078a868f6a72c61f54212f13be08b20.jpg" width="1810" height="2560">
+    <box label="marker_corners" source="manual" occluded="0" xtl="240.06" ytl="2198.62" xbr="287.21" ybr="2241.05" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1501.14" ytl="2191.55" xbr="1548.28" ybr="2238.69" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1515.28" ytl="308.18" xbr="1562.42" ybr="352.97" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="254.21" ytl="305.83" xbr="296.63" ybr="350.61" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="266.87" ytl="317.25" xbr="1533.24" ybr="2230.42" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="321.34" ytl="1563.20" xbr="1444.73" ybr="2162.34" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="903.46" ytl="970.86" xbr="1444.73" ybr="1563.20" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="321.34" ytl="1004.90" xbr="791.12" ybr="1542.77" z_order="0">
+    </box>
+  </image>
+  <image id="9" name="z7860224954511_d4cc8e313431598f3d5b8652ea35c6ad.jpg" width="1815" height="2560">
+    <box label="paper_region" source="manual" occluded="0" xtl="277.76" ytl="320.66" xbr="1537.32" ybr="2223.61" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="332.23" ytl="1004.90" xbr="795.20" ybr="1542.77" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="907.54" ytl="970.86" xbr="1448.81" ybr="1566.60" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="332.23" ytl="1566.60" xbr="1448.81" ybr="2155.50" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="248.55" ytl="2191.55" xbr="293.33" ybr="2238.69" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="260.33" ytl="305.83" xbr="302.76" ybr="352.97" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1521.41" ytl="305.83" xbr="1561.48" ybr="352.97" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1504.91" ytl="2196.26" xbr="1552.05" ybr="2238.69" z_order="0">
+    </box>
+  </image>
+  <image id="10" name="z7860224954524_7975aed381d30aa1839432840ded51db.jpg" width="1809" height="2560">
+    <box label="marker_corners" source="manual" occluded="0" xtl="254.91" ytl="305.83" xbr="302.06" ybr="348.26" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1518.35" ytl="305.83" xbr="1563.13" ybr="348.26" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1497.13" ytl="2196.26" xbr="1546.63" ybr="2243.40" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="240.77" ytl="2193.90" xbr="283.20" ybr="2243.40" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="267.89" ytl="317.25" xbr="1537.60" ybr="2223.61" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="322.36" ytl="1570.00" xbr="1445.75" ybr="2162.34" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="901.08" ytl="967.46" xbr="1445.75" ybr="1570.00" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="322.36" ytl="998.10" xbr="792.14" ybr="1535.96" z_order="0">
+    </box>
+  </image>
+  <image id="11" name="z7860224954715_651c6dfb65ec1263572e19c53005bb6e.jpg" width="1813" height="2560">
+    <box label="q_21_60" source="manual" occluded="0" xtl="321.00" ytl="1576.81" xbr="1447.79" ybr="2172.55" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1522.59" ytl="308.18" xbr="1565.02" ybr="355.33" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1508.45" ytl="2210.40" xbr="1553.23" ybr="2257.55" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="240.30" ytl="2205.69" xbr="285.08" ybr="2250.48" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="269.93" ytl="330.87" xbr="1543.11" ybr="2240.63" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="321.00" ytl="1015.12" xbr="787.37" ybr="1549.58" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="903.12" ytl="981.07" xbr="1447.79" ybr="1576.81" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="249.73" ytl="319.97" xbr="296.87" ybr="364.76" z_order="0">
+    </box>
+  </image>
+  <image id="12" name="z7860224979350_1de82686fbccc1a76c68daa90ac032e2.jpg" width="1819" height="2560">
+    <box label="marker_corners" source="manual" occluded="0" xtl="257.51" ytl="308.18" xbr="302.29" ybr="352.97" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="248.08" ytl="2198.62" xbr="290.51" ybr="2241.05" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1511.51" ytl="2189.19" xbr="1553.94" ybr="2241.05" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1525.65" ytl="301.11" xbr="1568.08" ybr="343.54" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="327.46" ytl="1566.60" xbr="1450.86" ybr="2162.30" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="906.18" ytl="970.86" xbr="1450.86" ybr="1566.60" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="327.47" ytl="1004.90" xbr="797.25" ybr="1539.37" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="273.00" ytl="317.25" xbr="1539.37" ybr="2227.02" z_order="0">
+    </box>
+  </image>
+  <image id="13" name="z7860224979394_abbdb41a4a2c1f084008bed0f96c7bfd.jpg" width="1814" height="2560">
+    <box label="paper_region" source="manual" occluded="0" xtl="272.32" ytl="317.25" xbr="1531.88" ybr="2220.21" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="239.59" ytl="2196.26" xbr="286.73" ybr="2238.69" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="256.09" ytl="301.11" xbr="298.52" ybr="345.90" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1519.52" ytl="301.11" xbr="1564.31" ybr="343.54" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1507.74" ytl="2191.55" xbr="1547.81" ybr="2238.69" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="326.78" ytl="1563.20" xbr="1450.18" ybr="2158.90" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="902.10" ytl="964.05" xbr="1450.18" ybr="1563.20" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="326.78" ytl="994.69" xbr="793.16" ybr="1539.37" z_order="0">
+    </box>
+  </image>
+  <image id="14" name="z7860224979591_e7a2aea02572b00e28605ff6980d2bf6.jpg" width="1824" height="2560">
+    <box label="marker_corners" source="manual" occluded="0" xtl="1515.28" ytl="298.76" xbr="1560.07" ybr="341.18" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1515.28" ytl="2208.05" xbr="1560.07" ybr="2250.48" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="244.78" ytl="2212.76" xbr="294.28" ybr="2262.26" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="244.78" ytl="315.26" xbr="289.56" ybr="355.33" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="317.93" ytl="1011.71" xbr="797.93" ybr="1556.39" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="260.06" ytl="327.47" xbr="1540.05" ybr="2237.23" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="317.93" ytl="1576.81" xbr="1448.13" ybr="2176.00" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="903.46" ytl="981.07" xbr="1448.13" ybr="1576.81" z_order="0">
+    </box>
+  </image>
+  <image id="15" name="z7860224995197_38e9e451c490a4c0c1f91f1ec510574e.jpg" width="1828" height="2560">
+    <box label="info_region" source="manual" occluded="0" xtl="319.98" ytl="1011.71" xbr="796.57" ybr="1549.58" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1521.88" ytl="2205.69" xbr="1569.02" ybr="2250.48" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="244.31" ytl="2215.12" xbr="293.81" ybr="2264.62" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="244.31" ytl="312.90" xbr="291.45" ybr="360.04" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="319.98" ytl="1576.81" xbr="1450.18" ybr="2172.55" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="905.50" ytl="974.27" xbr="1450.18" ybr="1576.81" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="272.32" ytl="324.06" xbr="1545.49" ybr="2237.23" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1519.52" ytl="294.04" xbr="1569.02" ybr="345.90" z_order="0">
+    </box>
+  </image>
+  <image id="16" name="z7860224995215_3ba31537ada56d76982d140bf2ff1069.jpg" width="1821" height="2560">
+    <box label="q_1_20" source="manual" occluded="0" xtl="900.39" ytl="977.67" xbr="1448.47" ybr="1576.81" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="239.59" ytl="319.97" xbr="289.09" ybr="367.11" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1517.17" ytl="301.11" xbr="1564.31" ybr="348.26" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1507.74" ytl="2208.05" xbr="1552.52" ybr="2250.48" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="239.59" ytl="2205.69" xbr="286.73" ybr="2250.48" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="257.00" ytl="337.68" xbr="1536.98" ybr="2233.83" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="318.27" ytl="1018.52" xbr="788.06" ybr="1549.58" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="318.27" ytl="1576.81" xbr="1448.47" ybr="2175.95" z_order="0">
+    </box>
+  </image>
+  <image id="17" name="z7860224995253_4b34759b84edc43dd4204647e6e36699.jpg" width="1827" height="2560">
+    <box label="q_1_20" source="manual" occluded="0" xtl="903.46" ytl="977.67" xbr="1451.54" ybr="1573.41" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="321.34" ytl="1576.81" xbr="1451.54" ybr="2175.95" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="247.37" ytl="2217.48" xbr="292.16" ybr="2266.98" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1515.52" ytl="2203.33" xbr="1557.95" ybr="2252.83" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1517.87" ytl="301.11" xbr="1565.02" ybr="343.54" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="260.06" ytl="330.87" xbr="1546.85" ybr="2230.42" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="242.66" ytl="310.54" xbr="292.16" ybr="357.70" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="321.34" ytl="1011.71" xbr="791.12" ybr="1549.58" z_order="0">
+    </box>
+  </image>
+  <image id="18" name="z7860225000725_5620981657d7ba5f13617b2502b4f2d2.jpg" width="1826" height="2560">
+    <box label="marker_corners" source="manual" occluded="0" xtl="243.36" ytl="2212.76" xbr="288.15" ybr="2257.55" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="267.89" ytl="334.30" xbr="1547.88" ybr="2244.04" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="325.76" ytl="1015.12" xbr="792.14" ybr="1552.98" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="907.88" ytl="977.67" xbr="1459.37" ybr="1583.60" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="325.76" ytl="1583.62" xbr="1459.37" ybr="2179.36" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="252.79" ytl="312.90" xbr="299.94" ybr="355.30" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1530.37" ytl="303.47" xbr="1572.80" ybr="348.26" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1511.51" ytl="2215.12" xbr="1561.01" ybr="2262.26" z_order="0">
+    </box>
+  </image>
+  <image id="19" name="z7860225000774_85a2fc42a3fc942baf00f626be07edc4.jpg" width="1826" height="2560">
+    <box label="info_region" source="manual" occluded="0" xtl="318.95" ytl="1008.31" xbr="792.14" ybr="1549.58" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="904.48" ytl="970.86" xbr="1455.96" ybr="1570.00" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="318.95" ytl="1570.00" xbr="1455.96" ybr="2172.55" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="250.43" ytl="2217.48" xbr="295.22" ybr="2259.90" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1528.01" ytl="2198.62" xbr="1575.15" ybr="2245.76" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1518.58" ytl="289.33" xbr="1561.01" ybr="334.11" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="243.36" ytl="312.90" xbr="288.15" ybr="360.04" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="261.08" ytl="327.46" xbr="1551.28" ybr="2233.83" z_order="0">
+    </box>
+  </image>
+  <image id="20" name="z7860225000926_ec944a4a61eec59bb0b3e79a39e8b864.jpg" width="1828" height="2560">
+    <box label="marker_corners" source="manual" occluded="0" xtl="251.38" ytl="310.54" xbr="298.52" ybr="357.68" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="262.10" ytl="324.06" xbr="1548.90" ybr="2240.63" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="326.78" ytl="1008.31" xbr="793.16" ybr="1556.39" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="902.10" ytl="984.48" xbr="1460.39" ybr="1580.22" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="326.78" ytl="1580.22" xbr="1460.39" ybr="2179.40" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="249.02" ytl="2219.83" xbr="293.81" ybr="2266.98" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1517.17" ytl="2210.40" xbr="1564.31" ybr="2257.55" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1533.67" ytl="301.11" xbr="1578.45" ybr="350.61" z_order="0">
+    </box>
+  </image>
+  <image id="21" name="z7860225000951_2e41afb3367788c65ddd9f9aa3506e6c.jpg" width="1822" height="2560">
+    <box label="q_1_20" source="manual" occluded="0" xtl="905.84" ytl="981.07" xbr="1453.92" ybr="1587.02" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="241.24" ytl="2215.12" xbr="288.38" ybr="2262.26" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1504.67" ytl="2212.76" xbr="1551.82" ybr="2257.55" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1528.25" ytl="305.83" xbr="1575.39" ybr="355.33" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="250.67" ytl="312.90" xbr="295.46" ybr="360.04" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="265.85" ytl="330.87" xbr="1542.43" ybr="2233.83" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="320.32" ytl="1015.10" xbr="796.91" ybr="1556.39" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="320.32" ytl="1587.02" xbr="1453.92" ybr="2186.17" z_order="0">
+    </box>
+  </image>
+  <image id="22" name="z7860225000962_8efff91f1548b68a8e280e2ec4fd4adb.jpg" width="1829" height="2560">
+    <box label="paper_region" source="manual" occluded="0" xtl="264.49" ytl="327.47" xbr="1544.47" ybr="2230.42" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="314.61" ytl="1578.12" xbr="1455.57" ybr="2176.77" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="911.29" ytl="970.86" xbr="1455.96" ybr="1576.81" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="315.55" ytl="1008.31" xbr="788.74" ybr="1552.98" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="250.67" ytl="305.83" xbr="300.17" ybr="355.33" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1528.25" ytl="298.76" xbr="1570.67" ybr="345.90" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1514.10" ytl="2208.05" xbr="1554.17" ybr="2250.50" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="236.53" ytl="2212.76" xbr="281.31" ybr="2255.19" z_order="0">
+    </box>
+  </image>
+  <image id="23" name="z7860225025214_ffbf23811cdcf10040972824918df874.jpg" width="1821" height="2560">
+    <box label="paper_region" source="manual" occluded="0" xtl="264.96" ytl="331.51" xbr="1543.26" ybr="2226.07" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="321.30" ytl="1004.12" xbr="793.18" ybr="1549.95" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="905.87" ytl="975.95" xbr="1458.74" ybr="1574.60" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="321.30" ytl="1574.60" xbr="1458.74" ybr="2166.20" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="251.38" ytl="310.54" xbr="298.52" ybr="357.68" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="253.73" ytl="2196.26" xbr="296.16" ybr="2243.40" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1517.17" ytl="2205.69" xbr="1561.95" ybr="2252.83" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1524.24" ytl="298.76" xbr="1569.02" ybr="343.54" z_order="0">
+    </box>
+  </image>
+  <image id="24" name="z7860225025239_2ced5a42b0512569cdfb66814477b8d4.jpg" width="1827" height="2560">
+    <box label="marker_corners" source="manual" occluded="0" xtl="256.80" ytl="303.47" xbr="303.94" ybr="350.61" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="264.30" ytl="320.95" xbr="1539.03" ybr="2229.59" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="320.60" ytl="1004.10" xbr="785.43" ybr="1546.43" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="901.64" ytl="968.90" xbr="1450.99" ybr="1567.56" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="320.60" ytl="1567.56" xbr="1450.99" ybr="2166.21" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="233.23" ytl="2193.90" xbr="280.37" ybr="2238.69" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1506.09" ytl="2196.26" xbr="1548.52" ybr="2248.12" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1529.66" ytl="289.33" xbr="1572.09" ybr="334.11" z_order="0">
+    </box>
+  </image>
+  <image id="25" name="z7860225025260_3e0ad63d1040a175063820a8f42e4dd2.jpg" width="1821" height="2560">
+    <box label="marker_corners" source="manual" occluded="0" xtl="241.95" ytl="2215.12" xbr="282.02" ybr="2257.55" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1512.45" ytl="2208.05" xbr="1559.60" ybr="2255.19" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="244.31" ytl="320.00" xbr="291.45" ybr="364.76" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="902.35" ytl="979.47" xbr="1448.18" ybr="1581.64" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="317.78" ytl="1581.64" xbr="1448.18" ybr="2173.25" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="317.78" ytl="1018.20" xbr="796.70" ybr="1556.99" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="261.44" ytl="331.51" xbr="1532.69" ybr="2243.68" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1519.52" ytl="301.11" xbr="1564.31" ybr="348.26" z_order="0">
+    </box>
+  </image>
+  <image id="26" name="z7860225025400_ca2c560ab1b3052cb907f72c0aab8886.jpg" width="1818" height="2560">
+    <box label="marker_corners" source="manual" occluded="0" xtl="241.71" ytl="2196.26" xbr="288.86" ybr="2243.40" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="253.50" ytl="298.76" xbr="303.00" ybr="348.26" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="317.78" ytl="1560.51" xbr="1451.70" ybr="2159.17" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="902.35" ytl="968.90" xbr="1451.70" ybr="1560.51" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="317.78" ytl="1000.60" xbr="796.70" ybr="1535.86" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="275.52" ytl="320.95" xbr="1536.21" ybr="2226.07" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1519.29" ytl="294.04" xbr="1566.43" ybr="341.18" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1500.43" ytl="2191.55" xbr="1549.93" ybr="2236.33" z_order="0">
+    </box>
+  </image>
+  <image id="27" name="z7860225025423_c71be07ff9c04680093cb4fdf1ed149b.jpg" width="1816" height="2560">
+    <box label="marker_corners" source="manual" occluded="0" xtl="250.20" ytl="303.47" xbr="297.34" ybr="348.26" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="324.12" ytl="1574.60" xbr="1450.99" ybr="2159.17" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="908.69" ytl="972.42" xbr="1450.99" ybr="1574.60" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="324.12" ytl="997.07" xbr="792.48" ybr="1546.43" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="267.77" ytl="320.95" xbr="1542.55" ybr="2226.07" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1520.70" ytl="301.10" xbr="1565.50" ybr="343.54" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1511.27" ytl="2198.62" xbr="1553.70" ybr="2243.40" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="252.56" ytl="2189.19" xbr="299.70" ybr="2236.33" z_order="0">
+    </box>
+  </image>
+  <image id="28" name="z7860225040840_b46bbf2e85b152b8c465726bb3720719.jpg" width="1826" height="2560">
+    <box label="q_1_20" source="manual" occluded="0" xtl="913.62" ytl="968.90" xbr="1462.97" ybr="1578.12" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="250.43" ytl="305.83" xbr="299.93" ybr="352.97" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1525.65" ytl="301.11" xbr="1575.15" ybr="352.97" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1528.01" ytl="2212.76" xbr="1570.44" ybr="2257.55" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="243.36" ytl="2212.76" xbr="290.51" ybr="2259.90" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="269.18" ytl="320.95" xbr="1551.00" ybr="2240.16" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="322.01" ytl="1011.16" xbr="800.93" ybr="1553.47" z_order="0">
+    </box>
+    <box label="q_21_60" source="manual" occluded="0" xtl="322.01" ytl="1578.12" xbr="1462.97" ybr="2183.82" z_order="0">
+    </box>
+  </image>
+  <image id="29" name="z7860225040871_e3abe445f49e4b01081abed5e7041124.jpg" width="1833" height="2560">
+    <box label="q_21_60" source="manual" occluded="0" xtl="320.25" ytl="1578.12" xbr="1461.21" ybr="2183.82" z_order="0">
+    </box>
+    <box label="paper_region" source="manual" occluded="0" xtl="263.90" ytl="320.95" xbr="1549.24" ybr="2250.72" z_order="0">
+    </box>
+    <box label="info_region" source="manual" occluded="0" xtl="320.25" ytl="1007.64" xbr="799.17" ybr="1553.47" z_order="0">
+    </box>
+    <box label="q_1_20" source="manual" occluded="0" xtl="911.85" ytl="982.99" xbr="1461.20" ybr="1578.10" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="250.43" ytl="2222.19" xbr="292.86" ybr="2269.33" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="250.43" ytl="308.18" xbr="295.22" ybr="355.33" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1528.01" ytl="301.11" xbr="1575.15" ybr="345.90" z_order="0">
+    </box>
+    <box label="marker_corners" source="manual" occluded="0" xtl="1525.65" ytl="2212.76" xbr="1570.44" ybr="2262.26" z_order="0">
+    </box>
+  </image>
+</annotations>
