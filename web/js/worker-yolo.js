@@ -601,6 +601,60 @@ self.onmessage = async (event) => {
         return;
       }
 
+      // ── Corner-derived bbox ablation (det=cornerbbox): the SAME single-class
+      //    corner model, but its 4 corner detections are reduced to one bounding
+      //    box (expanded by `pad`) and consumed as a hard mask, instead of being
+      //    fed as keypoints to a direct homography. Lets the paper claim "the
+      //    same detector consumed two ways". CV then re-detects on the masked image.
+      if (DET_MODE === "cornerbbox") {
+        const t_c_start = performance.now();
+        const corners = await detectCorners(imageData);
+        const t_c_end = performance.now();
+        let useRgba = rgba, pathName = "raw";
+        if (corners) {
+          const xs = [corners[0], corners[2], corners[4], corners[6]];
+          const ys = [corners[1], corners[3], corners[5], corners[7]];
+          let bx1 = Math.min(...xs), by1 = Math.min(...ys);
+          let bx2 = Math.max(...xs), by2 = Math.max(...ys);
+          const bw = bx2 - bx1, bh = by2 - by1;
+          const box = {
+            x1: Math.max(0, Math.round(bx1 - bw * YOLO_PAD_PCT)),
+            y1: Math.max(0, Math.round(by1 - bh * YOLO_PAD_PCT)),
+            x2: Math.min(width - 1, Math.round(bx2 + bw * YOLO_PAD_PCT)),
+            y2: Math.min(height - 1, Math.round(by2 + bh * YOLO_PAD_PCT)),
+          };
+          useRgba = maskImageOutsideBox(imageData, box).data;
+          pathName = "cornerbbox";
+        }
+        const run = runCppSheet(useRgba, width, height, groundTruth, pathName, null, null);
+        const perfCb = {
+          yolo_ms:          t_c_end - t_c_start,
+          yolo_detected:    corners !== null,
+          chosen_path:      run.pathName,
+          cpp_ms:           run.cpp_ms,
+          worker_total_ms:  performance.now() - t_worker_start,
+          wasm_heap_before: wasmMemBefore,
+          wasm_heap_after:  bridge.module ? bridge.module.HEAPU8.byteLength : 0,
+          cpp_logs:         cppLogs.slice(),
+          wasm_variant:     _loadedVariant,
+          wasm_requested_variant: _requestedVariant || "auto",
+          simd_supported:   _hasSIMD,
+          threads_supported: _hasThreads,
+          yolo_pad_pct:     YOLO_PAD_PCT,
+          yolo_mask_mode:   "cornerbbox",
+        };
+        const transfersCb = [run.result.buffer];
+        if (run.preview) transfersCb.push(run.preview.buffer);
+        if (run.warpedPreview) transfersCb.push(run.warpedPreview.buffer);
+        self.postMessage({ type: OMR_MSG.SHEET_RESULT, payload: {
+          status: run.status, width, height, buffer: run.result.buffer,
+          preview: run.preview ? run.preview.buffer : null,
+          warpedPreview: run.warpedPreview ? run.warpedPreview.buffer : null,
+          previewWidth: run.previewWidth, previewHeight: run.previewHeight,
+          result: run.parsed, perf: perfCb } }, transfersCb);
+        return;
+      }
+
       const t_yolo_start = performance.now();
       const markerBox = await detectMarkerRegion(imageData);
       const t_yolo_end = performance.now();

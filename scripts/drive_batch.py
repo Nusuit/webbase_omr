@@ -223,7 +223,7 @@ def pick_target(cdp_host: str, url_hint: str = ""):
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("platform")
-    ap.add_argument("method", choices=["cv", "yolo", "corners", "yolocorner"])
+    ap.add_argument("method", choices=["cv", "yolo", "corners", "yolocorner", "yolocornerbbox"])
     ap.add_argument("--cdp-port", type=int, default=9222)
     ap.add_argument("--cdp-host", default="http://localhost")
     ap.add_argument("--base-url", default="http://localhost:8080")
@@ -265,6 +265,8 @@ def main() -> int:
             page_params["mask"] = args.yolo_mask
         if args.yolo_fallback is not None:
             page_params["fallback"] = args.yolo_fallback
+    if args.method == "yolocornerbbox" and args.yolo_pad is not None:
+        page_params["pad"] = str(args.yolo_pad)
     url = f"{args.base_url}/batch-detect.html?{urllib.parse.urlencode(page_params)}"
 
     stem = args.output_tag or f"{args.platform}_{args.method}_n179"

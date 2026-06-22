@@ -94,6 +94,13 @@ def main():
     ws = WS(page["webSocketDebuggerUrl"])
     try:
         ws.call("Page.enable")
+        # Disable HTTP cache so the phone always fetches the current manifest.json
+        # and dataset images (Chrome Android otherwise serves a stale manifest).
+        try:
+            ws.call("Network.enable")
+            ws.call("Network.setCacheDisabled", {"cacheDisabled": True})
+        except Exception as _e:
+            print(f"[WARN] could not disable cache: {_e}")
         # Navigate (idempotent) and wait for ready
         ws.call("Page.navigate", {"url": url})
         print("[STEP] Waiting for page + worker init …")

@@ -105,8 +105,13 @@ function workerSource() {
   });
   // yolocorner: in-browser corner-keypoint model (960, WebGPU) → C++ direct warp.
   if (METHOD === "yolocorner") workerParams.set("det", "corner");
+  // yolocornerbbox: SAME corner model, but 4 corners → bbox → hard mask (ablation).
+  if (METHOD === "yolocornerbbox") {
+    workerParams.set("det", "cornerbbox");
+    if (PAGE_PARAMS.has("pad")) workerParams.set("pad", PAGE_PARAMS.get("pad"));
+  }
   const query = workerParams.toString();
-  const useYoloWorker = (METHOD === "yolo" || METHOD === "yolocorner");
+  const useYoloWorker = (METHOD === "yolo" || METHOD === "yolocorner" || METHOD === "yolocornerbbox");
   const workerFile = useYoloWorker ? "./js/worker-yolo.js" : "./js/worker-cv.js";
   return workerFile + (query ? `?${query}` : "");
 }
