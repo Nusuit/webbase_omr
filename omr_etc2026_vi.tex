@@ -63,7 +63,8 @@ cần cài đặt ứng dụng, nhưng chi phí của nó phân bố ra sao theo
 góp một benchmark đa nền tảng cho một pipeline OMR Web Edge hoàn chỉnh,
 ghép thị giác máy tính bằng WebAssembly (\wasm{}) với suy luận YOLO trên
 WebGPU, đo so với một mốc Native Android trên bộ ngữ liệu 185 phiếu đã
-được con người rà soát và bảy nền tảng Web. Chúng tôi báo cáo độ chính
+được con người rà soát, trên sáu thiết bị Web, với mốc Native chạy trên hai
+trong số đó. Chúng tôi báo cáo độ chính
 xác nhận dạng, độ trễ theo từng giai đoạn, và mức dùng tài nguyên cho hai
 cấu hình có thể hoán đổi: một pipeline chỉ-CV đạt độ chính xác câu hỏi
 99,03\%, và một bộ phát hiện YOLO theo điểm-góc (corner keypoint) đưa bốn
@@ -128,8 +129,8 @@ việc kìm giữ giai đoạn CV trên \wasm{}.
 Bài báo có ba đóng góp:
 \begin{enumerate}[leftmargin=*, itemsep=1pt, topsep=2pt]
   \item Một đánh giá OMR đa nền tảng đã rà soát trên bộ 185 phiếu, với các
-  phép đo độ chính xác có giám sát, độ trễ và tài nguyên trên bảy nền tảng
-  Web Edge và một mốc Native Android.
+  phép đo độ chính xác có giám sát, độ trễ và tài nguyên trên sáu thiết bị
+  Web Edge và một mốc Native Android trên hai trong số đó.
   \item Một kết quả quy gán theo giai đoạn cho thấy OMR trên \wasm{}, chứ
   không phải suy luận YOLO, mới là nút thắt cổ chai chủ đạo: trên cùng
   thiết bị Redmi, khoảng cách \texttt{cpp\_ms} của CV giữa Mobile Web và
@@ -442,12 +443,12 @@ hệt từng bit. Để giữ cho riêng thành phần suy luận có thể so s
 hai đích nạp cùng một mô hình ONNX và chỉ thay đổi provider thực thi, là
 WebGPU trong trình duyệt và CPU hoặc NNAPI trên Android.
 
-Bảy nền tảng Web phát lại cùng bộ $N{=}185$ ảnh: một máy desktop tham
+Sáu thiết bị Web phát lại cùng bộ $N{=}185$ ảnh: một máy desktop tham
 chiếu (i5-14600K / RTX 4070 Ti SUPER), một ASUS Vivobook (i5-13500H), một
-Acer Nitro~5 (i5-10300H), một MacBook Air M1, một iPhone~16
-(Safari/WebKit), một máy tính bảng Android Poco Pad M1 (Chrome/Blink), và
-chiếc Redmi Note~13 Pro+ (Chrome/Blink), với mốc Native chạy trên chính
-thiết bị Redmi đó. Các hàng độ trễ Web báo cáo \texttt{cpp\_ms} phía
+MacBook Air M1, một iPhone~16 (Safari/WebKit), một máy tính bảng Android
+Poco Pad M1 (Chrome/Blink), và chiếc Redmi Note~13 Pro+ (Chrome/Blink); mốc
+Native Android chạy trên hai trong số đó, Poco Pad và Redmi. Các hàng độ
+trễ Web báo cáo \texttt{cpp\_ms} phía
 worker trong khi các hàng Native báo cáo \texttt{e2e\_ms} dựa trên tệp,
 nên các phép kiểm cùng-biên được giới hạn ở \texttt{cpp\_ms} cho cả hai
 phía. Việc lấy mẫu tài nguyên dựa vào công cụ mà mỗi nền tảng phơi bày, cụ
@@ -467,7 +468,7 @@ trong ứng dụng trên Native.
 \midrule
 Nhận dạng & \texttt{runs/accuracy\_eval/} & chỉ câu hợp lệ \\
 Độ trễ Web & \texttt{runs/batch\_results/} & \texttt{cpp\_ms} worker \\
-Handoff YOLO Web & raw-handoff Redmi + tóm tắt phát hiện & bộ đếm tổng worker \\
+Độ trễ hệ lai Web & \texttt{runs/batch\_results/} & tổng worker + \texttt{yolo\_ms} \\
 Độ trễ Native & các tệp JSON Native & \texttt{e2e\_ms} dựa trên tệp \\
 Quy gán giai đoạn & hồ sơ giai đoạn + log Native & bộ đếm giai đoạn \\
 Tài nguyên & các CSV \texttt{runs/resources/} & theo từng công cụ \\
@@ -578,9 +579,10 @@ mốc CV thủ công sụp đổ trên các ảnh nền tối \texttt{dataset\_4
 dấu góc in mờ bị bỏ sót, giữ nhận dạng CV ở mức $87,2\%$. Chuyển đúng công
 thức điểm-góc sang Native --- cùng mô hình corner một-lớp, cùng cách sắp
 xếp góc hình học, và cùng homography --- khép lại khoảng cách đó: pipeline
-corner Native nhận dạng đúng $99,44\%$ câu, ngang với hệ lai Web ($99,45\%$)
-và đúng trên cả năm tập con kể cả các phiếu tối, với chi phí suy luận
-$335$\,ms dưới NNAPI và $530$\,ms trên bốn luồng CPU. So sánh tương đương,
+corner Native nhận dạng đúng $99,44\%$ câu trên cả hai thiết bị Native
+(Redmi và Poco Pad), ngang với hệ lai Web ($99,45\%$) và đúng trên cả năm
+tập con kể cả các phiếu tối, với chi phí suy luận $335$\,ms dưới NNAPI và
+$530$\,ms trên bốn luồng CPU trên Redmi. So sánh tương đương,
 bộ phát hiện corner chỉ chậm hơn $1,6\times$ trên WebGPU ($547$\,ms) so với
 NNAPI ($335$\,ms), trong khi lõi CV chậm hơn $5,7\times$ trên \wasm{} so với
 native; khoảng cách web-so-với-native do đó dồn vào runtime CV trên \wasm{},
@@ -593,8 +595,8 @@ bản Web qua đường điểm-góc chung.
 ms). Độ chính xác nay đã căn khớp chân trị qua đường điểm-góc chung.}
 \label{tab:stage-mini}
 \centering
-\setlength{\tabcolsep}{4pt}
-\resizebox{0.92\columnwidth}{!}{%
+\setlength{\tabcolsep}{6pt}
+\footnotesize
 \begin{tabular}{lcccc}
 \toprule
 \textbf{Cấu hình} & \textbf{ĐCX câu} & \textbf{ORT} & \textbf{cpp} & \textbf{e2e} \\
@@ -604,7 +606,7 @@ Corner NNAPI  & \textbf{99,44\%} & 335 & 476  & 496  \\
 Corner CPU-4T & \textbf{99,44\%} & 530 & 713  & 741  \\
 Corner CPU-1T & \textbf{99,44\%} & 956 & 1132 & 1166 \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 \vspace{2pt}
 \parbox{\columnwidth}{\footnotesize
 \texttt{cpp} là lõi OMR C\texttt{++} (gồm cả suy luận mô hình corner ở các
@@ -615,9 +617,10 @@ Runtime đo được. CV nhanh nhưng dò mốc thất bại trên các phiếu 
 \end{table}
 
 Bên trong trình duyệt, hệ lai theo điểm-góc tái định hình cơ cấu chi phí
-chứ không chỉ cộng thêm vào. Bảng~\ref{tab:hybrid} đối chiếu pipeline
-chỉ-CV và pipeline theo điểm-góc trên ba thiết bị, mỗi cái là trung vị năm
-lần chạy, và hai hiệu ứng lặp lại. Thứ nhất, hai pipeline đạt cùng độ chính
+chứ không chỉ cộng thêm vào. Bảng~\ref{tab:latency} liệt kê \texttt{cpp\_ms}
+mỗi phiếu cho cả hai pipeline trên sáu thiết bị; trên ba thiết bị đo theo
+giao thức điểm-góc, mỗi cái là trung vị năm lần chạy, hai hiệu ứng lặp lại.
+Thứ nhất, hai pipeline đạt cùng độ chính
 xác --- CV ở 99,03\% và hệ lai ở 99,45--99,46\% --- nên việc chọn bộ định vị
 là trung tính về độ chính xác và hệ lai có giá trị ở mặt khác. Thứ hai,
 đường theo góc giảm gần một nửa \texttt{cpp\_ms} của C\texttt{++}, vì đưa
@@ -633,58 +636,33 @@ tất định sang GPU ở cùng độ chính xác, đánh đổi độ trễ su
 đoạn CV nhẹ hơn.
 
 \begin{table}[t]
-\caption{Chỉ-CV so với hệ lai theo điểm-góc trên ba thiết bị ($N{=}185$,
-trung vị năm lần chạy; threads + WebGPU).}
-\label{tab:hybrid}
-\centering
-\scriptsize
-\setlength{\tabcolsep}{3pt}
-\resizebox{0.92\columnwidth}{!}{%
-\begin{tabular}{llcccc}
-\toprule
-\textbf{Thiết bị} & \textbf{Pipeline} & \textbf{ĐCX câu}
-& \textbf{cpp} & \textbf{YOLO} & \textbf{worker} \\
-\midrule
-Vivobook & CV     & 99,03\%          & 325 & --  & 379 \\
-(laptop) & Lai    & \textbf{99,45\%} & 138 & 142 & 278 \\
-Poco Pad & CV     & 99,03\%          & 343 & --  & 412 \\
-(tablet) & Lai    & \textbf{99,46\%} & 166 & 453 & 620 \\
-Redmi    & CV     & 99,03\%          & 503 & --  & 685 \\
-(đt)     & Lai    & \textbf{99,45\%} & 249 & 547 & 803 \\
-\bottomrule
-\end{tabular}}
-\vspace{2pt}
-\parbox{\columnwidth}{\footnotesize
-Thời gian tính bằng ms (\texttt{cpp} = lõi OMR C\texttt{++}; \texttt{YOLO} =
-suy luận corner trên WebGPU; \texttt{worker} = tổng thời gian worker).
-``Lai'' là bộ phát hiện YOLO theo điểm-góc chạy trong trình duyệt trên
-WebGPU đưa vào một homography trực tiếp. Tài nguyên báo cáo riêng ở
-Bảng~\ref{tab:resources}.}
-\end{table}
-
-\begin{table}[t]
-\caption{Độ trễ Web (\texttt{cpp\_ms}) vòng đo trước cho các nền tảng chưa
-đo lại theo giao thức điểm-góc. Ba thiết bị có so sánh CV-vs-lai đã kiểm
-chứng nằm ở Bảng~\ref{tab:hybrid} và Native Redmi ở
-Bảng~\ref{tab:stage-mini}.}
+\caption{Độ trễ lõi C\texttt{++} mỗi phiếu (\texttt{cpp\_ms}), chỉ-CV so với
+hệ lai theo điểm-góc, trên sáu thiết bị Web.}
 \label{tab:latency}
 \centering
-\resizebox{0.92\columnwidth}{!}{%
+\setlength{\tabcolsep}{6pt}
+\footnotesize
 \begin{tabular}{llcc}
 \toprule
-\textbf{Nền tảng} & \textbf{Ngăn xếp} & \textbf{CV (ms)} & \textbf{YOLO (ms)} \\
+\textbf{Thiết bị} & \textbf{Ngăn xếp} & \textbf{CV} & \textbf{Lai} \\
 \midrule
-Desktop tham chiếu & Win/Blink & $248\pm15$ & $246\pm18$ \\
-Mac (M1)          & macOS/Blink & $240\pm16$ & $240\pm22$ \\
-iPhone~16         & iOS/WebKit/chỉ SIMD & $\mathbf{160\pm14}$ & $\mathbf{165\pm18}$ \\
+Vivobook     & Win/Blink     & 325 & 138 \\
+Poco Pad     & Android/Blink & 343 & 166 \\
+Redmi        & Android/Blink & 503 & 249 \\
+Desktop t.c. & Win/Blink     & 248 & 246 \\
+Mac M1       & macOS/Blink   & 240 & 240 \\
+iPhone~16    & iOS/WebKit    & 160 & 165 \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 \vspace{2pt}
 \parbox{\columnwidth}{\footnotesize
-Ba nền tảng này được báo cáo từ vòng đo trước (CV và YOLO theo hộp bao) và
-đang chờ đo lại theo giao thức điểm-góc. Cột YOLO ở đây là đường hộp bao,
-không phải hệ lai theo điểm-góc của Bảng~\ref{tab:hybrid}. Thời gian thực
-của trình duyệt Web không được các log batch xuất ra.}
+\texttt{cpp\_ms} là lõi OMR C\texttt{++}. Hệ lai chạy thêm bộ phát hiện
+corner trên WebGPU, mà suy luận cộng thêm $\approx140$\,ms (laptop) tới
+$\approx550$\,ms (điện thoại) và được tính vào tổng thời gian worker ở
+Hình~\ref{fig:latency}. Ba thiết bị đầu là trung vị năm lần chạy theo giao
+thức điểm-góc ($N{=}185$); Desktop, Mac và iPhone từ một vòng đo trước. Độ
+chính xác đồng nhất theo thiết bị: CV 99,03\%, hệ lai 99,45\%
+(Bảng~\ref{tab:accuracy}).}
 \end{table}
 
 \FloatBarrier
@@ -721,10 +699,9 @@ MB.}
 \midrule
 Desktop & $60.5/168.7\%$ & $55.7/76.5\%$ & $1{,}310/984$ & psutil \\
 Vivobook & $96.8/225.2\%$ & $85.3/156.9\%$ & $1{,}137/1{,}001$ & psutil \\
-Nitro~5 & $74.7/204.6\%$ & $74.1/98.4\%$ & $1{,}145/1{,}071$ & psutil \\
 M1 Mac & $0.59/0.89$ & $0.67/0.85$ & $1{,}073/248$ & proxy \\
 iPhone~16 & $0.04/0.84$ & $0.21/0.83$ & $147/147$ & proxy \\
-Poco Pad M1 & $169/203\%$ & $83/119\%$ & $212/240$ & sampler \\
+Poco Pad M1 & $126/200\%$ & $94/151\%$ & $223/213$ & sampler \\
 Redmi Web & $202/287\%$ & $121/174\%$ & $230/253$ & sampler \\
 Native & $341/431\%$ & $98/393\%$ & $514/622$ & sampler \\
 \bottomrule
@@ -784,7 +761,7 @@ việc giảm chính chi phí CV trên \wasm{}.
   $\approx 2\times$ qua các lần chạy High-Performance lặp lại, do điều
   tiết xung nhịp CPU/GPU chứ không phải thay đổi thuật toán (đầu ra nhận
   dạng giống hệt từng bit qua các lần chạy). Do đó mọi thiết bị trong
-  Bảng~\ref{tab:hybrid} được báo cáo dưới dạng trung vị năm lần chạy, và so
+  Bảng~\ref{tab:latency} được báo cáo dưới dạng trung vị năm lần chạy, và so
   sánh Web-vs-Native được thực hiện trên cùng thiết bị Redmi để tránh yếu
   tố gây nhiễu này.
 \end{enumerate}

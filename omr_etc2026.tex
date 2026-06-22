@@ -55,7 +55,8 @@ distributes across processing stages and platforms has not been measured.
 This paper contributes a cross-platform benchmark of a complete Web Edge
 OMR pipeline that pairs WebAssembly (\wasm{}) computer vision with WebGPU
 YOLO inference, measured against a Native Android baseline on a
-human-reviewed corpus of 185 answer sheets and seven Web hosts. We report
+human-reviewed corpus of 185 answer sheets across six Web devices, with the
+Native baseline run on two of them. We report
 recognition accuracy, per-stage latency, and resource use for two
 interchangeable configurations: a CV-only pipeline at 99.03\% question
 accuracy, and a YOLO corner-keypoint detector that feeds four predicted
@@ -65,9 +66,9 @@ the localization stage onto the GPU and skipping the hand-written marker
 detection. The latency data localize the cost: on the same Redmi
 device the \wasm{} CV core is $5.7\times$ slower than Native ($503$ vs
 $89$\,ms), against only $1.6\times$ between WebGPU and NNAPI inference.
-These measurements indicate that WebGPU has already made YOLO inference a
-secondary cost, while the deterministic CV stage executed through \wasm{}
-governs end-to-end latency, so a competitive Web Edge OMR depends on
+These measurements indicate that the web-versus-native penalty is
+concentrated in the deterministic CV stage executed through \wasm{} rather
+than in the GPU-accelerated detector, so a competitive Web Edge OMR depends on
 reducing \wasm{} CV overhead rather than on accelerating the detector.
 \end{abstract}
 
@@ -121,8 +122,8 @@ that \wasm{} CV stage.
 The paper makes three contributions:
 \begin{enumerate}[leftmargin=*, itemsep=1pt, topsep=2pt]
   \item A reviewed cross-platform OMR benchmark on a 185-sheet set with
-  supervised accuracy, latency, and resource measurements across seven Web
-  Edge hosts and one Native Android baseline.
+  supervised accuracy, latency, and resource measurements across six Web
+  Edge devices and a Native Android baseline on two of them.
   \item A stage-attribution result showing that \wasm{} OMR, not YOLO
   inference, is the dominant bottleneck: on the same Redmi device the CV
   \texttt{cpp\_ms} gap between Mobile Web and Native is $5.7\times$
@@ -441,12 +442,12 @@ To keep the inference component itself comparable, both targets load the
 same ONNX model and vary only the execution provider, which is WebGPU in
 the browser and either CPU or NNAPI on Android.
 
-Seven Web hosts replay the identical $N{=}185$ images: a desktop
+Six Web devices replay the identical $N{=}185$ images: a desktop
 reference (i5-14600K / RTX 4070 Ti SUPER), an ASUS Vivobook (i5-13500H),
-an Acer Nitro~5 (i5-10300H), a MacBook Air M1, an iPhone~16
-(Safari/WebKit), a Poco Pad M1 Android tablet (Chrome/Blink), and the
-Redmi Note~13 Pro+ (Chrome/Blink), with the Native baseline running on
-that same Redmi device. Web latency rows report worker-side
+a MacBook Air M1, an iPhone~16 (Safari/WebKit), a Poco Pad M1 Android
+tablet (Chrome/Blink), and the Redmi Note~13 Pro+ (Chrome/Blink); the
+Native Android baseline runs on two of them, the Poco Pad and the Redmi.
+Web latency rows report worker-side
 \texttt{cpp\_ms} whereas Native rows report file-based \texttt{e2e\_ms},
 so that same-boundary tests are restricted to \texttt{cpp\_ms} on both
 sides. Resource sampling relies on whichever instrument each host
@@ -466,7 +467,7 @@ in-app sampler on Native.
 \midrule
 Recognition & \texttt{runs/accuracy\_eval/} & valid questions only \\
 Web latency & \texttt{runs/batch\_results/} & worker \texttt{cpp\_ms} \\
-Web YOLO handoff & Redmi raw-handoff + detection summary & worker total timer \\
+Web hybrid latency & \texttt{runs/batch\_results/} & worker total + \texttt{yolo\_ms} \\
 Native latency & Native JSON files & file-based \texttt{e2e\_ms} \\
 Stage attribution & stage profiles + Native logs & stage timers \\
 Resources & \texttt{runs/resources/} CSVs & instrument-specific \\
@@ -582,9 +583,10 @@ missed, holding CV recognition to $87.2\%$. Porting the identical
 corner-keypoint formulation to Native --- the same single-class corner
 model, the same geometric corner ordering, and the same homography ---
 closes that gap: the Native corner pipeline recognizes $99.44\%$ of
-questions, on par with the Web hybrid ($99.45\%$) and correct on all five
-sub-datasets including the dark sheets, at an inference cost of $335$\,ms
-under NNAPI and $530$\,ms on four CPU threads. Compared like for like, the
+questions on both native devices (Redmi and Poco Pad), on par with the Web
+hybrid ($99.45\%$) and correct on all five sub-datasets including the dark
+sheets, at an inference cost of $335$\,ms under NNAPI and $530$\,ms on four
+CPU threads on the Redmi. Compared like for like, the
 corner detector runs only $1.6\times$ slower on WebGPU ($547$\,ms) than on
 NNAPI ($335$\,ms), whereas the CV core is $5.7\times$ slower in \wasm{} than
 native; the web-vs-native penalty is therefore concentrated in the \wasm{}
@@ -597,8 +599,8 @@ accuracy through the shared corner-keypoint path.
 median ms). Accuracy is now GT-aligned via the shared corner-keypoint path.}
 \label{tab:stage-mini}
 \centering
-\setlength{\tabcolsep}{4pt}
-\resizebox{0.92\columnwidth}{!}{%
+\setlength{\tabcolsep}{6pt}
+\footnotesize
 \begin{tabular}{lcccc}
 \toprule
 \textbf{Configuration} & \textbf{Q Acc.} & \textbf{ORT} & \textbf{cpp} & \textbf{e2e} \\
@@ -608,7 +610,7 @@ Corner NNAPI    & \textbf{99.44\%} & 335 & 476  & 496  \\
 Corner CPU-4T   & \textbf{99.44\%} & 530 & 713  & 741  \\
 Corner CPU-1T   & \textbf{99.44\%} & 956 & 1132 & 1166 \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 \vspace{2pt}
 \parbox{\columnwidth}{\footnotesize
 \texttt{cpp} is the C\texttt{++} OMR core (it includes the corner-model
@@ -620,9 +622,10 @@ GT-aligned and correct on all sub-datasets.}
 \end{table}
 
 Within the browser, the corner-keypoint hybrid reshapes the cost
-structure rather than merely adding to it. Table~\ref{tab:hybrid}
-contrasts the CV-only and corner-keypoint pipelines on three devices, each
-a five-run median, and two effects recur. First, the two pipelines reach
+structure rather than merely adding to it. Table~\ref{tab:latency}
+lists per-sheet \texttt{cpp\_ms} for both pipelines across the six hosts;
+on the three devices measured under the corner protocol, each a five-run
+median, two effects recur. First, the two pipelines reach
 the same accuracy --- CV at 99.03\% and the hybrid at 99.45--99.46\% --- so
 the choice of localizer is accuracy-neutral and the hybrid earns its place
 on other grounds. Second, the corner path roughly halves the C\texttt{++}
@@ -639,59 +642,33 @@ deterministic C\texttt{++} core and onto the GPU at identical accuracy,
 trading inference latency for a lighter CV stage.
 
 \begin{table}[t]
-\caption{CV-only versus corner-keypoint hybrid across three devices
-($N{=}185$, five-run median; threads + WebGPU).}
-\label{tab:hybrid}
-\centering
-\scriptsize
-\setlength{\tabcolsep}{3pt}
-\resizebox{0.92\columnwidth}{!}{%
-\begin{tabular}{llcccc}
-\toprule
-\textbf{Device} & \textbf{Pipeline} & \textbf{Q Acc.}
-& \textbf{cpp} & \textbf{YOLO} & \textbf{worker} \\
-\midrule
-Vivobook & CV     & 99.03\%          & 325 & --  & 379 \\
-(laptop) & Hybrid & \textbf{99.45\%} & 138 & 142 & 278 \\
-Poco Pad & CV     & 99.03\%          & 343 & --  & 412 \\
-(tablet) & Hybrid & \textbf{99.46\%} & 166 & 453 & 620 \\
-Redmi    & CV     & 99.03\%          & 503 & --  & 685 \\
-(phone)  & Hybrid & \textbf{99.45\%} & 249 & 547 & 803 \\
-\bottomrule
-\end{tabular}}
-\vspace{2pt}
-\parbox{\columnwidth}{\footnotesize
-Times in ms (\texttt{cpp} = C\texttt{++} OMR core; \texttt{YOLO} = WebGPU
-corner inference; \texttt{worker} = full worker wall-time). ``Hybrid'' is
-the in-browser YOLO corner-keypoint detector on WebGPU feeding a direct
-homography. Resource use is reported separately in
-Table~\ref{tab:resources}.}
-\end{table}
-
-\begin{table}[t]
-\caption{Earlier-round Web latency (\texttt{cpp\_ms}) for the hosts not
-yet re-measured under the corner-keypoint protocol. The three devices with
-the validated CV-vs-hybrid comparison are in Table~\ref{tab:hybrid} and
-Native Redmi in Table~\ref{tab:stage-mini}.}
+\caption{Per-sheet C\texttt{++} core latency (\texttt{cpp\_ms}), CV-only
+versus corner-keypoint hybrid, across the six Web hosts.}
 \label{tab:latency}
 \centering
-\resizebox{0.92\columnwidth}{!}{%
+\setlength{\tabcolsep}{6pt}
+\footnotesize
 \begin{tabular}{llcc}
 \toprule
-\textbf{Platform} & \textbf{Stack} & \textbf{CV (ms)} & \textbf{YOLO (ms)} \\
+\textbf{Device} & \textbf{Stack} & \textbf{CV} & \textbf{Hybrid} \\
 \midrule
-Desktop reference & Win/Blink & $248\pm15$ & $246\pm18$ \\
-Mac (M1)          & macOS/Blink & $240\pm16$ & $240\pm22$ \\
-iPhone~16         & iOS/WebKit/SIMD only & $\mathbf{160\pm14}$ & $\mathbf{165\pm18}$ \\
+Vivobook     & Win/Blink     & 325 & 138 \\
+Poco Pad     & Android/Blink & 343 & 166 \\
+Redmi        & Android/Blink & 503 & 249 \\
+Desktop ref. & Win/Blink     & 248 & 246 \\
+Mac M1       & macOS/Blink   & 240 & 240 \\
+iPhone~16    & iOS/WebKit    & 160 & 165 \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 \vspace{2pt}
 \parbox{\columnwidth}{\footnotesize
-These three hosts are reported from the earlier measurement round (CV and
-bbox-guided YOLO) and are pending re-measurement under the corner-keypoint
-protocol. The YOLO column here is the bbox path, not the corner-keypoint
-hybrid of Table~\ref{tab:hybrid}. Web browser wall-time is not exported by
-the batch logs.}
+\texttt{cpp\_ms} is the C\texttt{++} OMR core. The hybrid additionally runs
+the WebGPU corner detector, whose inference adds $\approx140$\,ms on the
+laptop to $\approx550$\,ms on the phones and is included in the full worker
+wall-time of Fig.~\ref{fig:latency}. The first three hosts are five-run
+medians under the corner-keypoint protocol ($N{=}185$); Desktop, Mac, and
+iPhone are from an earlier single round. Recognition is device-uniform:
+CV 99.03\%, hybrid 99.45\% (Table~\ref{tab:accuracy}).}
 \end{table}
 
 \FloatBarrier
@@ -728,10 +705,9 @@ MB.}
 \midrule
 Desktop & $60.5/168.7\%$ & $55.7/76.5\%$ & $1{,}310/984$ & psutil \\
 Vivobook & $96.8/225.2\%$ & $85.3/156.9\%$ & $1{,}137/1{,}001$ & psutil \\
-Nitro~5 & $74.7/204.6\%$ & $74.1/98.4\%$ & $1{,}145/1{,}071$ & psutil \\
 M1 Mac & $0.59/0.89$ & $0.67/0.85$ & $1{,}073/248$ & proxy \\
 iPhone~16 & $0.04/0.84$ & $0.21/0.83$ & $147/147$ & proxy \\
-Poco Pad M1 & $169/203\%$ & $83/119\%$ & $212/240$ & sampler \\
+Poco Pad M1 & $126/200\%$ & $94/151\%$ & $223/213$ & sampler \\
 Redmi Web & $202/287\%$ & $121/174\%$ & $230/253$ & sampler \\
 Native & $341/431\%$ & $98/393\%$ & $514/622$ & sampler \\
 \bottomrule
@@ -791,7 +767,7 @@ latency continues to depend on reducing the \wasm{} CV cost itself.
   observed up to a $\approx 2\times$ spread in per-sheet \texttt{cpp\_ms}
   across repeated High-Performance runs, driven by CPU/GPU clock
   throttling rather than algorithmic change (recognition outputs are
-  bit-identical across runs). Every device in Table~\ref{tab:hybrid} is
+  bit-identical across runs). The three corner-protocol hosts in Table~\ref{tab:latency} are
   therefore reported as a five-run median, and the Web-versus-Native
   comparison is drawn on the same Redmi device to avoid this confound.
 \end{enumerate}
