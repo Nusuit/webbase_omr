@@ -126,8 +126,9 @@ pipeline against a Native Android baseline. Our findings reveal a critical
 shift: while WebGPU significantly reduces YOLO latency, the deterministic
 CV/\wasm{} stage is the larger source of the web-versus-native latency gap.
 Consequently, browser-based OMR emerges as a highly viable, privacy-preserving
-alternative whose ultimate competitiveness hinges on minimizing \wasm{}
-computational overhead rather than on further neural-network acceleration.
+alternative whose ultimate competitiveness hinges primarily on minimizing
+\wasm{} computational overhead, while mobile hybrid deployments may still
+benefit from lighter detector inference.
 
 The paper makes three contributions:
 \begin{enumerate}[leftmargin=*, itemsep=1pt, topsep=2pt]
@@ -191,8 +192,8 @@ inference within a full application is still poorly understood.
 
 \paragraph{Research gap}
 Prior work thus examines either OMR accuracy or browser inference
-performance, but rarely both within one system. We are not aware of a study
-that evaluates a fully client-side browser OMR pipeline --- computer vision
+performance, but rarely both within one system. To our knowledge, no prior
+study evaluates a fully client-side browser OMR pipeline --- computer vision
 and neural inference both executing locally, with no transmission of
 answer-sheet data --- or that establishes whether its latency is governed by
 neural inference or by the \wasm{}-executed computer-vision stages. The
@@ -383,7 +384,8 @@ an in-page event-loop-lag proxy where direct process sampling is
 unavailable (Mac and iOS), and an in-app/adb sampler on Android. A
 same-boundary latency ratio uses the corresponding core-stage time ---
 worker-side C\texttt{++} on Web and the native C\texttt{++} core on
-Android; where deployment latency is discussed the boundary is named
+Android, and inference ratios compare ORT/WebGPU time on Web with ORT/NNAPI
+time on Android. Where deployment latency is discussed the boundary is named
 explicitly, and Web browser wall-time is not exported by the current logs.
 
 \section{Results and Discussion}
