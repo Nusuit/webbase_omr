@@ -27,7 +27,9 @@ def load_mean_sd(path: Path, field: str) -> tuple[float, float]:
 
 # Web Edge (Chrome WebGPU+SIMD+Threads), N=185. Bars are full worker wall-time.
 HOSTS = [
+    ("Desktop",     BR / "pcg_cv_r1.json",       BR / "pcg_yc_r1.json",       "worker_total_ms"),
     ("Vivobook",    BR / "v185_cv.json",         BR / "v185_yolocorner.json", "worker_total_ms"),
+    ("Nitro 5",     BR / "nitro5_cv_r1.json",    BR / "nitro5_yc_r1.json",    "worker_total_ms"),
     ("Poco Pad",    BR / "poco185_cv_r1.json",   BR / "poco185_yc_r1.json",   "worker_total_ms"),
     ("Redmi (Web)", BR / "redmi185_cv_r1.json",  BR / "redmi185_yc_r1.json",  "worker_total_ms"),
 ]
@@ -85,10 +87,10 @@ def main() -> None:
     ax.set_xticks(x)
     ax.set_xticklabels(labels, rotation=30, ha="right", fontsize=7.5)
     ax.legend(loc="upper left", fontsize=8, frameon=False)
-    ax.axvline(x=2.5, color="#888888", linestyle=":", linewidth=0.6)
-    ax.text(1.0, 2400, "Web Edge (Chrome WebGPU+SIMD/Threads)",
+    ax.axvline(x=4.5, color="#888888", linestyle=":", linewidth=0.6)
+    ax.text(2.0, 2400, "Web Edge (Chrome WebGPU+SIMD/Threads)",
             ha="center", fontsize=7, color="#444444")
-    ax.text(3.0, 2400, "Native Android",
+    ax.text(5.0, 2400, "Native Android",
             ha="center", fontsize=7, color="#444444")
     ax.grid(axis="y", alpha=0.3, linewidth=0.4)
     ax.set_axisbelow(True)
