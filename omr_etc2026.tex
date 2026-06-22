@@ -51,7 +51,7 @@ Huy Kien Phan & Minh Chau Truong & Thanh Binh Nguyen
 \begin{abstract}
 Browser-based Optical Mark Recognition (OMR) enables on-device grading
 without application installation, but the relative impact of the different
-stages in a complete Web Edge pipeline has not been systematically
+stages in a browser-side OMR computation pipeline has not been systematically
 quantified. To address this gap, we present a cross-platform Web Edge OMR
 framework that integrates WebAssembly (\wasm{}) computer vision with WebGPU
 YOLO inference, and evaluate it on a fixed-template 185-sheet dataset
@@ -195,7 +195,7 @@ Prior work thus examines either OMR accuracy or browser inference
 performance, but rarely both within one system. To our knowledge, no prior
 study evaluates a fully client-side browser OMR pipeline --- computer vision
 and neural inference both executing locally, with no transmission of
-answer-sheet data --- or that establishes whether its latency is governed by
+answer-sheet data --- or establishes whether its latency is governed by
 neural inference or by the \wasm{}-executed computer-vision stages. The
 present paper closes these gaps through controlled per-stage profiling of a
 YOLOv8n-based browser OMR system across several back-ends and deployment
@@ -205,7 +205,7 @@ configurations.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\columnwidth]{figures/structure_system.png}
+  \includegraphics[width=\columnwidth]{figures/structure_system.pdf}
   \caption{Web-Based Edge OMR architecture. The main JavaScript thread
   dispatches camera or file input to a Web Worker. WebGPU accelerates
   only YOLO localization; normalization, thresholding, bubble reading,
@@ -230,9 +230,8 @@ any localization output into that same \wasm{} core, the two pipelines
 remain interchangeable at the recognition stage. Both back-ends ultimately
 execute inside the OS and browser sandbox, which mediates scheduling,
 memory, and security before mapping the work onto whatever CPU, GPU, or
-NPU the device exposes. This separation between application control,
-algorithm execution, and hardware access is what lets a single codebase
-target desktop and mobile platforms without modification.
+NPU the device exposes. This separation lets a single codebase target
+desktop and mobile platforms without modification.
 
 \subsection{Algorithmic Pipelines and Handoff Mechanism}
 
@@ -279,7 +278,9 @@ connected-component blob detection of the CV \emph{Normalize} stage and the
 second marker re-detection, so the YOLO branch rejoins the shared
 recognizer only at the \emph{Adaptive Threshold} stage. YOLO thus
 contributes localization alone, since the answer string is invariably
-decoded by the CV recognizer rather than by the detector.
+decoded by the CV recognizer rather than by the detector. This strict
+decoupling makes the detector a purely geometric front-end, so the
+localization handoff can be evaluated without changing downstream grading.
 
 Once the two branches have rejoined on a common rectified crop,
 \emph{Adaptive Threshold} performs local blurring and thresholding, and
