@@ -25,7 +25,8 @@ class CornerBenchmarkRunner(private val context: Context) {
     }
 
     private val detector  = CornerKeypointDetector.getInstance(context)
-    private val processor = OmrProcessor(context, detector)
+    // Corner-warp already maps markers onto the canvas corners → skip Stage 2 (web parity).
+    private val processor = OmrProcessor(context, detector, applyStage2 = false)
 
     val captures: MutableMap<String, MutableList<SheetCapture>> = mutableMapOf()
     private var sourceLabels: List<String>? = null

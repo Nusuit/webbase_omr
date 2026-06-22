@@ -91,7 +91,10 @@ object NormalizePaper {
         Imgproc.morphologyEx(bin, bin, Imgproc.MORPH_OPEN, kernel)
 
         val labels = Mat(); val stats = Mat(); val centroids = Mat()
-        val nlab = Imgproc.connectedComponentsWithStats(bin, labels, stats, centroids, 8, CvType.CV_32S)
+        // 4-connectivity to match the web/WASM FindBlobs (up+left union-find). 8-conn lets
+        // diagonally-touching dark regions merge into oversized blobs that pass the marker
+        // filter as false corners (observed on z-sheets 096/054 → skewed quad → scramble).
+        val nlab = Imgproc.connectedComponentsWithStats(bin, labels, stats, centroids, 4, CvType.CV_32S)
         bin.release(); labels.release()
 
         val maxArea = minOf(n / 4, 2000)
@@ -113,13 +116,16 @@ object NormalizePaper {
             val roi = gray.submat(Rect(x, y, bw, bh))
             val meanGray = Core.mean(roi).`val`[0]
             roi.release()
-            // Markers must be a dark solid square. C++ reference used <80 (expects
-            // pure-black markers gray 28-57), but Redmi photos on dark backgrounds
-            // expose the printed markers at gray ~85-100, so <80 rejected all four
-            // corners and the warp fell back to misaligned paper corners. <130 keeps
-            // the real markers while aspect/fill still reject text and shadows.
-            // Sweep over the 179-sheet set: <80 → 130/179 valid quads, <130 → 174/179.
-            if (meanGray > 130.0) continue
+            // Markers must be a dark solid square. Match the web/WASM reference gate (<80,
+            // pure-black markers gray 28-57). On dark sheets (dataset_4/5) the printed
+            // markers sit at gray ~85-100 and are MEANT to fail here so Layer 1 returns
+            // null and the warp falls through to Layer 2 (findPaperCorners / white paper
+            // boundary). The rough Layer-2 warp is then re-aligned by Stage 2 (MarkerCrop)
+            // in OmrProcessor, which re-detects the markers on the warped image and tight-
+            // crops to the canonical template — this is what gives the web CV path its
+            // d4/d5 accuracy. Do NOT loosen this gate (a looser gate lets text/shadow blobs
+            // pass as false markers, producing a wrong quad that skips Layer 2).
+            if (meanGray > 80.0) continue
             cands.add(Cand(area, centroids.get(i, 0)[0], centroids.get(i, 1)[0]))
         }
         stats.release(); centroids.release()

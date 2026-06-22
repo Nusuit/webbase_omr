@@ -28,7 +28,12 @@ data class StageTimes(
  */
 class OmrProcessor(
     private val context: Context,
-    private val paperDetector: PaperDetector = PaperDetector { NormalizePaper.normalize(it) }
+    private val paperDetector: PaperDetector = PaperDetector { NormalizePaper.normalize(it) },
+    // Stage 2 (MarkerCrop) re-detects markers on the warped image and tight-crops so the
+    // grid aligns. Needed for the traditional-CV path (matches web/WASM). The corner-warp
+    // path already maps markers onto the canvas corners, so Stage 2 is skipped there
+    // (web: `if (!used_corner_warp)`); harmful on faint sheets otherwise.
+    private val applyStage2: Boolean = true
 ) {
 
     private val config: OmrConfig by lazy { ConfigLoader.load(context) }
@@ -68,7 +73,12 @@ class OmrProcessor(
         log(logCallback, "Đã load ảnh: ${img.cols()}×${img.rows()} px")
 
         // 2. Normalize (warp perspective) — via injected PaperDetector
-        val warped = paperDetector.normalize(img)
+        var warped = paperDetector.normalize(img)
+        // 2b. Stage 2: tight crop by corner markers (CV path only; corner-warp skips it).
+        if (applyStage2) {
+            val refined = MarkerCrop.cropByMarkers(warped)
+            if (refined !== warped) { warped.release(); warped = refined }
+        }
         val normalizeMs = android.os.SystemClock.elapsedRealtime() - t
         t = android.os.SystemClock.elapsedRealtime()
         log(logCallback, "Normalize xong: ${warped.cols()}×${warped.rows()} px")
