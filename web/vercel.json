@@ -1,4 +1,7 @@
 {
+  "rewrites": [
+    { "source": "/", "destination": "/product.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

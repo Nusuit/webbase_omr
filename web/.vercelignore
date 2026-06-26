@@ -1,0 +1,15 @@
+# Deploy only product.html as the public page — exclude the other entry pages
+index.html
+batch-detect.html
+blank.html
+preview-print.html
+review-prelabel.html
+
+# Dev server + backup/eval artifacts (not needed at runtime)
+server.py
+manifest.json.bak
+corners_gt.json
+corners_pred.json
+models/*.bak186
+models/*.bak190
+wasm/*.bak
