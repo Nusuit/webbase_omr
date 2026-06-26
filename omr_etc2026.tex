@@ -14,7 +14,7 @@
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,calc}
 
-\newcommand{\wasm}{\textnormal{\textsc{wasm}}}
+\newcommand{\wasm}{\textnormal{\textsc{Wasm}}}
 \newcommand{\ms}{\,ms}
 
 \definecolor{hwblue}{RGB}{180,205,240}
@@ -24,58 +24,72 @@
 \definecolor{cblue}{RGB}{150,195,235}
 \definecolor{yorange}{RGB}{220,155,130}
 \definecolor{gpink}{RGB}{255,200,200}
+\setcounter{topnumber}{4}
+\setcounter{bottomnumber}{4}
+\setcounter{totalnumber}{6}
+\renewcommand{\topfraction}{0.95}
+\renewcommand{\bottomfraction}{0.95}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.85}
+\setlength{\textfloatsep}{6pt plus 2pt minus 2pt}
+\setlength{\floatsep}{6pt plus 2pt minus 2pt}
+\setlength{\intextsep}{6pt plus 2pt minus 2pt}
+
 
 \begin{document}
 
 \title{Web-Based Edge Computing for Optical Mark Recognition:\protect\\
 A Cross-Platform Performance Benchmark}
 
-\author{%
-\IEEEauthorblockA{%
-Faculty of Information Systems\\
-University of Information Technology, VNU-HCM\\
-Ho Chi Minh City, Vietnam}
-\vspace{0.35em}
-\IEEEauthorblockN{%
-\begin{tabular}{@{}c@{\hspace{2.6em}}c@{\hspace{2.6em}}c@{}}
-Huy Kien Phan & Minh Chau Truong & Thanh Binh Nguyen
-\end{tabular}}
-\IEEEauthorblockA{%
-\begin{tabular}{@{}c@{\hspace{2.6em}}c@{\hspace{2.6em}}c@{}}
-\texttt{huykien283@gmail.com} & \texttt{chautm@uit.edu.vn} & \texttt{binhnt@uit.edu.vn}
-\end{tabular}}
-}
+% \author{%
+% \IEEEauthorblockA{%
+% Faculty of Information Systems\\
+% University of Information Technology, VNU-HCM\\
+% Ho Chi Minh City, Vietnam}
+% \vspace{0.35em}
+% \IEEEauthorblockN{%
+% \begin{tabular}{@{}c@{\hspace{2.6em}}c@{\hspace{2.6em}}c@{}}
+% Huy Kien Phan & Minh Chau Truong & Thanh Binh Nguyen
+% \end{tabular}}
+% \IEEEauthorblockA{%
+% \begin{tabular}{@{}c@{\hspace{2.6em}}c@{\hspace{2.6em}}c@{}}
+% \texttt{22520709@gm.uit.edu.vn}& \texttt{chautm@uit.edu.vn} & \texttt{binhnt@uit.edu.vn}
+% \end{tabular}}
+% }
+
+\author{\IEEEauthorblockN{Huy Kien Phan\IEEEauthorrefmark{1}\IEEEauthorrefmark{2}, Chau M. Truong\IEEEauthorrefmark{1}\IEEEauthorrefmark{2}, Thanh Binh Nguyen\IEEEauthorrefmark{1}\IEEEauthorrefmark{2}}
+\IEEEauthorblockA{\IEEEauthorrefmark{1}University of Information Technology, Ho Chi Minh City, Vietnam}
+\IEEEauthorblockA{\IEEEauthorrefmark{2}Vietnam National University, Ho Chi Minh City, Vietnam}
+\IEEEauthorblockA{
+22520709@gm.uit.edu.vn,
+\{chautm,binhnt\}@uit.edu.vn
+}}
 
 \maketitle
 
 \begin{abstract}
 Browser-based Optical Mark Recognition (OMR) enables on-device grading
-without application installation, but the relative impact of the different
-stages in a browser-side OMR computation pipeline has not been systematically
-quantified. To address this gap, we present a cross-platform Web Edge OMR
-framework that integrates WebAssembly (\wasm{}) computer vision with WebGPU
-YOLO inference, and evaluate it on a fixed-template 185-sheet dataset
-across seven browser/device configurations, comparing the results with a
-Native Android implementation on two of them.
-Our stage attribution reveals that the web-versus-native latency gap is
-larger for deterministic \wasm{} computer vision than for WebGPU YOLO
-inference, though detector inference remains a substantial absolute cost on
-phones. On the 185-sheet set, the matched-boundary computer-vision stage on
-Mobile Web is $2.6\times$ slower than its Native counterpart, whereas the
-corner detector's inference on WebGPU is only $1.6\times$ slower than Native
-NNAPI. Despite this latency gap, the Web
-pipeline reaches $99.03\%$ question accuracy with classical computer vision
-and $99.46\%$ with the corner-marker detector; on this closed-set
-fixed-template benchmark the detector yields a small paired gain
-($+0.4$ points) that must be validated end-to-end against the
-fixed-template recognizer rather than assumed from localization quality ---
-and the same corner-marker path, ported to Native, reaches matching
-accuracy ($99.44\%$). These findings indicate that
-optimizing Web Edge OMR should primarily target the \wasm{} computer-vision
-stage, while mobile hybrid deployments would also benefit from lighter
-detector inference; they support
-browser-based grading as a privacy-preserving, installation-free
-alternative to native deployment.
+without application installation, but the relative cost of the different
+stages in a browser-side OMR pipeline has not been systematically quantified.
+We present a Web Edge OMR framework and the first reported stage-wise cost
+attribution of a fully client-side browser OMR pipeline that runs WebAssembly
+(\wasm{}) computer vision and WebGPU YOLO inference locally on the device. We evaluate it on a 185-sheet fixed-template benchmark
+across five browser/device configurations, with a Native Android baseline
+for reference.
+Our evaluation yields three findings. First, the web-versus-native latency gap is
+dominated by the deterministic \wasm{} computer-vision core, which runs
+$2.6\times$ slower than its Native counterpart (CV-only, matched boundaries).
+Because this core runs on every sheet, it is the first-order target in the
+CV-only path and the cost common to both configurations; the hybrid path
+instead trades part of that CV cost for WebGPU inference. Second, despite this gap, both Web configurations exceed $99\%$ question
+accuracy, and the corner-marker path matches this level when ported to Native
+Android.
+Third, adding a WebGPU corner-marker detector gives only a small accuracy
+gain ($\sim\!0.4$ points), so detector outputs must be validated end-to-end
+against the fixed-template recognizer rather than assumed from localization
+quality. The corner-marker path reaches $99.46\%$ overall ($99.3\%$ on 101 unseen sheets).
+These results support browser-based grading as an installation-free,
+privacy-preserving option for on-device OMR.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -99,64 +113,49 @@ Recent maturation of \wasm{} and WebGPU now allows computer-vision and
 deep-learning workloads to execute directly inside modern browsers
 without plugins or installation, which enables a third deployment model:
 a fully client-side pipeline in which answer-sheet images are processed
-within the browser and never leave the device. Because a single
-URL-deployed bundle serves both desktop and mobile browsers, this model
-avoids the data-exposure risk inherent in server-side grading while also
-removing the installation friction of a native application.
+within the browser and never leave the device. Local execution therefore avoids the data-exposure risk inherent in server-side
+grading, while a single URL-deployed bundle that serves both desktop and mobile
+browsers removes the installation friction of a native application.
 
-In the browser these workloads map onto two different substrates. The
-classical image-processing stages, namely perspective rectification,
-adaptive thresholding, and fixed-grid bubble reading, are compiled from
-C\texttt{++}/OpenCV to \wasm{} and run on the CPU, whereas sheet-region
-localization can optionally be offloaded to neural inference through ONNX
-Runtime Web on a WebGPU backend. A deployment may thus run a CV-only
-pipeline or add a YOLO detector for the localization step; because the two
-substrates use different browser APIs and hardware, it is their relative
-cost rather than either component in isolation that determines whether a
-given configuration can rival native execution. This benchmark measures
-both.
+This heterogeneous model is promising, but its performance is not yet
+understood. A browser OMR pipeline couples two very different substrates:
+CPU-bound \wasm{} computer vision and GPU-accelerated neural inference, each
+using distinct browser APIs and hardware. Existing work has not shown how these substrates interact inside a complete
+recognition pipeline. It remains unclear where the dominant bottleneck lies,
+whether WebGPU localization can offset the browser's latency disadvantage
+relative to native execution, and whether a learned localizer improves
+recognition enough to justify replacing the classical front-end. Because it is their relative cost,
+not either component in isolation, that determines whether a configuration can
+rival native deployment, both must be measured within the same pipeline.
 
-Despite the potential of this heterogeneous web pipeline, the exact
-interplay between CPU-bound \wasm{} computer vision and GPU-accelerated deep
-learning inside the browser remains unquantified. Crucially, it is unclear
-whether accelerating inference via WebGPU is sufficient to close the
-performance gap with native platforms. To address this, this paper presents
-a systematic empirical study that benchmarks a complete Web Edge OMR
-pipeline against a Native Android baseline. Our findings reveal a critical
-shift: while WebGPU significantly reduces YOLO latency, the deterministic
-CV/\wasm{} stage is the larger source of the web-versus-native latency gap.
-Consequently, browser-based OMR emerges as a highly viable, privacy-preserving
-alternative whose ultimate competitiveness hinges primarily on minimizing
-\wasm{} computational overhead, while mobile hybrid deployments may still
-benefit from lighter detector inference.
+To address this, we present a systematic empirical study that benchmarks a
+complete Web Edge OMR pipeline, in both a CV-only and a hybrid YOLO+CV
+configuration, against a Native Android baseline. Our analysis shows that although WebGPU makes YOLO inference an effective
+accelerator, the deterministic \wasm{} computer-vision stage is the larger
+source of the web-versus-native latency gap, and is therefore the primary
+optimization target for browser-side OMR.
 
 The paper makes three contributions:
 \begin{enumerate}[leftmargin=*, itemsep=1pt, topsep=2pt]
-  \item We provide a human-reviewed cross-platform benchmark for Web Edge
-  OMR using a 185-sheet fixed-template dataset, with supervised measurements
-  of accuracy and latency across seven browser/device configurations ---
-  plus indicative resource measurements on the hosts that expose
-  process-level instrumentation --- and a Native Android baseline on two of
-  them.
+  \item We construct and evaluate a human-reviewed 185-sheet fixed-template OMR
+benchmark across five browser/device configurations, with supervised accuracy
+and latency measurements, indicative resource measurements, and a Native
+Android baseline on two devices.
   \item We perform a stage-level attribution analysis that separates
   browser-based computer vision and neural-inference costs, demonstrating
   that the web-versus-native latency gap is larger for the deterministic
   \wasm{} computer-vision stage than for WebGPU-accelerated YOLO inference.
-  \item We demonstrate, through a detector-handoff analysis, that a YOLO
-  corner-marker localizer can act as a primary front-end validated on this
-  fixed-template benchmark --- matching or slightly exceeding classical-CV
-  recognition on both Web and Native and offloading localization to the
-  GPU --- while also showing that the localizer yields only a small accuracy
-  gain, so detector outputs must be validated end-to-end with the
-  fixed-template recognizer rather than assumed from localization quality.
+  \item We evaluate a YOLO corner-marker handoff that offloads localization to WebGPU
+while keeping recognition in the shared fixed-template CV core, and find a
+small but measurable accuracy gain concentrated in low-contrast captures.
 \end{enumerate}
 
 \section{Related Work}
 
 \paragraph{Classical OMR}
 Traditional OMR pipelines rely on handcrafted image-processing
-techniques such as thresholding, edge detection, and morphological
-operations for bubble localization and recognition~\cite{patel2015,okorie2022}.
+techniques such as thresholding, edge detection, and morphological operations that register each sheet to a fixed template and
+read bubbles at predetermined grid positions~\cite{patel2015,okorie2022}.
 Although computationally efficient, these methods remain sensitive to
 illumination variation and geometric distortion in mobile capture
 scenarios~\cite{afifi2019}.
@@ -174,8 +173,7 @@ unclear how inference cost relates to the surrounding CV pipeline on
 constrained devices.
 
 \paragraph{Browser-based edge computing}
-\wasm{} and WebGPU~\cite{webgpu2025} together enable privacy-preserving
-client-side execution in modern browsers, with neural inference exposed
+\wasm{} and WebGPU~\cite{webgpu2025} together enable client-side execution in modern browsers, with neural inference exposed
 through ONNX Runtime Web~\cite{microsoft2021}. Quantitative evidence on the associated
 overhead is already available: Jangda et al.~\cite{jangda2019} report
 that \wasm{} runs on average 45\% slower than native code on
@@ -185,31 +183,26 @@ al.~\cite{wang2024} measure browser deep-learning inference at
 $16.9\times$ slower than native on CPU and $4.9\times$ on GPU, with
 WebGPU emerging as the strongest browser-side back-end. These studies,
 however, characterize isolated kernels rather than complete
-computer-vision pipelines. A higher-level abstraction is also emerging in
-the W3C WebNN API~\cite{webnn2026}, yet it remains a draft, so the
-practical interaction between \wasm{}-based image processing and WebGPU
-inference within a full application is still poorly understood.
+computer-vision pipelines. A higher-level abstraction, the W3C WebNN API~\cite{webnn2026}, is also advancing through the W3C standardization process, but practical
+client-side pipelines commonly still rely on \wasm{} and WebGPU, whose interaction within
+a full application is poorly understood.
 
-\paragraph{Research gap}
-Prior work thus examines either OMR accuracy or browser inference
-performance, but rarely both within one system. To our knowledge, no prior
-study evaluates a fully client-side browser OMR pipeline --- computer vision
-and neural inference both executing locally, with no transmission of
-answer-sheet data --- or establishes whether its latency is governed by
-neural inference or by the \wasm{}-executed computer-vision stages. The
-present paper closes these gaps through controlled per-stage profiling of a
-YOLOv8n-based browser OMR system across several back-ends and deployment
-configurations.
+Prior work thus examines either OMR accuracy or browser inference performance,
+but rarely both within one system: OMR studies omit browser-stage costs, while
+browser-performance studies measure isolated kernels~\cite{jangda2019,wang2024}
+rather than a complete recognition pipeline. The present paper bridges this by
+profiling a full client-side OMR pipeline per stage, across several back-ends
+and deployment configurations.
 
 \section{System Architecture and Methods}
 
-\begin{figure}[t]
+\begin{figure}[!htb]
   \centering
   \includegraphics[width=\columnwidth]{figures/structure_system.pdf}
-  \caption{Web-Based Edge OMR architecture. The main JavaScript thread
-  dispatches camera or file input to a Web Worker. WebGPU accelerates
-  only YOLO localization; normalization, thresholding, bubble reading,
-  and grading remain in the \wasm{} C\texttt{++}/OpenCV core.}
+  \caption{Web-Based Edge OMR architecture. (a) Layered runtime: the main
+JavaScript thread dispatches camera or file input to a Web Worker. (b) Per-sheet
+pipeline: WebGPU accelerates only YOLO localization, while normalization,
+thresholding, bubble reading, and grading remain in the \wasm{} C\texttt{++}/OpenCV core.}
   \label{fig:arch}
 \end{figure}
 
@@ -218,26 +211,24 @@ The system is organized as the layered runtime shown in
 Fig.~\ref{fig:arch}(a), where each layer hides the one beneath it so that
 the same application code runs unchanged on heterogeneous hardware. At the
 top, the JavaScript main thread owns user interaction and image
-acquisition from a camera stream or an uploaded file, but it delegates all
+acquisition from a camera stream or an uploaded file, and rendering them onto a canvas, but it delegates all
 computation to a dedicated Web Worker so that heavy processing never
 blocks UI responsiveness. Within the worker, an Algorithm Dispatcher
-selects between a conventional CV-only pipeline and a hybrid YOLO$+$CV
-pipeline; in the hybrid case it drives an ONNX YOLO model on a WebGPU
-backend for localization, while the \wasm{} OMR core --- hand-written
+is configured to run either a conventional CV-only pipeline or a hybrid
+YOLO$+$CV pipeline to resolve the sheet corners; in the hybrid case it drives an ONNX YOLO model on a WebGPU
+backend for localization, while the \wasm{} OMR core (hand-written
 C\texttt{++} image-processing kernels together with OpenCV, compiled to
-\wasm{} --- performs the actual recognition and grading. Since the dispatcher feeds
+\wasm{} utilizing SIMD and multi-threading) performs the actual recognition and grading. Since the dispatcher feeds
 any localization output into that same \wasm{} core, the two pipelines
-remain interchangeable at the recognition stage. Both back-ends ultimately
-execute inside the OS and browser sandbox, which mediates scheduling,
-memory, and security before mapping the work onto whatever CPU, GPU, or
-NPU the device exposes. This separation lets a single codebase target
-desktop and mobile platforms without modification.
+remain interchangeable at the recognition stage. Both browser back-ends execute inside the browser sandbox, which mediates
+scheduling, memory, and accelerator access before mapping work onto the
+available CPU and GPU.
 
 \subsection{Algorithmic Pipelines and Handoff Mechanism}
 
 Fig.~\ref{fig:arch}(b) traces a single sheet from capture to score along
 a predominantly linear spine, comprising the Input Frame, JS Decode \&
-Prep, Method Selection, a detect stage, Fixed Grid Bubble Detection, and
+Prep, Method Selection, followed by parallel CV or YOLO detection branches, a shared Adaptive Threshold, Fixed Grid Bubble Detection, and
 Grade Output. Detection is the only stage that forks: it splits into a CV
 branch and a YOLO branch, both of which converge again before grading so
 that the remainder of the pipeline is identical in either configuration.
@@ -248,14 +239,18 @@ image onto a canvas and derives the two artifacts that the downstream
 stages require, namely an RGBA pixel buffer for the \wasm{} core and,
 whenever the hybrid path is selected, a letterboxed tensor for the YOLO
 detector ($960\times960$ for the primary corner-marker model).
-\emph{Method Selection} then routes the image into one of the
-two detect branches. Because each branch performs the single task of
+The two branches correspond to deployment configurations selected explicitly
+(the benchmark evaluates each separately) rather than chosen per sheet; within
+the hybrid branch, the corner-warp path is taken when the detector returns four
+boxes whose ordered centres pass a geometric sanity check (four distinct corners
+forming a non-degenerate, correctly ordered quadrilateral); otherwise it falls
+back to the classical detector. Because each branch performs the single task of
 placing the answer grid at known coordinates and both subsequently feed
 the same recognizer, the chosen branch alters only how the sheet is
 located, never how an answer is ultimately read.
 
 On the CV branch, the \wasm{} core recovers the page geometry without
-external guidance. The \emph{Normalize} stage thresholds the image,
+external guidance. The \emph{WASM Normalize} stage thresholds the image,
 extracts connected components, and retains the four corner registration
 markers by filtering candidate blobs on area, aspect ratio, and fill;
 when that marker route proves unreliable, it instead falls back to the
@@ -267,20 +262,17 @@ to fixed positions.
 On the YOLO branch, the primary configuration is a corner-marker
 detector: a single-class YOLOv8n \emph{object} detector (not a pose/keypoint
 head) that localizes the four printed corner markers and uses their
-bounding-box centres as registration points. The image is \emph{letterboxed}
-into a $960\times960$ square (scaled to fit while padding the margin), and the
-model runs through the WebGPU backend. The four highest-confidence detections
-are reduced to their centres, geometrically ordered into top-left, top-right,
-bottom-right, and bottom-left, and passed
-\emph{directly} to the homography that rectifies the sheet onto the
-canonical template. This lets the \wasm{} core skip both the
-connected-component blob detection of the CV \emph{Normalize} stage and the
-second marker re-detection, so the YOLO branch rejoins the shared
-recognizer only at the \emph{Adaptive Threshold} stage. YOLO thus
-contributes localization alone, since the answer string is invariably
-decoded by the CV recognizer rather than by the detector. This strict
-decoupling makes the detector a purely geometric front-end, so the
-localization handoff can be evaluated without changing downstream grading.
+bounding-box centres as registration points. The raw image ($1{,}145\times2{,}560$\,px) is first letterboxed into a
+$960\times960$ tensor by scaling the longest dimension and zero-padding the
+shorter axis, and the model runs through the WebGPU backend. Following inference, the four highest-confidence boxes are reduced to their
+centres, mapped back to original-image coordinates by inverting the letterbox
+scale and padding, ordered (top-left, top-right, bottom-right, bottom-left), and
+passed to the homography that rectifies the sheet onto the canonical
+$1700\times2400$ template. This lets the \wasm{} core skip both connected-component
+blob detection and the second marker re-detection, so the YOLO branch rejoins the
+shared recognizer only at \emph{Adaptive Threshold}. YOLO therefore acts only as a geometric front-end; the answer string is always
+decoded by the shared CV recognizer, allowing the handoff to be evaluated
+without changing downstream grading.
 
 Once the two branches have rejoined on a common rectified crop,
 \emph{Adaptive Threshold} performs local blurring and thresholding, and
@@ -293,26 +285,19 @@ decision. The final \emph{Grade Output} stage emits the decoded answer
 string together with validity and suspicious-mark flags and the per-stage
 timers reported throughout this paper.
 
-Because the recognizer is deterministic, any geometric error before the
-homography displaces the entire grid --- so detector-guided cropping is an
-integral part of the recognition algorithm, not a harmless preprocessing
-step.
+Detector-guided cropping is therefore integral to recognition, not a harmless
+preprocessing step: any geometric error before the homography displaces the
+entire grid.
 
 \subsection{Platform-Specific Optimization and Edge Deployment}
-The framework targets two deployment environments with complementary
-trade-offs. The Web Edge build uses \wasm{} via OpenCV.js for deterministic
-image processing and WebGPU via ONNX Runtime Web for inference, enabling
-zero-installation cross-platform execution in the browser sandbox, at the
-cost of virtualization overhead and only managed accelerator access. The
-Native Android build uses the OpenCV Android SDK through JNI and ONNX Runtime
-Android, granting direct access to the Neural Networks API (NNAPI) and
-markedly lower inference latency, at the cost of packaging and per-platform
-maintenance. Both execute every stage locally on the device: this removes
-network latency from recognition and is privacy-preserving by design, since
-the answer-sheet images need not leave the device during recognition
-(assuming the deployed application performs no upload or telemetry; offline
-operation further requires cached or PWA-installed assets). It is also what
-makes a like-for-like latency comparison between the two targets meaningful.
+The two deployment targets present complementary trade-offs. The Web Edge
+build runs unmodified in the browser sandbox with zero installation, but
+accepts virtualization overhead and only managed accelerator access. The
+Native Android build instead obtains direct accelerator access and markedly
+lower inference latency, at the cost of platform-specific packaging and
+maintenance. Because both targets execute all recognition stages locally on the device,
+answer-sheet images need not leave it. Latency is comparable across the two
+targets only at a matched measurement boundary, which the next section defines.
 
 \section{Experimental Setup}
 
@@ -321,38 +306,57 @@ The evaluation set ($N{=}185$) comprises every annotated sheet in the
 corpus: 179 student-answer images and six
 answer-key sheets, drawn from five sub-datasets (50, 48, 36, 46, and 5
 sheets; \texttt{dataset\_3} holds the low-contrast, re-compressed photos)
-and each captured at $1{,}145\times2{,}560$\,px on a mobile device. Answer sheets and answer keys
-are the same printed form---a key merely carries the correct marks---so both
+and captured on mobile devices (nominally $1{,}145\times2{,}560$\,px for
+\texttt{dataset\_1}; other subsets vary).
+Dataset~3 is a washed-out, re-compressed subset: all 36 sheets have a
+compressed tonal range (median $p_{99}-p_{1}\approx129$ grey levels and paper
+white capped at $\approx192/255$, versus $\approx225$–$237$ on the cleanest
+subsets), which leaves the printed corner markers close to the
+connected-component detection threshold. Answer sheets and answer keys
+are the same printed form (a key merely carries the correct marks), so both
 are recognized by the identical pipeline, the keys differing only in that
-they additionally serve as the grading reference. A human-reviewed reference
-establishes the ground truth and marks invalid trailing questions as
-non-applicable, yielding 9{,}810 valid question labels and 49{,}050
-individual binary mark decisions behind every accuracy figure in this paper.
+they additionally serve as the grading reference. Two reviewers independently established the ground truth, resolving
+disagreements by manual inspection, and marked invalid trailing questions as
+non-applicable, yielding 9{,}810 valid question labels and 49{,}050 individual
+binary mark decisions behind every accuracy figure in this paper.
 
 \subsection{Detector Training Configuration}
-The corner-marker localizer is a single-class YOLOv8 nano model trained on
-the 185 annotated sheets, split into 159 images for training and 26 for
-validation under the standard Ultralytics YOLOv8 recipe. After convergence
-the model is exported to a unified ONNX format shared across the Web and
-Native deployments, which removes cross-framework conversion variance; only
-the execution provider differs, being WebGPU in the browser and CPU or NNAPI
-on Android. Inference uses a $960\times960$ letterboxed input with confidence
-threshold $0.05$ and NMS IoU $0.45$. On the 26-image validation split the
+The corner-marker localizer is a single-class (\texttt{marker\_corners})
+YOLOv8 nano model fine-tuned from \texttt{yolov8n.pt} on 85 annotated sheets,
+split into 68 for training and 17 for validation. Training runs for up to
+100 epochs (early stopping, patience 30) at batch size 8 and $960\times960$
+input, with the Ultralytics auto-selected optimizer (initial learning rate
+0.01, momentum 0.937, weight decay 0.0005); augmentation is intentionally
+minimal: small translation (0.1) and scale (0.2) jitter only, with
+horizontal/vertical flips, mosaic, and mixup disabled, since the four corner
+markers carry a fixed geometric ordering. After convergence the model is
+exported to a unified ONNX format shared across the Web and Native
+deployments, which removes cross-framework conversion variance; only the
+execution provider differs, being WebGPU in the browser and CPU or NNAPI on
+Android. Inference uses a $960\times960$ letterboxed input with confidence threshold
+$0.05$ (the four highest-confidence boxes are retained) and NMS IoU $0.45$. On the 17-image validation split the
 detector obtains $\mathrm{mAP}@0.5{=}0.995$ and recall $1.0$ (all four corner
-markers recovered per sheet); CV-stage recognition is deterministic and
-identical across repeated runs and across Windows hosts.
+markers recovered per sheet). Because the detector localizes only the fixed
+printed fiducials and never the marked content, and 101 of the 179 student-answer benchmark sheets were never used during
+detector development (the 85 development sheets include 78 of these 179 student
+sheets; the remaining 7 lie outside the 179-sheet student set), the benchmark recognition
+accuracy (Section~\ref{sec:results-recognition}) characterizes the recognizer
+given localized corners, separately from this detector validation split.
+CV-stage recognition is deterministic and identical across repeated runs and
+across Windows hosts.
 
 \subsection{Benchmark Platforms and Hosts}
-The benchmark replays the identical 185-image set across seven browser/device configurations and
+The benchmark replays the identical 185-image set across five browser/device configurations and
 a Native Android baseline on two of them:
 \begin{itemize}[leftmargin=*, itemsep=1pt, topsep=2pt]
-  \item \textbf{Desktop reference:} Intel Core i5-14600K with an NVIDIA
-  RTX~4070 Ti SUPER.
-  \item \textbf{Laptops:} ASUS Vivobook (i5-13500H) and Acer Nitro~5
-  (i5-10300H).
-  \item \textbf{Apple:} a MacBook Air~M1 and an iPhone~16 (Safari/WebKit).
-  \item \textbf{Android (Chrome/Blink):} a Poco Pad~M1 tablet and a Redmi
-  Note~13 Pro+.
+  \item   \textbf{Desktop reference:} Intel Core i5-14600K, NVIDIA
+  RTX~4070 Ti SUPER, 32\,GB RAM.
+  \item \textbf{Laptops:} ASUS Vivobook (i5-13500H, 24\,GB RAM, Intel Iris Xe
+  iGPU) and Acer Nitro~5 (i5-10300H, 16\,GB RAM).
+  \item \textbf{Android (Chrome/Blink):} a Poco Pad~M1 tablet (Snapdragon~7s
+  Gen~4, 8\,GB LPDDR4X) and a Redmi Note~13 Pro+ (Dimensity 7200-Ultra,
+  8\,GB LPDDR5).
+
   \item \textbf{Native baseline:} the Poco Pad and the Redmi additionally
   run a native Android application via multi-threaded CPU and NNAPI
   execution providers.
@@ -367,7 +371,7 @@ runs ONNX Runtime Web on WebGPU with an Emscripten-compiled OpenCV core
 using SIMD and threads under cross-origin isolation, and the Native build
 runs ONNX Runtime Android with OpenCV~4; every latency host is warmed up
 with five sheets, and the five corner-protocol hosts are reported as five-run
-medians (the Mac and iPhone as an earlier single round).
+medians.
 
 \subsection{Metrics and Measurement Boundaries}
 To keep comparisons fair across sandboxed and native environments, metrics
@@ -375,58 +379,23 @@ are bounded by the runtime abstraction layer, and each claim is tied to its
 artifact and boundary as follows. \emph{Web latency} is a
 \emph{worker-pipeline} latency: the worker-side C\texttt{++} (and, for the
 hybrid, WebGPU) execution time, measured after image data reaches the worker
-thread, so it excludes main-thread decoding and rendering and is therefore a
-lower bound on the full browser wall-time rather than a complete
-device-to-grade time. \emph{Native latency} is the file-based end-to-end
+thread, so it excludes main-thread decoding and rendering. \emph{Native latency} is the file-based end-to-end
 duration, covering image decoding and processing; the debug-only JPEG write
-is excluded from reported timings. \emph{Resource use} is sampled with
-whichever instrument a host exposes: process utilities for Windows browsers,
-an in-page event-loop-lag proxy where direct process sampling is
-unavailable (Mac and iOS), and an in-app/adb sampler on Android. A
-same-boundary latency ratio uses the corresponding core-stage time ---
-worker-side C\texttt{++} on Web and the native C\texttt{++} core on
-Android, and inference ratios compare ORT/WebGPU time on Web with ORT/NNAPI
+is excluded from reported timings. Because the two boundaries differ (Web excludes decoding while Native includes it), direct Web-Native latency comparisons are reported only on the same-boundary core-stage measurements. \emph{Resource use} is sampled with whichever instrument a host exposes:
+process utilities for Windows browsers and an in-app/adb
+sampler on Android. A
+same-boundary latency ratio uses the corresponding core-stage time (worker-side C\texttt{++} on Web and the native C\texttt{++} core on
+Android). Inference ratios compare ORT/WebGPU time on Web with ORT/NNAPI
 time on Android. Where deployment latency is discussed the boundary is named
-explicitly, and Web browser wall-time is not exported by the current logs.
+explicitly, and full browser end-to-end wall-time, including main-thread
+decoding and rendering, is not exported by the current logs.
 
 \section{Results and Discussion}
 
 \subsection{Recognition Accuracy}
 \label{sec:results-recognition}
 
-Table~\ref{tab:accuracy} reports supervised exact-match recognition on
-the reviewed $N{=}185$ fixed-template set. Traditional CV correctly
-recognizes 9{,}715 of the 9{,}810 questions, a question-level accuracy of
-99.03\%, and reproduces every answer on 143 of the 185 sheets. Replacing
-the CV sheet-localization stage with a YOLO corner-marker detector, which
-emits the four corner registration markers and feeds their centres directly
-to the homography, returns 99.46\% (9{,}757/9{,}810) and 155 of 185 fully
-correct sheets, reproducibly across the five corner-protocol hosts.
-
-A bootstrap-by-sheet 95\% confidence interval is 98.63--99.37\% for CV and
-99.20--99.68\% for the corner path. Because questions within a sheet are
-correlated, we test the difference with a paired bootstrap over the 185
-sheets (10{,}000 resamples): the mean per-sheet gain is $+0.45$ points (95\% CI $[+0.20,+0.72]$,
-excluding zero), with the corner path better on 32 sheets and worse on 15.
-The gain concentrates on the low-contrast \texttt{dataset\_3} photos where
-the connected-component marker search is least reliable (CV 97.2\% versus
-99.6\% there). The corner-marker formulation is therefore not merely
-accuracy-neutral; it gives a modest but real improvement that ---
-crucially --- must be validated end-to-end against the fixed-template
-recognizer rather than assumed from localization quality alone.
-
-Beyond accuracy, passing four exact corner points to the homography removes
-the connected-component marker detection and its second re-detection pass
-from the C\texttt{++} core and moves the localization onto the GPU; the
-latency results below show the resulting shift in where the per-sheet cost
-is spent. On the 179 student sheets alone CV scores 99.00\% and the corner
-path 99.45\% (both $\geq$99.6\% on the six keys), so the metrics are not
-inflated by easy templates. At the bubble level the CV baseline attains
-Precision 0.992,
-Recall 0.994, and F1 0.993 over the 49{,}050 binary decisions, and the
-corner-marker pipeline edges it at 0.995/0.998/0.997.
-
-\begin{table}[t]
+\begin{table}[!htb]
 \caption{Supervised question-level recognition accuracy on the reviewed
 $N{=}185$ set.}
 \label{tab:accuracy}
@@ -443,6 +412,7 @@ YOLO corner markers         & \textbf{99.46\%} & \textbf{9{,}757}/9{,}810 & \tex
 Traditional CV              & 99.03\%          & 9{,}715/9{,}810          & 143/185          & 44 & 42 & 18 \\
 \bottomrule
 \end{tabular}}
+
 \vspace{2pt}
 \parbox{\columnwidth}{\footnotesize
 Corner-marker is the in-browser YOLO 4-corner detector feeding a direct
@@ -454,63 +424,43 @@ P/R/F1 are 0.992/0.994/0.993 (CV) and 0.995/0.998/0.997 (corner) over
 49{,}050 binary decisions.}
 \end{table}
 
+Table~\ref{tab:accuracy} reports supervised exact-match recognition on
+the reviewed $N{=}185$ fixed-template set. Traditional CV correctly
+recognizes 9{,}715 of the 9{,}810 questions, a question-level accuracy of
+99.03\%, and reproduces every answer on 143 of the 185 sheets. Replacing
+the CV sheet-localization stage with a YOLO corner-marker detector, which
+emits the four corner registration markers and feeds their centres directly
+to the homography, returns 99.46\% (9{,}757/9{,}810) and 155 of 185 fully
+correct sheets, reproducibly across the five corner-protocol hosts. Across this in-distribution benchmark the detector returned four corner markers on
+every sheet, so the classical fallback was never exercised; this is a closed-set
+result, not tested out-of-distribution robustness. Two quantities must be kept separate here. \emph{Localization accuracy} is measured on the 17-sheet held-out split, where the detector attains $\mathrm{mAP}@0.5{=}0.995$ and recovers all four corners per sheet. The 99.46\% above is instead an \emph{end-to-end recognition} figure: it quantifies how well the deterministic C\texttt{++} core reads bubbles once given accurate corner geometry. Because the corner labels cover part of the evaluation sheets, this is a closed-set, fixed-template bound on recognition given good localization, not a measure of the detector's open-set generalization. On the 101
+student-answer sheets never seen during detector development, the corner path
+reaches $99.3\%$ question accuracy ($5{,}503/5{,}540$), within noise of the
+$99.6\%$ on the 78 detector-development-overlap sheets, suggesting the full-set figure is
+not materially inflated by the development overlap.
+
+A bootstrap-by-sheet 95\% confidence interval is 98.63--99.37\% for CV and
+99.20--99.68\% for the corner path. Because questions within a sheet are
+correlated, we test the difference with a paired bootstrap over the 185
+sheets (10{,}000 resamples): the mean per-sheet gain is $+0.45$ points (95\% CI $[+0.20,+0.72]$,
+excluding zero), with the corner path better on 32 sheets and worse on 15.
+The gain concentrates on the low-contrast \texttt{dataset\_3} photos where
+the connected-component marker search is least reliable (CV 97.2\% versus
+99.6\% there). In absolute terms this corrects 42 of 9{,}810 questions, a non-negligible
+margin when exact sheet-level grading is required. The improvement is therefore
+statistically supported but modest in magnitude, and it should still be validated
+end-to-end against the fixed-template recognizer rather than inferred from
+localization quality alone.
+
+Excluding the six keys, CV and corner score 99.00\% and 99.45\% on the 179
+student sheets (keys $\geq$99.6\%), so easy templates do not inflate the figures.
+The latency cost of this shift is quantified next. 
+
 \subsection{Cross-Platform Latency}
-\label{sec:latency}
-Fig.~\ref{fig:latency} and Tables~\ref{tab:stage-mini}--\ref{tab:latency}
-report the deployment benchmark, which shows that the Web-versus-Native gap
-is larger for the deterministic CV stage than for YOLO inference, although
-on mobile hybrid runs the absolute WebGPU inference time remains a major
-contributor to the worker pipeline.
 
-The clearest evidence is a same-device, same-boundary comparison on the
-Redmi. For the CV core (the full two-stage normalize, re-crop, threshold and
-bubble read, timed worker-side), Native Android
-requires $191$\,ms whereas the Mobile Web build requires $503$\,ms, a
-$2.6\times$ gap under matched stage boundaries, attributable to the
-browser/\wasm{} execution stack together with build-level differences such
-as memory layout, SIMD scheduling, and OpenCV implementation. The
-learned stage behaves very differently: the corner detector takes
-$547$\,ms on WebGPU against $335$\,ms for the Native NNAPI provider, a
-$1.6\times$ gap that is far smaller than the $4.9\times$ GPU-side browser
-slowdown reported for browser deep-learning inference in prior
-work~\cite{wang2024}, which shows that WebGPU is already an effective
-accelerator. Since the CV gap exceeds the inference gap in both relative
-($2.6\times$ vs $1.6\times$) and absolute ($312$ vs $212$\,ms) terms, and
-the CV stage runs on every sheet irrespective of the detector, the
-first-order lever for Web Edge latency is the \wasm{} CV runtime --- though
-the detector remains a substantial absolute cost on phones.
-
-\begin{figure}[!b]
-  \centering
-  \includegraphics[width=\columnwidth]{figures/fig1_latency.pdf}
-  \caption{Per-sheet latency by platform and configuration
-  ($N{=}185$, log scale). Web bars are the full worker wall-time
-  (including WebGPU corner inference); Native bars are the file-based
-  end-to-end time.}
-  \label{fig:latency}
-\end{figure}
-
-The Native budget reinforces this attribution
-(Table~\ref{tab:stage-mini}). With the complete CV pipeline ported across
---- two-stage normalization, the Stage-2 marker re-crop, threshold, and
-bubble read --- the Native CV core runs in $191$\,ms and recognizes
-$97.75\%$ of questions. The residual gap to the Web CV path ($99.03\%$) is
-not a limitation of the fixed-grid recognizer but of build-sensitive marker
-preprocessing: it is confined to three low-contrast, re-compressed photos
-whose marker grey level sits at the detection threshold, so OpenCV-Android
-downscaling and thresholding diverge from the Web build's custom kernels by
-a few grey levels and reject one marker. The corner-marker path removes
-exactly this implementation sensitivity: ported to Native it yields
-$99.44\%$ on both devices (Redmi and Poco Pad), on par with the Web hybrid
-($99.46\%$) and correct on all five sub-datasets including the dark sheets.
-The web-versus-native penalty is thus concentrated in the \wasm{} CV
-runtime, not the GPU-accelerated detector, and Native keeps the lower
-latency while the shared corner-marker path delivers matching,
-platform-robust accuracy.
-
-\begin{table}[t]
+\begin{table}[!htb]
 \caption{Native Redmi recognition and latency by configuration ($N{=}185$,
-median ms). Accuracy is now GT-aligned via the shared corner-marker path.}
+median ms). Accuracy is evaluated against the reviewed ground truth.}
 \label{tab:stage-mini}
 \centering
 \setlength{\tabcolsep}{6pt}
@@ -525,6 +475,7 @@ Corner CPU-4T   & \textbf{99.44\%} & 530 & 713  & 750  \\
 Corner CPU-1T   & \textbf{99.44\%} & 956 & 1132 & 1174 \\
 \bottomrule
 \end{tabular}
+
 \vspace{2pt}
 \parbox{\columnwidth}{\footnotesize
 \texttt{Pipeline} is the native OMR processing time; for the Corner rows it
@@ -533,25 +484,23 @@ JPEG decode (the
 debug-only JPEG write, absent in production, is excluded); ORT is the
 measured ONNX Runtime inference time. The CV row uses the full ported
 pipeline including the Stage-2 re-crop ($97.75\%$); the corner path is
-GT-aligned and correct on all sub-datasets.}
+evaluated against the same reviewed ground truth and remains robust across all sub-datasets.}
 \end{table}
 
-Within the browser, the corner-marker hybrid reshapes the cost structure
-rather than merely adding to it (Table~\ref{tab:latency}, five-run medians).
-Feeding an exact four-point geometry to the homography lets the C\texttt{++}
-core skip both blob detection and the second marker re-detection, roughly
-halving its per-sheet latency: $503\to249$\,ms on the Redmi, $343\to166$ on
-the Poco Pad, and $325\to138$ on the Vivobook. Whether the full pipeline is
-faster is device-dependent: on the Vivobook the C\texttt{++} saving
-outweighs the added WebGPU inference (worker time $379\to278$\,ms), whereas
-on the phones the $450$--$550$\,ms corner inference dominates and worker time
-rises (Redmi $683\to805$\,ms). The hybrid thus moves localization off the
-deterministic core and onto the GPU, trading inference latency for a lighter
-CV stage at a small accuracy gain.
+\begin{figure}[!htb]
+  \centering
+  \includegraphics[width=\columnwidth]{figures/fig1_latency.pdf}
+  \caption{Per-sheet mean latency by platform and configuration ($N{=}185$, log
+scale). Web bars show worker wall-time, including WebGPU corner inference;
+Native bars show file-based end-to-end time. These boundaries are not direct
+speed ratios; matched-boundary ratios are reported in Section~\ref{sec:latency}.
+On Redmi Web, hybrid increases worker wall-time by $20\%$ ($680\to817$\,ms).}
 
-\begin{table}[t]
+  \label{fig:latency}
+\end{figure}
+\begin{table}[!htb]
 \caption{Per-sheet C\texttt{++} core latency (ms), CV-only versus
-corner-marker hybrid, across the seven browser/device configurations.}
+corner-marker hybrid, across the five browser/device configurations.}
 \label{tab:latency}
 \centering
 \setlength{\tabcolsep}{6pt}
@@ -563,38 +512,99 @@ corner-marker hybrid, across the seven browser/device configurations.}
 Desktop ref. & Win/Blink     & 170 & 49  \\
 Vivobook     & Win/Blink     & 325 & 138 \\
 Nitro~5      & Win/Blink     & 344 & 94  \\
-Mac M1       & macOS/WebKit  & 240 & 240 \\
-iPhone~16    & iOS/WebKit    & 160 & 165 \\
 Poco Pad     & Android/Blink & 343 & 166 \\
 Redmi        & Android/Blink & 503 & 249 \\
 \bottomrule
 \end{tabular}
+
 \vspace{2pt}
 \parbox{\columnwidth}{\footnotesize
 Worker-side C\texttt{++} core time. The hybrid additionally runs the WebGPU
 detector (inference $\approx90$\,ms desktop to $\approx550$\,ms phones,
 included in Fig.~\ref{fig:latency}'s worker wall-time). The five
-corner-protocol hosts are five-run medians ($N{=}185$); Mac/iPhone are an
-earlier single round. Recognition is device-uniform (CV 99.03\%, hybrid
+corner-protocol hosts are five-run medians ($N{=}185$). Recognition is device-uniform (CV 99.03\%, hybrid
 99.46\%).}
 \end{table}
+\label{sec:latency}
+Fig.~\ref{fig:latency} and Tables~\ref{tab:stage-mini}--\ref{tab:latency}
+report the deployment benchmark, which shows that the Web-versus-Native gap
+is larger for the deterministic CV stage than for YOLO inference.
+
+The clearest evidence is a same-device, same-boundary comparison on the
+Redmi. For the CV core (the full two-stage normalize, re-crop, threshold and
+bubble read, timed worker-side), Native Android
+requires $191$\,ms whereas the Mobile Web build requires $503$\,ms, a
+$2.6\times$ gap under matched stage boundaries, attributable to the
+browser/\wasm{} stack and build-level differences (OpenCV build, memory
+layout, SIMD scheduling). The
+learned stage behaves very differently: the corner detector takes
+$547$\,ms on WebGPU against $335$\,ms for the Native NNAPI provider, a
+$1.6\times$ gap that is far smaller than the $4.9\times$ GPU-side browser
+slowdown reported for browser deep-learning inference in prior
+work~\cite{wang2024}, suggesting that WebGPU can be an effective browser-side
+accelerator for this workload. The $312$\,ms CV gap ($503$ vs $191$) is the CV-only figure, which makes the
+browser/build-stack CV core the first-order lever in that configuration. In the
+hybrid path the residual CV gap shrinks to ${\sim}108$\,ms ($249$ vs ${\sim}141$)
+while WebGPU inference adds a $212$\,ms gap ($547$ vs $335$), so a detector-based
+deployment is instead inference-bound. The CV core is nonetheless the cost paid
+on every sheet regardless of detector, and on phones the inference cost grows
+further under CPU execution providers (Table~\ref{tab:stage-mini}).
+
+
+
+The Native budget reinforces this attribution
+(Table~\ref{tab:stage-mini}). With the complete CV pipeline ported across
+(two-stage normalization, the Stage-2 marker re-crop, threshold, and
+bubble read), the Native CV core runs in $191$\,ms and recognizes
+$97.75\%$ of questions. The residual gap to the Web CV path ($99.03\%$) is
+not a limitation of the fixed-grid recognizer but of build-sensitive marker
+preprocessing: it is confined to three low-contrast, re-compressed photos
+whose marker grey level sits at the detection threshold, so OpenCV-Android
+downscaling and thresholding diverge from the Web build's custom kernels by
+a few grey levels and reject one marker. This CV-only shortfall is an implementation artifact (a few-grey-level threshold
+mismatch), in principle fixable by retuning the Android marker thresholds, rather
+than an inherent limitation of the recognizer; the corner-marker path simply
+sidesteps it: ported to Native it yields $99.44\%$ on both devices (Redmi and
+Poco Pad), on par with the Web hybrid ($99.46\%$) and robust across all five
+sub-datasets including the low-contrast subset.
+Native keeps the lower
+latency while the shared corner-marker path delivers matching,
+platform-robust accuracy.
+
+
+
+Within the browser, the corner-marker hybrid reshapes the cost structure
+rather than merely adding to it (Table~\ref{tab:latency}, five-run medians).
+Feeding detector-supplied four-point geometry
+to the homography lets the C\texttt{++} core skip both blob detection and the second marker re-detection, roughly
+halving its per-sheet latency: $503\to249$\,ms on the Redmi, $343\to166$ on
+the Poco Pad, and $325\to138$ on the Vivobook. Whether the full pipeline is
+faster is device-dependent: on the Vivobook the C\texttt{++} saving
+outweighs the added WebGPU inference (worker time $414\to284$\,ms), whereas
+on the phones the $450$--$550$\,ms corner inference dominates and worker time
+rises (Redmi $680\to817$\,ms). The hybrid thus moves localization off the
+deterministic core and onto the GPU, trading inference latency for a lighter
+CV stage at a small accuracy gain.
+
 
 \FloatBarrier
-
 \subsection{System Resource Usage}
 \label{sec:resources}
 
-Resource use remains bounded (Table~\ref{tab:resources}), though CPU units
-are instrument-specific: Windows rows are renderer-process CPU\%, while
-Android Web and Native use an adb/in-app sampler out of $800\%$ (Mac and
-iPhone omitted, their event-loop proxy not unit-comparable). Web memory
-peaks from $\approx 1.0$--$1.3$\,GB on Windows Chrome up to $\approx
-2.3$\,GB on the Nitro~5, well above Native. As no single instrument spans
-all platforms --- and browser sampling may miss GPU-process memory under
-WebGPU --- we treat these as indicative feasibility evidence, not efficiency
-ratios.
+Resource use remains bounded (Table~\ref{tab:resources}), though CPU and
+memory values are instrument-specific. Windows rows report renderer-process
+CPU\% and RSS, whereas Android Web and Native use an adb/in-app sampler out of
+$800\%$. Web memory peaks range from approximately $1.0$--$1.3$\,GB on Windows
+Chrome to $2.3$\,GB on the Nitro~5. The Nitro~5 peak is an outlier, roughly
+double the other Windows hosts, consistent with browser/driver-specific
+allocation on that machine rather than a workload difference. On the Redmi, sampled Native RAM is higher
+than sampled Web RAM, but this reflects measurement boundaries: the native
+sampler reports whole-process PSS, whereas the browser sampler captures only
+the renderer process and can miss GPU-process allocations under WebGPU. We
+therefore treat these measurements as indicative feasibility evidence rather
+than efficiency ratios.
 
-\begin{table}[!t]
+\begin{table}[!htb]
 \caption{Resource summary over the $N{=}185$ continuous run. CPU cells
 are avg/peak in the instrument's native unit; RAM cells are CV/hybrid peak
 MB. Indicative feasibility only; units are not comparable across instruments.}
@@ -616,44 +626,38 @@ Redmi Web & $177/271\%$ & $93/213\%$ & $254/216$ & sampler \\
 Native (Redmi) & $360/538\%$ & $98/393\%$ & $510/622$ & sampler \\
 \bottomrule
 \end{tabular}}
-\vspace{1pt}
+
+\vspace{2pt}
 \parbox{\columnwidth}{\footnotesize
 Windows hosts use \texttt{psutil} renderer CPU\% and RSS-MB; Android Web and
 Native use an adb/in-app sampler reported as CPU\% out of $800$ and PSS-MB.
 Android-Web CV/Hybrid columns are CV-only versus the corner-marker hybrid;
-Native uses the NNAPI provider. The Mac and iPhone are omitted here: their
-event-loop proxy is not unit-comparable with process sampling.}
+Native uses the NNAPI provider.}
 \end{table}
 
 A lower browser CPU reading does not imply higher throughput: the \wasm{}
 worker stays near single-core, whereas Native OpenCV converts higher sampled
-CPU into lower latency via native threading. Bounded resource use confirms
-deployability, but latency still depends on reducing the \wasm{} CV cost.
+CPU into lower latency via native threading.
 
 \subsection{Threats to Validity}
 \label{sec:threats}
 \begin{enumerate}[label=(\roman*), leftmargin=*, itemsep=1pt, topsep=2pt]
-  \item CPU/RAM instruments differ across platforms, so resource values
-  are reported with their native units and used for trend interpretation
-  rather than direct cross-instrument ratios. All latencies are
-  steady-state batch medians after warm-up; cold-start asset and model
-  loading is excluded.
+  \item CPU/RAM instruments differ across platforms, so resource values are
+indicative rather than comparable efficiency ratios. Stage-level latency tables
+report steady-state medians after warm-up, while deployment-level figure bars
+report per-sheet means; cold-start asset/model loading is excluded.
   \item The supervised accuracy artifact covers one 185-sheet
   fixed-template collection. This is the intended workload scope rather
-  than a claim about arbitrary-layout OMR; writer-disjoint data and
-  broader capture conditions remain future validation.
-  \item Web and Native share source-level stages but differ in OpenCV build,
-  floating-point ordering, and memory layout, so outputs are not
-  bit-identical. The corner-marker path ports at parity ($99.44\%$ vs
-  $99.46\%$); the ported CV-only path reaches $97.75\%$, the $1.3$-point gap
-  confined to three borderline-contrast sheets where hand-tuned marker
-  thresholds are build-sensitive --- itself evidence for the fiducial
-  front-end.
-  \item The detector is trained on the 185 sheets ($159/26$ split). Because
-  the corner labels include the evaluation sheets, the $99.46\%$ figure is a
-  closed-set,
-  fixed-template result; writer-disjoint and multi-template evaluation remain
-  future work, so we avoid any claim of generalization beyond this layout.
+  than a claim about arbitrary-layout OMR; broader capture conditions remain future validation.
+  \item   Web and Native share source-level stages but differ in OpenCV build,
+  floating-point ordering, and memory layout, so outputs are not bit-identical.
+  The corner-marker path nonetheless ports at parity ($99.44\%$ vs $99.46\%$);
+  the residual CV-only gap traces to build-sensitive marker preprocessing
+  (Section~\ref{sec:latency}).
+  \item      The detector is developed on 85 sheets ($68/17$ train/validation); the corner
+path holds $99.3\%$ on the 101 unseen student-answer benchmark sheets, so the
+$99.46\%$ full-set figure is a closed-set, fixed-template result. Writer-disjoint and multi-template
+  evaluation remain future work; we claim no generalization beyond this layout.
   \item Web latency on thermally constrained laptops is sensitive to power
   and thermal state: on the Vivobook we saw up to a $\approx 2\times$ spread
   in per-sheet C\texttt{++} latency across runs (outputs bit-identical).
@@ -663,30 +667,21 @@ deployability, but latency still depends on reducing the \wasm{} CV cost.
 
 \section{Conclusion}
 
-Web Edge OMR proves to be both accurate and deployable, yet its latency
-is determined by how the stages balance rather than by inference alone.
-The reviewed Web CV path reaches 99.03\% question accuracy, and a YOLO
-corner-marker detector that feeds four predicted markers straight into
-the homography reaches 99.46\% across five devices --- a small but
-statistically significant gain on this closed-set fixed-template
-benchmark --- and, ported to Native, attains a matching $99.44\%$ there as
-well, while moving localization onto the GPU and removing the hand-written
-marker detection. On latency,
-the dominant web-versus-native term is the \wasm{} CV stage: on the same
-Redmi device its $503$\,ms is $2.6\times$ the $191$\,ms native core, a
-larger gap than the $1.6\times$ between WebGPU and NNAPI for the same
-detector. Native Android therefore remains the faster deployment --- now at
-matching accuracy --- while Web Edge exchanges that latency for privacy and
-installation-free reach. As a deployment rule: prefer Native when
-installation is acceptable and latency is paramount, Web for reach and
-privacy; within either, prefer the corner-marker front-end on low-contrast
-sheets and CV-only when markers are clean. Closing the
-web-versus-native gap primarily requires browser-accessible CV acceleration
-and a leaner \wasm{} runtime, while mobile hybrid deployments would also
-benefit from lighter detector inference.
+This benchmark shows that Web Edge OMR can be accurate and deployable for
+fixed-template grading, yet its latency is set by how the stages balance rather
+than by inference alone. The Web CV path reaches 99.03\% question accuracy and the corner-marker
+hybrid 99.46\% across five devices, matched at $99.44\%$ when ported to Native.
+The learned detector adds only a small but statistically supported accuracy
+gain, concentrated in low-contrast captures. On latency, the largest single web-versus-native term in the CV-only path is the
+browser/build-stack CV core: on the same Redmi its $503$\,ms is $2.6\times$ the
+$191$\,ms native core, wider than the $1.6\times$ between WebGPU and NNAPI; the
+hybrid path is instead inference-bound. Native therefore
+remains the faster deployment at matching accuracy, while Web Edge exchanges
+that latency for privacy and installation-free reach. Closing the gap primarily requires a leaner \wasm{} CV runtime with better browser access to CV acceleration, while mobile hybrid deployments would also benefit from lighter detector inference.
+
 
 \begin{thebibliography}{12}
-\setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}\footnotesize
+\setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}\scriptsize
 
 \bibitem{patel2015}
 R.~Patel, S.~Sanghavi, D.~Gupta, and M.~S.~Raval,

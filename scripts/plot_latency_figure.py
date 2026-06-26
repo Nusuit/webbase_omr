@@ -25,13 +25,15 @@ def load_mean_sd(path: Path, field: str) -> tuple[float, float]:
     return statistics.mean(vals), statistics.stdev(vals)
 
 
-# Web Edge (Chrome WebGPU+SIMD+Threads), N=185. Bars are full worker wall-time.
+# Web Edge (Chrome WebGPU+SIMD+Threads), N=185. Bars are full worker wall-time
+# (worker_total_ms). Mac M1 and iPhone 16 are an earlier single round whose logs
+# export only the C++ core timer (cpp_ms), not worker_total_ms.
 HOSTS = [
-    ("Desktop",     BR / "pcg_cv_r1.json",       BR / "pcg_yc_r1.json",       "worker_total_ms"),
-    ("Vivobook",    BR / "v185_cv.json",         BR / "v185_yolocorner.json", "worker_total_ms"),
-    ("Nitro 5",     BR / "nitro5_cv_r1.json",    BR / "nitro5_yc_r1.json",    "worker_total_ms"),
-    ("Poco Pad",    BR / "poco185_cv_r1.json",   BR / "poco185_yc_r1.json",   "worker_total_ms"),
-    ("Redmi (Web)", BR / "redmi185_cv_r1.json",  BR / "redmi185_yc_r1.json",  "worker_total_ms"),
+    ("Desktop",     BR / "pcg_cv_r1.json",            BR / "pcg_yc_r1.json",            "worker_total_ms"),
+    ("Vivobook",    BR / "v185_cv.json",              BR / "v185_yolocorner.json",      "worker_total_ms"),
+    ("Nitro 5",     BR / "nitro5_cv_r1.json",         BR / "nitro5_yc_r1.json",         "worker_total_ms"),
+    ("Poco Pad",    BR / "poco185_cv_r1.json",        BR / "poco185_yc_r1.json",        "worker_total_ms"),
+    ("Redmi (Web)", BR / "redmi185_cv_r1.json",       BR / "redmi185_yc_r1.json",       "worker_total_ms"),
 ]
 
 # Native Android (ONNX RT), N=185. Bars are full-pipeline e2e_ms.
@@ -64,7 +66,7 @@ def main() -> None:
     x = list(range(n))
     w = 0.4
 
-    fig, ax = plt.subplots(figsize=(7.0, 3.6))
+    fig, ax = plt.subplots(figsize=(8.4, 2.7))
     cv_x = [i - w / 2 for i in x]
     yo_x = [i + w / 2 for i in x]
 
@@ -73,24 +75,30 @@ def main() -> None:
     ax.bar(yo_x, yolo_means, w, yerr=yolo_sds, capsize=2, label="Hybrid (corner)",
            color="#d96b3a", edgecolor="#7a3210", linewidth=0.4)
 
+    # Place each label a constant multiplicative gap above the TOP of its error
+    # bar (mean + sd), so labels clear the bar/whisker uniformly on the log axis.
+    gap = 1.07
     for i, (cm, ym) in enumerate(zip(cv_means, yolo_means)):
         if cm > 0:
-            ax.text(cv_x[i], cm * 1.04, f"{cm:.0f}", ha="center", va="bottom",
-                    fontsize=6.5)
+            ax.text(cv_x[i], (cm + cv_sds[i]) * gap, f"{cm:.0f}", ha="center",
+                    va="bottom", fontsize=6.5)
         if ym > 0:
-            ax.text(yo_x[i], ym * 1.04, f"{ym:.0f}", ha="center", va="bottom",
-                    fontsize=6.5)
+            ax.text(yo_x[i], (ym + yolo_sds[i]) * gap, f"{ym:.0f}", ha="center",
+                    va="bottom", fontsize=6.5)
 
     ax.set_yscale("log")
-    ax.set_ylim(50, 3000)
-    ax.set_ylabel("Per-sheet latency (ms, log scale)")
+    ax.set_ylim(60, 1500)
+    ax.set_ylabel("Per-sheet latency (ms, log scale)", fontsize=8)
     ax.set_xticks(x)
     ax.set_xticklabels(labels, rotation=30, ha="right", fontsize=7.5)
-    ax.legend(loc="upper left", fontsize=8, frameon=False)
-    ax.axvline(x=4.5, color="#888888", linestyle=":", linewidth=0.6)
-    ax.text(2.0, 2400, "Web Edge (Chrome WebGPU+SIMD/Threads)",
+
+    n_web = len(HOSTS)
+    ax.legend(loc="upper left", fontsize=7.5, frameon=False, ncol=2,
+              columnspacing=1.0, handletextpad=0.4)
+    ax.axvline(x=n_web - 0.5, color="#888888", linestyle=":", linewidth=0.6)
+    ax.text((n_web - 1) / 2.0, 1280, "Web Edge (Chrome WebGPU+SIMD/Threads)",
             ha="center", fontsize=7, color="#444444")
-    ax.text(5.0, 2400, "Native Android",
+    ax.text(n_web, 1280, "Native Android",
             ha="center", fontsize=7, color="#444444")
     ax.grid(axis="y", alpha=0.3, linewidth=0.4)
     ax.set_axisbelow(True)

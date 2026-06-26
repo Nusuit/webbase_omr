@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GradeSnap Web</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --surface-2: #eef3f8;
+      --ink: #18212f;
+      --muted: #627086;
+      --line: #d7dee8;
+      --primary: #1d5fd3;
+      --primary-ink: #ffffff;
+      --success: #138a5b;
+      --warn: #b26a00;
+      --danger: #c2413b;
+      --focus: #7aa7ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      letter-spacing: 0;
+      overflow-x: hidden;
+    }
+
+    button, input, select {
+      font: inherit;
+    }
+
+    button:focus-visible,
+    label.file-action:focus-within,
+    .question-wrap:focus-within,
+    select:focus-visible,
+    input:focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    .app-shell {
+      height: 100vh;
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      overflow: hidden;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding: 14px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 10px;
+      min-width: 0;
+      margin-left: auto;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.2;
+    }
+
+    .brand span {
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      max-width: 48vw;
+      min-width: 220px;
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-2);
+      color: var(--muted);
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+      overflow-x: auto;
+    }
+
+    .file-action,
+    .action,
+    .select-wrap,
+    .question-wrap {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--ink);
+    }
+
+    .file-action,
+    .action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .action {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: var(--primary-ink);
+    }
+
+    .action.secondary {
+      border-color: var(--line);
+      background: var(--surface);
+      color: var(--ink);
+    }
+
+    .action:disabled,
+    .file-action.disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .action:disabled {
+      border-color: #d7e1f0;
+      background: #d7e1f0;
+      color: #6d7a8c;
+    }
+
+    .file-action input {
+      display: none;
+    }
+
+    .select-wrap,
+    .question-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px;
+      white-space: nowrap;
+      color: var(--muted);
+    }
+
+    .select-wrap select,
+    .question-wrap input {
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      outline: none;
+    }
+
+    .select-wrap select {
+      min-width: 118px;
+    }
+
+    .question-wrap input {
+      width: 58px;
+      min-height: 34px;
+      text-align: right;
+    }
+
+    .count {
+      color: var(--muted);
+      font-size: 13px;
+      min-width: 54px;
+      white-space: nowrap;
+    }
+
+    .progress-track {
+      flex: 1;
+      min-width: 140px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+
+    .progress-fill {
+      width: 0%;
+      height: 100%;
+      background: var(--primary);
+      transition: width 0.18s ease;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(240px, 300px) minmax(320px, 1fr) minmax(420px, 1.35fr);
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .pane {
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--line);
+      background: var(--surface);
+    }
+
+    .pane:last-child {
+      border-right: 0;
+    }
+
+    .pane-header {
+      min-height: 58px;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .pane-header h2 {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.2;
+    }
+
+    .pane-header .sub {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .pane-body {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 14px 16px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: var(--surface);
+      min-width: 0;
+    }
+
+    .metric .value {
+      display: block;
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+
+    .metric .label {
+      display: block;
+      margin-top: 4px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .key-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .section-toggle {
+      width: 100%;
+      min-height: 38px;
+      margin: 0 0 10px;
+      padding: 0 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--ink);
+      cursor: pointer;
+      font-weight: 600;
+      text-align: left;
+    }
+
+    .section-toggle .chevron {
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 7px solid var(--muted);
+      flex: 0 0 auto;
+      transition: transform 0.18s ease;
+    }
+
+    .section-toggle.collapsed .chevron {
+      transform: rotate(-90deg);
+    }
+
+    .section-body {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .section-body.collapsed {
+      display: none;
+    }
+
+    .key-item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fbfcfe;
+    }
+
+    .key-name {
+      font-size: 13px;
+      color: var(--ink);
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      margin-bottom: 8px;
+    }
+
+    .key-fields {
+      display: grid;
+      grid-template-columns: 76px 1fr;
+      gap: 8px;
+      align-items: center;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .key-fields input {
+      width: 100%;
+      min-height: 32px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 5px 8px;
+      color: var(--ink);
+      background: var(--surface);
+    }
+
+    .key-alert {
+      margin-top: 10px;
+      padding: 9px 10px;
+      border: 1px solid #e7c37d;
+      border-radius: 8px;
+      background: #fff7e6;
+      color: var(--warn);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .manual-entry {
+      margin-top: 10px;
+      border-top: 1px solid var(--line);
+      padding-top: 10px;
+    }
+
+    .manual-entry summary {
+      cursor: pointer;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .manual-entry textarea {
+      width: 100%;
+      min-height: 104px;
+      margin-top: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      resize: vertical;
+      color: var(--ink);
+      background: var(--surface);
+      font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    }
+
+    .manual-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .mini-action {
+      min-height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 0 10px;
+      background: var(--surface);
+      color: var(--ink);
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .mini-action.primary {
+      border-color: #9fbaf1;
+      background: #eef5ff;
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    .manual-hint {
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .empty {
+      min-height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: var(--muted);
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .empty.compact {
+      min-height: 54px;
+      padding: 12px;
+    }
+
+    .preview-frame {
+      min-height: 0;
+      display: grid;
+      grid-template-rows: minmax(280px, 1fr) auto;
+      gap: 12px;
+      height: 100%;
+    }
+
+    .canvas-wrap {
+      min-height: 280px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fbfcfe;
+      min-height: 116px;
+    }
+
+    .detail-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .detail-title span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .detail-title .badge {
+      flex: 0 0 auto;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 24px;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 12px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .badge.ok { color: var(--success); border-color: #9bd8bd; background: #ecf8f2; }
+    .badge.warn { color: var(--warn); border-color: #e7c37d; background: #fff7e6; }
+    .badge.bad { color: var(--danger); border-color: #e7aaa5; background: #fff0ef; }
+
+    .answer-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .answer-cell {
+      min-width: 0;
+      min-height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .answer-cell:hover {
+      border-color: #9fbaf1;
+    }
+
+    .answer-cell.filled {
+      color: var(--ink);
+      border-color: #a9bfdd;
+      background: #eef5ff;
+    }
+
+    .answer-cell.correct {
+      color: #075c3b;
+      border-color: #57bf87;
+      background: #d8f3e5;
+      box-shadow: inset 0 0 0 1px rgba(19, 138, 91, 0.2);
+    }
+
+    .answer-cell.review {
+      color: var(--warn);
+      border-color: #e7c37d;
+      background: #fff7e6;
+    }
+
+    .answer-cell.recovered {
+      color: #7a4b00;
+      border-color: #e7c37d;
+      background: #fff3cf;
+    }
+
+    .answer-cell.manual {
+      color: #334155;
+      border-color: #7aa7ff;
+      background: #edf5ff;
+      box-shadow: inset 0 0 0 1px #7aa7ff;
+    }
+
+    .answer-cell.missing {
+      color: var(--warn);
+      border-color: #e7c37d;
+      background: #fff7e6;
+    }
+
+    .answer-cell.ignored {
+      color: #8b96a8;
+      border-style: dashed;
+      background: #f3f5f8;
+    }
+
+    .answer-editor {
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: var(--surface);
+    }
+
+    .answer-editor-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .answer-editor-options {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .choice-button {
+      min-height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--surface);
+      color: var(--ink);
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .choice-button.active {
+      border-color: #7aa7ff;
+      background: #edf5ff;
+      color: var(--primary);
+    }
+
+    .choice-button.clear {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .review-list {
+      display: grid;
+      gap: 6px;
+    }
+
+    .review-item {
+      width: 100%;
+      min-height: 34px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      padding: 7px 8px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--surface);
+      color: var(--ink);
+      cursor: pointer;
+      text-align: left;
+      font-size: 12px;
+    }
+
+    .review-item span:first-child {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .table-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 9px 8px;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: var(--surface);
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    td.file {
+      max-width: 180px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    tr.result-row {
+      cursor: pointer;
+    }
+
+    tr.result-row:hover {
+      background: #f2f6fb;
+    }
+
+    .score {
+      font-weight: 700;
+      color: var(--ink);
+      white-space: nowrap;
+    }
+
+    @media (max-width: 1100px) {
+      .workspace {
+        grid-template-columns: 280px minmax(320px, 1fr);
+        grid-template-rows: minmax(420px, 52vh) minmax(360px, 1fr);
+      }
+
+      .pane.results {
+        grid-column: 1 / -1;
+        border-top: 1px solid var(--line);
+      }
+    }
+
+    @media (max-width: 720px) {
+      .app-shell {
+        height: auto;
+        min-height: 100vh;
+        overflow: visible;
+      }
+
+      html,
+      body,
+      .app-shell,
+      .topbar,
+      .toolbar,
+      .workspace,
+      .pane {
+        width: 100vw;
+        max-width: 100vw;
+      }
+
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .topbar-right {
+        width: 100%;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+
+      .status {
+        max-width: 100%;
+        width: 100%;
+        grid-column: 1 / -1;
+        order: 2;
+      }
+
+      .toolbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        align-items: stretch;
+        overflow-x: visible;
+      }
+
+      .file-action,
+      .action,
+      .select-wrap,
+      .question-wrap {
+        min-width: 0;
+        width: 100%;
+      }
+
+      .count {
+        display: none;
+      }
+
+      .select-wrap,
+      .question-wrap {
+        grid-column: 1 / -1;
+      }
+
+      .progress-track {
+        grid-column: 1 / -1;
+        width: 100%;
+      }
+
+      .workspace {
+        display: block;
+      }
+
+      .pane {
+        min-height: 360px;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+        overflow: hidden;
+      }
+
+      .pane-body {
+        overflow-x: hidden;
+      }
+
+      .preview {
+        min-height: 560px;
+      }
+
+      .answer-grid {
+        grid-template-columns: repeat(5, minmax(42px, 1fr));
+      }
+
+      .table-scroll {
+        overflow-x: auto;
+      }
+
+      table {
+        min-width: 680px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <h1>GradeSnap Web</h1>
+        <span>OMR scanner</span>
+      </div>
+      <div class="topbar-right">
+        <button id="exportCsvBtn" class="action secondary" disabled>Export CSV</button>
+        <button id="exportJsonBtn" class="action secondary" disabled>Export JSON</button>
+        <div id="status" class="status">Starting engine...</div>
+      </div>
+    </header>
+
+    <section class="toolbar" aria-label="Scan controls">
+      <label class="file-action">
+        <input id="keyInput" type="file" accept="image/*" multiple />
+        <span>Answer keys</span>
+      </label>
+      <span id="keyCount" class="count">0 files</span>
+
+      <label class="file-action">
+        <input id="sheetInput" type="file" accept="image/*" multiple />
+        <span>Student sheets</span>
+      </label>
+      <span id="sheetCount" class="count">0 files</span>
+
+      <span class="select-wrap">
+        <span>Engine</span>
+        <select id="engineSelect">
+          <option value="corner">AI corner</option>
+          <option value="cv">CV</option>
+        </select>
+      </span>
+
+      <label class="question-wrap" title="How many questions are in this exam?">
+        <span>Questions</span>
+        <input id="questionCountInput" type="number" min="1" max="60" value="60" inputmode="numeric" />
+      </label>
+
+      <button id="scanKeysBtn" class="action secondary" disabled>Scan keys</button>
+      <button id="scanSheetsBtn" class="action" disabled>Process sheets</button>
+      <div class="progress-track" aria-label="Progress">
+        <div id="progressFill" class="progress-fill"></div>
+      </div>
+    </section>
+
+    <main class="workspace">
+      <section class="pane keys">
+        <div class="pane-header">
+          <h2>Answer Keys</h2>
+          <span id="keySummary" class="sub">No key</span>
+        </div>
+        <div class="pane-body">
+          <div class="summary-grid">
+            <div class="metric">
+              <span id="metricKeys" class="value">0</span>
+              <span class="label">keys</span>
+            </div>
+            <div class="metric">
+              <span id="metricReadyKeys" class="value">0</span>
+              <span class="label">ready</span>
+            </div>
+          </div>
+          <button id="inputStatusToggle" class="section-toggle" type="button">
+            <span>Input status</span>
+            <span class="chevron" aria-hidden="true"></span>
+          </button>
+          <div id="inputStatusPanel" class="section-body">
+            <div id="keyList" class="key-list">
+              <div class="empty">Select answer key images and scan them.</div>
+            </div>
+          </div>
+          <button id="answerReviewToggle" class="section-toggle" type="button">
+            <span>Answers / review</span>
+            <span class="chevron" aria-hidden="true"></span>
+          </button>
+          <div id="answerReviewPanel" class="section-body">
+            <div id="detailPanel" class="detail">
+              <div class="detail-title">
+                <span>No result</span>
+                <span class="badge">Idle</span>
+              </div>
+              <div class="empty">Processed sheets will appear here.</div>
+            </div>
+            <div id="reviewList" class="review-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="pane preview">
+        <div class="pane-header">
+          <h2>Preview</h2>
+          <span id="previewLabel" class="sub">No scan selected</span>
+        </div>
+        <div class="pane-body">
+          <div class="preview-frame">
+            <div class="canvas-wrap">
+              <canvas id="previewCanvas" width="850" height="1200"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="pane results">
+        <div class="pane-header">
+          <h2>Results</h2>
+          <div class="table-actions">
+            <span id="resultSummary" class="sub">0 processed</span>
+          </div>
+        </div>
+        <div class="pane-body table-scroll">
+          <table aria-label="Scan results">
+            <thead>
+              <tr>
+                <th>File</th>
+                <th>MSSV</th>
+                <th>Code</th>
+                <th>Answered</th>
+                <th>Review</th>
+                <th>Score</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="resultRows">
+              <tr><td colspan="7" class="empty">No student sheets processed.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./js/worker-protocol.js"></script>
+  <script src="./js/product-app.js"></script>
+</body>
+</html>

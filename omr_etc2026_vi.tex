@@ -21,7 +21,7 @@
 \renewcommand{\tablename}{Bảng}
 \renewcommand{\refname}{Tài liệu tham khảo}
 
-\newcommand{\wasm}{\textnormal{\textsc{wasm}}}
+\newcommand{\wasm}{\textnormal{\textsc{Wasm}}}
 \newcommand{\ms}{\,ms}
 
 \definecolor{hwblue}{RGB}{180,205,240}
@@ -31,613 +31,541 @@
 \definecolor{cblue}{RGB}{150,195,235}
 \definecolor{yorange}{RGB}{220,155,130}
 \definecolor{gpink}{RGB}{255,200,200}
+\setcounter{topnumber}{4}
+\setcounter{bottomnumber}{4}
+\setcounter{totalnumber}{6}
+\renewcommand{\topfraction}{0.95}
+\renewcommand{\bottomfraction}{0.95}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.85}
+\setlength{\textfloatsep}{6pt plus 2pt minus 2pt}
+\setlength{\floatsep}{6pt plus 2pt minus 2pt}
+\setlength{\intextsep}{6pt plus 2pt minus 2pt}
+
 
 \begin{document}
 
 \title{Điện toán biên trên nền Web cho Nhận dạng Dấu Quang học:\protect\\
 Một đánh giá hiệu năng đa nền tảng}
 
-\author{%
-\IEEEauthorblockA{%
-Khoa Hệ thống Thông tin\\
-Trường Đại học Công nghệ Thông tin, ĐHQG-HCM\\
-Thành phố Hồ Chí Minh, Việt Nam}
-\vspace{0.35em}
-\IEEEauthorblockN{%
-\begin{tabular}{@{}c@{\hspace{2.6em}}c@{\hspace{2.6em}}c@{}}
-Phan Huy Kiên & Trương Minh Châu & Nguyễn Thanh Bình
-\end{tabular}}
-\IEEEauthorblockA{%
-\begin{tabular}{@{}c@{\hspace{2.6em}}c@{\hspace{2.6em}}c@{}}
-\texttt{huykien283@gmail.com} & \texttt{chautm@uit.edu.vn} & \texttt{binhnt@uit.edu.vn}
-\end{tabular}}
-}
+\author{\IEEEauthorblockN{Huy Kien Phan\IEEEauthorrefmark{1}\IEEEauthorrefmark{2}, Chau M. Truong\IEEEauthorrefmark{1}\IEEEauthorrefmark{2}, Thanh Binh Nguyen\IEEEauthorrefmark{1}\IEEEauthorrefmark{2}}
+\IEEEauthorblockA{\IEEEauthorrefmark{1}Trường Đại học Công nghệ Thông tin, Thành phố Hồ Chí Minh, Việt Nam}
+\IEEEauthorblockA{\IEEEauthorrefmark{2}Đại học Quốc gia Thành phố Hồ Chí Minh, Việt Nam}
+\IEEEauthorblockA{
+22520709@gm.uit.edu.vn,
+\{chautm,binhnt\}@uit.edu.vn
+}}
 
 \maketitle
 
 \begin{abstract}
-Nhận dạng Dấu Quang học (Optical Mark Recognition, OMR) chạy trên trình
-duyệt có thể giữ phiếu trả lời của học sinh ngay trên thiết bị và không
-cần cài đặt ứng dụng, nhưng chi phí của nó phân bố ra sao theo từng giai
-đoạn xử lý và theo từng nền tảng thì chưa được đo đạc. Bài báo này đóng
-góp một benchmark đa nền tảng cho một pipeline OMR Web Edge hoàn chỉnh,
-ghép thị giác máy tính bằng WebAssembly (\wasm{}) với suy luận YOLO trên
-WebGPU, đo so với một mốc Native Android trên bộ ngữ liệu 185 phiếu đã
-được con người rà soát, trên sáu thiết bị Web, với mốc Native chạy trên hai
-trong số đó. Chúng tôi báo cáo độ chính
-xác nhận dạng, độ trễ theo từng giai đoạn, và mức dùng tài nguyên cho hai
-cấu hình có thể hoán đổi: một pipeline chỉ-CV đạt độ chính xác câu hỏi
-99,03\%, và một bộ phát hiện YOLO theo điểm-góc (corner keypoint) đưa bốn
-điểm mốc dự đoán vào phép biến đổi homography, ngang bằng độ chính xác đó
-ở 99,45\% trên ba thiết bị và đạt cùng 99,44\% khi chuyển sang Native,
-đồng thời dời giai đoạn định vị lên GPU và bỏ bước dò mốc thủ công. Dữ liệu
-độ trễ định vị rõ chi phí: trên cùng thiết bị Redmi, lõi CV trên \wasm{}
-chậm hơn Native $5,7\times$ ($503$ so với $89$\,ms), so với chỉ $1,6\times$
-giữa WebGPU và NNAPI cho cùng bộ phát hiện điểm-góc. Các phép đo này cho
-thấy khoảng cách web-so-với-native dồn vào giai đoạn CV trên \wasm{} chứ
-không vào bộ phát hiện đã tăng tốc bằng GPU, nên một hệ OMR Web Edge có tính
-cạnh tranh phụ thuộc vào việc giảm chi phí CV trên \wasm{}.
+Nhận dạng Dấu Quang học (OMR) trên nền trình duyệt cho phép chấm điểm ngay
+trên thiết bị mà không cần cài đặt ứng dụng, nhưng chi phí tương đối của các
+giai đoạn khác nhau trong một pipeline OMR phía trình duyệt vẫn chưa được định
+lượng một cách hệ thống. Chúng tôi trình bày một khung (framework) Web Edge OMR
+cùng với phân bổ chi phí theo từng giai đoạn (stage) đầu tiên được báo cáo cho
+một pipeline OMR chạy hoàn toàn phía client trong trình duyệt, trong đó thị giác
+máy tính WebAssembly (\wasm{}) và suy luận YOLO trên WebGPU đều thực thi cục bộ
+ngay trên thiết bị. Chúng tôi đánh giá nó trên một benchmark mẫu cố định gồm 185
+phiếu, qua năm cấu hình trình duyệt/thiết bị, kèm một baseline Native Android để
+tham chiếu.
+Đánh giá của chúng tôi đưa ra ba phát hiện. Thứ nhất, khoảng cách độ trễ
+web-so-với-native bị chi phối bởi lõi thị giác máy tính \wasm{} có tính tất định.
+Lõi này chạy chậm hơn $2.6\times$ so với phần tương ứng trên Native dưới cùng
+ranh giới giai đoạn, và vẫn nằm trên đường tới hạn (critical path) ngay cả khi
+việc định vị được chuyển sang bộ phát hiện, khiến nó trở thành mục tiêu tối ưu
+hàng đầu cho Web Edge OMR. Thứ hai, bất chấp khoảng cách này, cả hai cấu hình
+Web đều vượt $99\%$ độ chính xác theo câu hỏi, và nhánh dấu góc đạt cùng mức đó
+khi được chuyển sang Native Android.
+Thứ ba, việc thêm một bộ phát hiện dấu góc trên WebGPU chỉ mang lại mức tăng độ
+chính xác nhỏ ($\sim\!0.4$ điểm), nên đầu ra của bộ phát hiện phải được kiểm
+chứng đầu-cuối (end-to-end) dựa trên bộ nhận dạng mẫu cố định, thay vì suy ra từ
+chất lượng định vị. Nhánh dấu góc đạt $99.46\%$ tổng thể và $99.3\%$ trên 101
+phiếu trả lời của học sinh chưa từng xuất hiện trong quá trình phát triển bộ phát
+hiện.
+Những kết quả này ủng hộ việc chấm điểm trên nền trình duyệt như một lựa chọn
+không cần cài đặt, bảo vệ quyền riêng tư cho OMR trên thiết bị.
 \end{abstract}
 
 \begin{IEEEkeywords}
 Nhận dạng dấu quang học, điện toán biên, trình duyệt web, YOLO,
-WebAssembly, WebGPU, đánh giá hiệu năng đa nền tảng
+WebAssembly, WebGPU, benchmark đa nền tảng
 \end{IEEEkeywords}
 
 \section{Giới thiệu}
 
-Việc chấm tự động các phiếu trắc nghiệm được sử dụng rộng rãi trong các
-cơ sở giáo dục, nơi khối lượng lớn phiếu phải được xử lý chính xác trong
-thời gian ngắn. Các triển khai hiện có theo hai khuôn mẫu đã được khẳng
-định. Các dịch vụ dựa trên máy chủ truyền ảnh quét hoặc chụp lên hạ tầng
-từ xa, kéo theo sự phụ thuộc vào mạng và làm lộ dữ liệu học sinh ra các hệ
-thống bên ngoài~\cite{patel2015,okorie2022}. Các ứng dụng di động bản địa
-tránh được việc truyền dữ liệu nhưng đòi hỏi đóng gói riêng theo nền tảng,
-phân phối qua kho ứng dụng, và chi phí bảo trì cho từng nền tảng.
+Chấm điểm tự động các phiếu trắc nghiệm được sử dụng rộng rãi trong các cơ sở
+giáo dục, nơi khối lượng lớn phiếu phải được xử lý chính xác trong thời gian
+ngắn. Các phương án triển khai hiện có đi theo hai hướng đã được thiết lập. Các
+dịch vụ dựa trên máy chủ truyền các phiếu được quét hoặc chụp về hạ tầng từ xa,
+gây phụ thuộc mạng và để lộ dữ liệu học sinh ra các hệ thống bên
+ngoài~\cite{patel2015,okorie2022}. Ứng dụng di động native tránh được việc truyền
+dữ liệu nhưng đòi hỏi đóng gói riêng cho từng nền tảng, phân phối qua kho ứng
+dụng, và chi phí bảo trì theo từng nền tảng.
 
-Sự trưởng thành gần đây của \wasm{} và WebGPU nay cho phép các tác vụ thị
-giác máy tính và học sâu thực thi trực tiếp bên trong các trình duyệt
-hiện đại mà không cần plugin hay cài đặt, qua đó mở ra một mô hình triển
-khai thứ ba: một pipeline hoàn toàn phía máy khách, trong đó ảnh phiếu trả
-lời được xử lý ngay trong trình duyệt và không bao giờ rời khỏi thiết bị.
-Vì một gói mã duy nhất triển khai qua URL phục vụ được cả trình duyệt
-desktop lẫn di động, mô hình này tránh được rủi ro lộ dữ liệu vốn có của
-việc chấm phía máy chủ, đồng thời loại bỏ trở ngại cài đặt của một ứng
-dụng bản địa.
+Sự trưởng thành gần đây của \wasm{} và WebGPU nay cho phép các khối lượng công
+việc thị giác máy tính và học sâu thực thi trực tiếp bên trong các trình duyệt
+hiện đại mà không cần plugin hay cài đặt, qua đó mở ra một mô hình triển khai thứ
+ba: một pipeline hoàn toàn phía client, trong đó ảnh phiếu trả lời được xử lý
+ngay trong trình duyệt và không bao giờ rời khỏi thiết bị. Việc thực thi cục bộ
+do đó tránh được rủi ro lộ dữ liệu vốn có ở cách chấm điểm phía máy chủ, trong
+khi một gói (bundle) triển khai qua một URL duy nhất phục vụ cả trình duyệt trên
+desktop lẫn di động giúp loại bỏ rào cản cài đặt của một ứng dụng native.
 
-Trong trình duyệt, các tải công việc này ánh xạ lên hai nền tảng thực thi
-khác nhau. Các giai đoạn xử lý ảnh cổ điển — cụ thể là nắn chỉnh phối
-cảnh, ngưỡng hóa thích nghi, và đọc ô tròn theo lưới cố định — được biên
-dịch từ C\texttt{++}/OpenCV sang \wasm{} và chạy trên CPU, trong khi việc
-định vị vùng phiếu có thể tùy chọn được giao cho suy luận nơ-ron qua ONNX
-Runtime Web trên một backend WebGPU. Như vậy, một bản triển khai có thể
-chạy pipeline chỉ-CV hoặc bổ sung một bộ phát hiện YOLO cho bước định vị;
-vì hai nền tảng này dùng các API trình duyệt và phần cứng khác nhau, chính
-chi phí tương đối của chúng — chứ không phải riêng một thành phần nào — mới
-quyết định liệu một cấu hình cho trước có thể sánh được với thực thi bản
-địa hay không. Benchmark này đo cả hai.
+Mô hình không đồng nhất này hứa hẹn, nhưng hiệu năng của nó vẫn chưa được hiểu
+rõ. Một pipeline OMR trên trình duyệt ghép hai nền tảng thực thi rất khác nhau:
+thị giác máy tính \wasm{} bị giới hạn bởi CPU và suy luận nơ-ron được tăng tốc
+bởi GPU, mỗi bên dùng các API và phần cứng trình duyệt riêng biệt. Các công trình
+hiện có chưa cho thấy hai nền tảng này tương tác ra sao khi cùng chạy trong một
+pipeline nhận dạng hoàn chỉnh. Vẫn chưa rõ điểm nghẽn chủ đạo nằm ở đâu, liệu
+việc định vị bằng WebGPU có đủ bù lại bất lợi về độ trễ của trình duyệt so với
+thực thi native hay không, và liệu một bộ định vị học máy có cải thiện nhận dạng
+đủ nhiều để biện minh cho việc thay thế front-end cổ điển hay không. Bởi vì chính
+chi phí tương đối giữa chúng, chứ không phải từng thành phần riêng lẻ, mới quyết
+định một cấu hình có sánh được với triển khai native hay không, nên cả hai phải
+được đo trong cùng một pipeline.
 
-Theo đó, bài báo này đặt câu hỏi liệu suy luận WebGPU, tự thân nó, có đủ
-để làm cho một pipeline OMR Web Edge cạnh tranh được với Native Android
-hay không. Dưới khối lượng công việc đo được, câu trả lời là không: WebGPU
-có làm giảm độ trễ YOLO, nhưng giai đoạn CV/\wasm{} tất định sau đó lại
-chi phối hành vi đầu-cuối. Điều này khiến Native Android vẫn là phương án
-triển khai có độ trễ thấp hơn, trong khi Web Edge là lựa chọn bảo toàn
-quyền riêng tư và triển khai qua URL, mà tính cạnh tranh phụ thuộc vào
-việc kìm giữ giai đoạn CV trên \wasm{}.
+Để giải quyết điều này, chúng tôi trình bày một nghiên cứu thực nghiệm có hệ
+thống, đánh giá một pipeline Web Edge OMR hoàn chỉnh, ở cả cấu hình chỉ-CV lẫn
+cấu hình lai YOLO+CV, đối chiếu với một baseline Native Android. Phân tích của
+chúng tôi cho thấy rằng mặc dù WebGPU biến suy luận YOLO thành một bộ tăng tốc
+hiệu quả, lõi thị giác máy tính \wasm{} có tính tất định mới là nguồn lớn hơn của
+khoảng cách độ trễ web-so-với-native, và do đó là mục tiêu tối ưu hàng đầu cho
+OMR phía trình duyệt.
 
 Bài báo có ba đóng góp:
 \begin{enumerate}[leftmargin=*, itemsep=1pt, topsep=2pt]
-  \item Một đánh giá OMR đa nền tảng đã rà soát trên bộ 185 phiếu, với các
-  phép đo độ chính xác có giám sát, độ trễ và tài nguyên trên sáu thiết bị
-  Web Edge và một mốc Native Android trên hai trong số đó.
-  \item Một kết quả quy gán theo giai đoạn cho thấy OMR trên \wasm{}, chứ
-  không phải suy luận YOLO, mới là nút thắt cổ chai chủ đạo: trên cùng
-  thiết bị Redmi, khoảng cách \texttt{cpp\_ms} của CV giữa Mobile Web và
-  Native là $5,7\times$ ($503$ so với $89$\,ms), trong khi khoảng cách giữa
-  WebGPU và NNAPI cho cùng bộ phát hiện điểm-góc chỉ là $1,6\times$ ($547$
-  so với $335$\,ms).
-  \item Một công thức theo điểm-góc biến YOLO thành bộ phát hiện chính đã
-  kiểm chứng: đưa thẳng bốn điểm mốc góc dự đoán vào homography đạt 99,45\%
-  trên ba thiết bị, ngang mốc CV 99,03\%, đồng thời dời giai đoạn định vị từ
-  CPU sang GPU và loại bỏ bước dò mốc thủ công cùng lần dò lại thứ hai.
+  \item Chúng tôi xây dựng và đánh giá một benchmark OMR mẫu cố định gồm 185
+phiếu, được con người rà soát, qua năm cấu hình trình duyệt/thiết bị, với các
+phép đo có giám sát về độ chính xác và độ trễ, các phép đo tài nguyên mang tính
+tham khảo, và một baseline Native Android trên hai thiết bị.
+  \item Chúng tôi thực hiện một phân tích phân bổ theo cấp độ giai đoạn (stage),
+  tách bạch chi phí của thị giác máy tính trên trình duyệt và chi phí suy luận
+  nơ-ron, chứng minh rằng khoảng cách độ trễ web-so-với-native lớn hơn ở giai
+  đoạn thị giác máy tính \wasm{} tất định so với ở suy luận YOLO được tăng tốc
+  bởi WebGPU.
+  \item Chúng tôi đánh giá một cơ chế bàn giao (handoff) dấu góc YOLO chuyển việc
+  định vị sang WebGPU trong khi vẫn giữ phần nhận dạng trong lõi CV mẫu cố định
+  dùng chung, và nhận thấy một mức tăng độ chính xác nhỏ nhưng đo được, tập trung
+  ở các ảnh chụp có độ tương phản thấp.
 \end{enumerate}
 
-\section{Các công trình liên quan}
+\section{Công trình liên quan}
 
 \paragraph{OMR cổ điển}
-Các pipeline OMR truyền thống dựa vào các kỹ thuật xử lý ảnh thủ công như
-ngưỡng hóa, dò biên, và các phép toán hình thái để định vị và nhận dạng ô
-tròn~\cite{patel2015,okorie2022}. Tuy hiệu quả về mặt tính toán, các
-phương pháp này vẫn nhạy cảm với biến thiên ánh sáng và méo hình học trong
-các tình huống chụp bằng thiết bị di động~\cite{afifi2019}.
+Các pipeline OMR truyền thống dựa vào các kỹ thuật xử lý ảnh thủ công như lấy
+ngưỡng, phát hiện biên, và các phép toán hình thái (morphological) để đăng ký
+(register) mỗi phiếu vào một mẫu cố định và đọc các ô tô ở những vị trí lưới định
+trước~\cite{patel2015,okorie2022}. Tuy hiệu quả về mặt tính toán, các phương pháp
+này vẫn nhạy cảm với biến thiên ánh sáng và méo hình học trong các tình huống
+chụp bằng thiết bị di động~\cite{afifi2019}.
 
 \paragraph{Học sâu cho OMR}
 Các nghiên cứu gần đây áp dụng các bộ phát hiện dựa trên
-YOLO~\cite{redmon2016} để tăng độ bền vững trong điều kiện chụp khó khăn.
-Ali và cộng sự~\cite{ali2025} cho thấy YOLO đạt độ chính xác phát hiện cao
-hơn và tổng quát hóa tốt hơn so với các phương pháp dựa trên ngưỡng, trong
-khi YOLOv8n~\cite{jocher2023} cung cấp một kiến trúc nhẹ phù hợp cho triển
-khai biên. Tabassum và Rahman~\cite{tabassum2024} triển khai YOLOv8 cho
-OMR di động nhưng không báo cáo phân rã độ trễ theo giai đoạn lẫn so sánh
-đa nền tảng có kiểm soát, để ngỏ việc chi phí suy luận liên hệ thế nào với
-pipeline CV xung quanh trên các thiết bị hạn chế.
+YOLO~\cite{redmon2016} để cải thiện độ bền vững trong các điều kiện chụp ảnh khó.
+Ali và cộng sự~\cite{ali2025} tổng hợp các bằng chứng cho thấy các bộ phát hiện
+dựa trên YOLO cải thiện độ bền vững phát hiện so với các phương pháp dựa trên
+ngưỡng, trong khi YOLOv8n~\cite{jocher2023} cung cấp một kiến trúc nhẹ phù hợp cho
+triển khai biên. Tabassum và Rahman~\cite{tabassum2024} triển khai YOLOv8 cho OMR
+di động nhưng không báo cáo cả phân rã độ trễ theo giai đoạn lẫn một so sánh đa
+nền tảng có kiểm soát, khiến chưa rõ chi phí suy luận liên hệ thế nào với pipeline
+CV bao quanh trên các thiết bị bị giới hạn.
 
 \paragraph{Điện toán biên trên nền trình duyệt}
-\wasm{} và WebGPU cùng nhau cho phép thực thi phía máy khách bảo toàn
-riêng tư trong các trình duyệt hiện đại, với suy luận nơ-ron được phơi bày
-qua ONNX Runtime Web~\cite{microsoft2021}. Bằng chứng định lượng về chi
-phí kèm theo đã có sẵn: Jangda và cộng sự~\cite{jangda2019} báo cáo
-\wasm{} chạy trung bình chậm hơn 45\% so với mã bản địa trên các phép thử
-nặng tính toán, một biên độ liên quan trực tiếp đến các tác vụ xử lý ảnh
-C\texttt{++} biên dịch sang \wasm{}; và Wang và cộng sự~\cite{wang2024} đo
-được suy luận học sâu trên trình duyệt chậm hơn bản địa $16,9\times$ trên
-CPU và $4,9\times$ trên GPU, với WebGPU nổi lên là backend mạnh nhất phía
-trình duyệt. Tuy nhiên, các nghiên cứu này đặc tả các nhân (kernel) riêng
-lẻ chứ không phải các pipeline thị giác máy tính hoàn chỉnh. Một lớp trừu
-tượng cao hơn cũng đang hình thành trong W3C WebNN API~\cite{webnn2024},
-nhưng nó vẫn ở dạng bản thảo, nên tương tác thực tế giữa xử lý ảnh trên
-\wasm{} và suy luận WebGPU trong một ứng dụng đầy đủ vẫn còn ít được hiểu
-rõ.
+\wasm{} và WebGPU~\cite{webgpu2025} cùng nhau cho phép thực thi phía client trong
+các trình duyệt hiện đại, với suy luận nơ-ron được phơi bày qua ONNX Runtime
+Web~\cite{microsoft2021}. Bằng chứng định lượng về chi phí phụ trội liên quan đã
+có sẵn: Jangda và cộng sự~\cite{jangda2019} báo cáo rằng \wasm{} chạy chậm hơn
+trung bình 45\% so với mã native trên các benchmark nặng về tính toán, một mức
+chênh có liên quan trực tiếp đến các khối lượng xử lý ảnh C\texttt{++} được biên
+dịch sang \wasm{}; còn Wang và cộng sự~\cite{wang2024} đo được suy luận học sâu
+trên trình duyệt chậm hơn native $16.9\times$ trên CPU và $4.9\times$ trên GPU,
+với WebGPU nổi lên là back-end mạnh nhất phía trình duyệt. Tuy nhiên, các nghiên
+cứu này đặc tả các kernel riêng lẻ chứ không phải các pipeline thị giác máy tính
+hoàn chỉnh. Một mức trừu tượng cao hơn, API WebNN của W3C~\cite{webnn2026}, cũng
+đang tiến triển qua quy trình chuẩn hóa của W3C, nhưng các pipeline phía client
+thực tế hiện nay vẫn thường dựa vào \wasm{} và WebGPU, mà sự tương tác giữa chúng
+trong một ứng dụng đầy đủ thì còn ít được hiểu rõ.
 
-\paragraph{Khoảng trống nghiên cứu}
-Như vậy, các công trình trước hoặc khảo sát độ chính xác OMR, hoặc khảo
-sát hiệu năng suy luận trên trình duyệt, hiếm khi cả hai trong cùng một hệ
-thống. Chúng tôi chưa biết đến một nghiên cứu nào đánh giá một pipeline
-OMR trình duyệt hoàn toàn phía máy khách, trong đó cả thị giác máy tính
-lẫn suy luận nơ-ron đều thực thi cục bộ, không truyền bất kỳ dữ liệu phiếu
-trả lời nào ra máy chủ bên ngoài. Cũng còn để ngỏ liệu độ trễ đầu-cuối
-trên một pipeline như vậy bị chi phối bởi suy luận nơ-ron hay bởi các giai
-đoạn thị giác máy tính chạy trên \wasm{}. Bài báo này lấp các khoảng trống
-đó qua việc lập hồ sơ (profiling) từng giai đoạn có kiểm soát cho một hệ
-OMR trình duyệt dựa trên YOLOv8n, trên nhiều backend thực thi và cấu hình
-triển khai.
+Như vậy, các công trình trước hoặc xét độ chính xác OMR hoặc xét hiệu năng suy
+luận trên trình duyệt, nhưng hiếm khi cả hai trong cùng một hệ thống: các nghiên
+cứu OMR bỏ qua chi phí các giai đoạn phía trình duyệt, trong khi các nghiên cứu
+hiệu năng trình duyệt chỉ đo các kernel riêng lẻ~\cite{jangda2019,wang2024} chứ
+không phải một pipeline nhận dạng hoàn chỉnh. Bài báo này lấp khoảng trống đó bằng
+cách lập hồ sơ (profiling) một pipeline OMR hoàn toàn phía client theo từng giai
+đoạn, qua nhiều back-end và cấu hình triển khai.
 
 \section{Kiến trúc hệ thống và Phương pháp}
 
-\begin{figure}[t]
+\begin{figure}[!htb]
   \centering
-  \resizebox{\columnwidth}{!}{%
-\begin{tikzpicture}[
-  font=\small,
-  >=Stealth,
-  thick,
-  every node/.style={align=center},
-  base/.style    = {draw, rounded corners=4pt, text centered, inner sep=3pt, text=black},
-  wide/.style    = {base, minimum width=7.6cm, minimum height=0.72cm},
-  mid/.style     = {base, minimum width=3.08cm, minimum height=0.78cm},
-  small/.style   = {base, minimum width=3.15cm, minimum height=0.70cm},
-  camnd/.style   = {wide, fill=cpurple, draw=red, line width=1.2pt},
-  wknd/.style    = {wide, fill=wgreen},
-  dispnd/.style  = {wide, fill=wgreen, minimum height=0.88cm},
-  osnd/.style    = {wide, fill=osbrown!55},
-  hwnd/.style    = {wide, fill=hwblue},
-  wgpund/.style  = {mid, fill=yorange!58},
-  wasmnd/.style  = {mid, fill=osbrown!55},
-  cfrnd/.style   = {base, fill=cpurple, minimum width=4.00cm, minimum height=0.72cm},
-  jsnd/.style    = {base, fill=wgreen, minimum width=4.35cm, minimum height=0.72cm},
-  cvbx/.style    = {small, fill=cblue},
-  ylbx/.style    = {small, fill=yorange!58},
-  mrgnd/.style   = {base, fill=wgreen, minimum width=6.8cm, minimum height=0.78cm},
-  outnd/.style   = {base, fill=gpink, draw=red, line width=1.2pt,
-                    minimum width=6.8cm, minimum height=0.68cm},
-  simdlbl/.style = {draw=red!75!black, line width=0.7pt, fill=white,
-                    rounded corners=2pt, inner sep=1.6pt, font=\scriptsize},
-  lab/.style     = {draw=black!35, fill=white, rounded corners=1.5pt,
-                    inner sep=1.6pt, font=\scriptsize}
-]
-\node[hwnd] (hw) at (0.00, 0.02)
-  {\textbf{Phần cứng} \\ \textit{\scriptsize CPU / GPU / NPU}};
-\node[osnd] (os) at (0.00, 1.17)
-  {\textbf{Hệ điều hành / Sandbox trình duyệt} \\ \textit{\scriptsize lập lịch, bộ nhớ, bảo mật}};
-\node[wasmnd] (wasm) at ( 2.24, 2.70)
-  {\textbf{Lõi OMR \wasm{}} \\ \textit{\scriptsize CV OpenCV.js}};
-\node[wgpund] (wgpu) at (-2.24, 2.70)
-  {\textbf{Backend WebGPU} \\ \textit{\scriptsize YOLO ONNX}};
-\node[dispnd] (disp) at (0.00, 4.00)
-  {\textbf{Bộ điều phối thuật toán} \\ \textit{\scriptsize chỉ CV hoặc YOLO+CV}};
-\node[wknd] (wk) at (0.00, 5.25)
-  {\textbf{Web Worker} \\ \textit{\scriptsize tách khỏi luồng giao diện}};
-\node[wknd] (mt) at (0.00, 6.55)
-  {\textbf{Luồng chính (JavaScript)} \\
-   \textit{\scriptsize camera/tệp $\to$ canvas}};
-\node[camnd] (cam) at (0.00, 7.75)
-  {\textbf{Đầu vào Camera / Ảnh}};
-
-\draw[->] (cam) -- (mt);
-\draw[->] (mt) -- (wk);
-\draw[->] (wk) -- (disp);
-\coordinate (dispatchSplit) at (0.00, 3.36);
-\draw[->] (disp.south) -- (dispatchSplit) -| (wgpu.north);
-\draw[->] (disp.south) -- (dispatchSplit) -| (wasm.north);
-\node[lab] at (-1.08, 3.43) {Giai đoạn YOLO};
-\node[lab] at ( 1.08, 3.43) {CV / chấm};
-\draw[->, dashed] (wgpu.east) -- node[lab, midway, above=2.5pt] {góc} (wasm.west);
-\draw[->] (wgpu.south) -- ++(0,-0.58) |- (os.west);
-\draw[->] (wasm.south) -- ++(0,-0.58) |- (os.east);
-\draw[->] (os) -- (hw);
-\node[simdlbl] at (3.36, 1.94) {\textit{SIMD} \\ +\textit{Threads}};
-\node[font=\small\bfseries] at (0.00, 8.45) {(a) Mô hình thực thi phân tầng};
-
-\node[cfrnd] (cfr) at (10.35, 7.75)
-  {\textbf{Khung/Phiếu đầu vào} \\ \textit{\scriptsize ảnh 1145$\times$2560 px}};
-\node[jsnd] (decode) at (10.35, 6.65)
-  {\textbf{JS giải mã \& chuẩn bị} \\ \textit{\scriptsize canvas $\to$ tensor}};
-\node[jsnd] (select) at (10.35, 5.55)
-  {\textbf{Chọn phương pháp} \\ \textit{\scriptsize CV hoặc YOLO+CV}};
-\node[cvbx] (cvnorm) at (7.90, 4.35)
-  {\textbf{Chuẩn hóa \wasm{}} \\ \textit{\scriptsize homography}};
-\node[cvbx] (stage2) at (7.90, 3.25)
-  {\textbf{Cắt theo mốc} \\ \textit{\scriptsize nắn về chuẩn}};
-\node[cvbx] (thr) at (7.90, 2.15)
-  {\textbf{Ngưỡng hóa thích nghi} \\ \textit{\scriptsize làm mờ + ngưỡng}};
-\node[ylbx] (yolo) at (12.70, 4.35)
-  {\textbf{YOLOv8n góc} \\ \textit{\scriptsize WebGPU, 960$^2$}};
-\node[ylbx] (nms) at (12.70, 3.25)
-  {\textbf{4 tâm góc} \\ \textit{\scriptsize một lớp}};
-\node[ylbx] (mask) at (12.70, 2.15)
-  {\textbf{Homography trực tiếp} \\ \textit{\scriptsize biến đổi chuẩn}};
-\node[mrgnd] (grid) at (10.35, 0.95)
-  {\textbf{Dò ô tròn theo lưới cố định} \\ \textit{\scriptsize mật độ + cờ}};
-\node[outnd] (grade) at (10.35, -0.10)
-  {\textbf{Kết quả chấm} \\ \textit{\scriptsize điểm + thời gian}};
-
-\draw[->] (cfr) -- (decode);
-\draw[->] (decode) -- (select);
-\coordinate (methodSplit) at (10.35, 4.92);
-\draw[->] (select.south) -- (methodSplit) -| (cvnorm.north);
-\draw[->] (select.south) -- (methodSplit) -| (yolo.north);
-\node[lab] at (8.82, 4.99) {đường CV};
-\node[lab] at (11.82, 4.99) {đường YOLO};
-\draw[->] (cvnorm) -- (stage2);
-\draw[->] (stage2) -- (thr);
-\draw[->] (yolo) -- (nms);
-\draw[->] (nms) -- (mask);
-\draw[->] (mask.west) -- (thr.east);
-\node[lab, font=\scriptsize] at (10.35, 2.43) {góc $\to$ warp\\(bỏ Stage 2)};
-\draw[->] (thr.south) |- (grid.west);
-\draw[->] (grid) -- (grade);
-\node[font=\small\bfseries] at (10.35, 8.45) {(b) Luồng thuật toán};
-\end{tikzpicture}%
-  }
-  \caption{Kiến trúc OMR Web Edge. Luồng JavaScript chính điều phối đầu
-  vào từ camera hoặc tệp tới một Web Worker. WebGPU chỉ tăng tốc khâu định
-  vị YOLO; còn chuẩn hóa, ngưỡng hóa, đọc ô tròn và chấm điểm đều nằm
-  trong lõi C\texttt{++}/OpenCV trên \wasm{}.}
+  \includegraphics[width=\columnwidth]{figures/structure_system.pdf}
+  \caption{Kiến trúc Web-Based Edge OMR. (a) Runtime phân tầng: luồng JavaScript
+chính điều phối đầu vào từ camera hoặc tệp tới một Web Worker. (b) Pipeline theo
+từng phiếu: WebGPU chỉ tăng tốc việc định vị YOLO, trong khi chuẩn hóa, lấy
+ngưỡng, đọc ô tô và chấm điểm vẫn nằm trong lõi \wasm{} C\texttt{++}/OpenCV.}
   \label{fig:arch}
 \end{figure}
 
-\subsection{Kiến trúc hệ thống đa nền tảng}
-Hệ thống được tổ chức thành kiến trúc thực thi phân tầng minh họa ở
-Hình~\ref{fig:arch}(a), trong đó mỗi tầng che giấu tầng bên dưới để cùng
-một mã ứng dụng chạy không đổi trên phần cứng không đồng nhất. Ở trên
-cùng, luồng JavaScript chính nắm tương tác người dùng và thu nhận ảnh từ
-luồng camera hoặc tệp tải lên, nhưng ủy thác toàn bộ tính toán cho một Web
-Worker chuyên dụng để xử lý nặng không bao giờ làm nghẽn độ phản hồi giao
-diện. Bên trong worker, một Bộ điều phối thuật toán chọn giữa pipeline
-chỉ-CV thông thường và pipeline lai YOLO$+$CV; ở trường hợp lai, nó điều
-khiển một mô hình YOLO ONNX trên backend WebGPU để định vị, trong khi lõi
-OMR \wasm{} dựng trên OpenCV.js thực hiện nhận dạng và chấm điểm thực sự.
-Vì bộ điều phối đưa mọi đầu ra định vị vào chính lõi \wasm{} đó, hai
-pipeline vẫn có thể hoán đổi cho nhau ở khâu nhận dạng. Cả hai backend rốt
-cuộc đều thực thi bên trong sandbox của hệ điều hành và trình duyệt, vốn
-trung gian việc lập lịch, bộ nhớ và bảo mật trước khi ánh xạ công việc lên
-bất kỳ CPU, GPU hay NPU nào thiết bị phơi bày. Chính sự phân tách giữa
-điều khiển ứng dụng, thực thi thuật toán và truy cập phần cứng cho phép
-một mã nguồn duy nhất nhắm tới các nền tảng desktop và di động mà không cần
-sửa đổi.
+\subsection{Kiến trúc phân tầng đa nền tảng}
+Hệ thống được tổ chức thành runtime phân tầng như trong Hình~\ref{fig:arch}(a),
+nơi mỗi tầng che giấu tầng bên dưới sao cho cùng một mã ứng dụng chạy không đổi
+trên phần cứng không đồng nhất. Ở trên cùng, luồng JavaScript chính nắm việc
+tương tác với người dùng và thu nhận ảnh từ luồng camera hoặc tệp được tải lên,
+cùng việc vẽ chúng lên một canvas, nhưng nó ủy thác toàn bộ phần tính toán cho
+một Web Worker chuyên trách để việc xử lý nặng không bao giờ làm nghẽn khả năng
+phản hồi của giao diện. Bên trong worker, một Algorithm Dispatcher được cấu hình
+để chạy hoặc một pipeline chỉ-CV thông thường hoặc một pipeline lai YOLO$+$CV
+nhằm xác định các góc của phiếu; trong trường hợp lai, nó vận hành một mô hình
+YOLO ONNX trên một backend WebGPU để định vị, trong khi lõi OMR \wasm{} (các
+kernel xử lý ảnh C\texttt{++} viết tay cùng với OpenCV, được biên dịch sang
+\wasm{} có dùng SIMD và đa luồng) thực hiện phần nhận dạng và chấm điểm thực sự.
+Vì dispatcher đưa mọi đầu ra định vị vào chính lõi \wasm{} đó, hai pipeline vẫn
+hoán đổi được cho nhau ở giai đoạn nhận dạng. Cả hai back-end trình duyệt đều
+thực thi bên trong sandbox của trình duyệt, vốn điều phối lập lịch, bộ nhớ và
+quyền truy cập bộ tăng tốc trước khi ánh xạ công việc xuống CPU và GPU sẵn có. Sự
+tách biệt này cho phép một codebase duy nhất nhắm tới cả nền tảng desktop lẫn di
+động mà không cần chỉnh sửa.
 
-\subsection{Pipeline}
+\subsection{Các pipeline thuật toán và cơ chế bàn giao}
 
-Hình~\ref{fig:arch}(b) lần theo một phiếu từ lúc thu nhận tới lúc ra điểm
-dọc theo một trục chủ yếu tuyến tính, gồm Khung đầu vào, JS giải mã \&
-chuẩn bị, Chọn phương pháp, một giai đoạn phát hiện, Dò ô tròn theo lưới
-cố định, và Kết quả chấm. Phát hiện là giai đoạn duy nhất rẽ nhánh: nó
-tách thành một nhánh CV và một nhánh YOLO, cả hai hội tụ lại trước khi
-chấm để phần còn lại của pipeline là như nhau ở cả hai cấu hình.
+Hình~\ref{fig:arch}(b) lần theo một phiếu từ lúc thu ảnh tới khi ra điểm dọc theo
+một trục chủ yếu tuyến tính, gồm Input Frame, JS Decode \& Prep, Method Selection,
+tiếp đến là các nhánh phát hiện CV hoặc YOLO song song, một Adaptive Threshold
+dùng chung, Fixed Grid Bubble Detection, và Grade Output. Phát hiện là giai đoạn
+duy nhất rẽ nhánh: nó tách thành một nhánh CV và một nhánh YOLO, cả hai lại hội tụ
+trước khi chấm điểm, sao cho phần còn lại của pipeline là như nhau ở cả hai cấu
+hình.
 
-Luồng chính trước tiên trao cho worker một khung thô hoặc ảnh tải lên, ở
-đây là $1{,}145\times2{,}560$\,px. \emph{JS giải mã \& chuẩn bị} dựng ảnh
-này lên một canvas và tạo ra hai sản phẩm mà các giai đoạn sau cần, cụ thể
-là một vùng đệm điểm ảnh RGBA cho lõi \wasm{} và, mỗi khi chọn đường lai,
-một tensor letterbox cho bộ phát hiện YOLO ($960\times960$ cho mô hình
-điểm-góc chính). \emph{Chọn phương pháp} sau
-đó định tuyến ảnh vào một trong hai nhánh phát hiện. Vì mỗi nhánh chỉ thực
-hiện một nhiệm vụ duy nhất là đặt lưới đáp án về tọa độ đã biết và cả hai
-sau đó cùng nuôi một bộ nhận dạng, nhánh được chọn chỉ thay đổi cách định
-vị phiếu, chứ không bao giờ thay đổi cách một đáp án được đọc cuối cùng.
+Luồng chính trước hết trao cho worker một khung hình thô hoặc ảnh được tải lên, ở
+đây là $1{,}145\times2{,}560$\,px. \emph{JS Decode \& Prep} vẽ ảnh này lên một
+canvas và tạo ra hai sản phẩm mà các giai đoạn sau cần, cụ thể là một bộ đệm điểm
+ảnh RGBA cho lõi \wasm{} và, mỗi khi nhánh lai được chọn, một tensor đã
+letterbox cho bộ phát hiện YOLO ($960\times960$ đối với mô hình dấu góc chính).
+Hai nhánh tương ứng với các cấu hình triển khai được chọn một cách tường minh
+(benchmark đánh giá riêng từng cấu hình) chứ không phải chọn theo từng phiếu;
+trong nhánh lai, đường biến đổi từ góc (corner-warp) được dùng khi bộ phát hiện
+cho ra các góc hợp lệ, và nếu không thì lùi về bộ phát hiện cổ điển. Vì mỗi nhánh
+chỉ làm một việc duy nhất là đặt lưới đáp án vào các tọa độ đã biết và cả hai sau
+đó đều đưa vào cùng một bộ nhận dạng, nhánh được chọn chỉ thay đổi cách định vị
+phiếu, chứ không bao giờ thay đổi cách một đáp án rốt cuộc được đọc ra.
 
-Trên nhánh CV, lõi \wasm{} khôi phục hình học trang mà không cần dẫn hướng
-bên ngoài. Giai đoạn \emph{Chuẩn hóa} ngưỡng hóa ảnh, trích các thành phần
-liên thông, và giữ lại bốn điểm mốc đăng ký ở góc bằng cách lọc các blob
-ứng viên theo diện tích, tỉ lệ cạnh và độ lấp đầy; khi đường theo mốc tỏ
-ra không đáng tin, nó chuyển sang lấy biên giấy trắng. Từ bốn điểm tham
-chiếu thu được, nó ước lượng một homography lên một khuôn mẫu chuẩn
-$1700\times2400$, và giai đoạn \emph{Cắt theo mốc} áp dụng phép biến đổi
-đó để đưa lưới đáp án về vị trí cố định.
+Trên nhánh CV, lõi \wasm{} khôi phục hình học của trang mà không cần dẫn dắt bên
+ngoài. Giai đoạn \emph{WASM Normalize} lấy ngưỡng ảnh, trích các thành phần liên
+thông (connected components), và giữ lại bốn dấu góc đăng ký bằng cách lọc các
+blob ứng viên theo diện tích, tỉ lệ khung và độ lấp đầy; khi tuyến dấu góc tỏ ra
+không đáng tin, nó thay vào đó lùi về biên giấy trắng. Từ bốn điểm tham chiếu thu
+được, nó ước lượng một phép biến đổi homography lên một mẫu chuẩn
+$1700\times2400$, mà giai đoạn \emph{Marker Crop} áp dụng để đưa lưới đáp án về
+các vị trí cố định.
 
-Trên nhánh YOLO, cấu hình chính là bộ phát hiện theo điểm-góc. Ảnh trước
-hết được \emph{letterbox} thành một ô vuông $960\times960$ — tức là phóng/thu
-để vừa khít trong khi giữ nguyên tỉ lệ khung hình, rồi đệm (pad) phần lề
-còn dư — và một mô hình YOLOv8n một lớp (\texttt{marker\_corners}) sau đó
-chạy trên đầu vào vuông này qua backend WebGPU. Bốn phát hiện có độ tin cậy
-cao nhất được rút về tâm của chúng, sắp xếp hình học thành trên-trái,
-trên-phải, dưới-phải, dưới-trái, và đưa \emph{thẳng} vào homography để nắn
-phiếu về khuôn mẫu chuẩn. Điều này cho phép lõi \wasm{} bỏ qua cả bước dò
-blob thành-phần-liên-thông của giai đoạn \emph{Chuẩn hóa} CV lẫn bước dò
-lại mốc lần hai, nên nhánh YOLO chỉ tái hợp với bộ nhận dạng chung tại giai
-đoạn \emph{Ngưỡng hóa thích nghi}. Như vậy YOLO chỉ đóng góp việc định vị,
-vì chuỗi đáp án luôn được giải mã bởi bộ nhận dạng CV chứ không phải bởi bộ
-phát hiện.
+Trên nhánh YOLO, cấu hình chính là một bộ phát hiện dấu góc: một bộ phát hiện
+\emph{đối tượng} YOLOv8n đơn lớp (không phải đầu pose/keypoint) định vị bốn dấu
+góc in sẵn và dùng tâm các hộp bao (bounding box) của chúng làm các điểm đăng ký.
+Ảnh thô ($1{,}145\times2{,}560$\,px) trước tiên được letterbox thành một tensor
+$960\times960$ bằng cách co theo chiều dài nhất và đệm 0 ở trục ngắn hơn, rồi mô
+hình chạy qua backend WebGPU. Sau khi suy luận, bốn hộp bao có độ tin cậy cao
+nhất được rút gọn về tâm của chúng trong hệ tọa độ tensor. Để quay lại pipeline
+dùng chung, các tọa độ này được ánh xạ ngược về không gian ảnh gốc bằng cách trừ
+đi các phần đệm và áp dụng hệ số co nghịch đảo. Các tâm đã khôi phục sau đó được
+sắp thứ tự theo hình học (trên-trái, trên-phải, dưới-phải, dưới-trái) và đưa
+\emph{thẳng} vào phép homography để nắn phiếu lên mẫu chuẩn $1700\times2400$. Trên
+nhánh này, các tâm góc được đưa thẳng vào hàm biến đổi, nhờ đó lõi \wasm{} bỏ qua
+được cả việc phát hiện blob bằng thành phần liên thông của giai đoạn CV \emph{WASM
+Normalize} lẫn lần dò lại dấu góc thứ hai, nên nhánh YOLO chỉ nhập lại bộ nhận
+dạng dùng chung tại giai đoạn \emph{Adaptive Threshold}. Do đó YOLO chỉ đóng vai
+trò một front-end hình học; chuỗi đáp án luôn được giải mã bởi bộ nhận dạng CV
+dùng chung, cho phép đánh giá cơ chế bàn giao mà không thay đổi phần chấm điểm
+phía sau.
 
-Cùng đầu ra bộ phát hiện đó có thể được dùng theo cách khác là cắt theo hộp
-bao, và Mục~\ref{sec:results-recognition} cho thấy lựa chọn này mang tính
-quyết định. Trong phép so sánh đó, một biến thể bốn lớp (\texttt{marker\_corners},
-\texttt{id\_keycode}, \texttt{questions\_1\_20}, và \texttt{questions\_21\_60})
-được letterbox về $640\times640$; sau NMS, vùng giữ lại được ánh xạ về tọa độ
-ảnh gốc rồi mask hoặc cắt, quay lại nhánh CV tại bước nắn nhưng vẫn giữ
-nguyên bước dò lại mốc phía sau. Chúng tôi giữ đường này chỉ như một so sánh
-cảnh báo, bởi một bản cắt không hoàn hảo sẽ làm nhiễu bước dò lại đó và, qua
-nó, toàn bộ lưới cố định.
+Một khi hai nhánh đã nhập lại trên một ảnh đã nắn (rectified crop) chung,
+\emph{Adaptive Threshold} thực hiện làm mờ cục bộ và lấy ngưỡng, còn \emph{Fixed
+Grid Bubble Detection} đọc các đáp án. Vì phiếu nay đã nằm trong tọa độ mẫu, lưới
+cố định trước tâm của mọi ô tô, nhờ đó mỗi lựa chọn có thể được chấm theo mật độ
+tiền cảnh (foreground) trong một cửa sổ lấy mẫu hình tròn, và các điểm số có thể
+được chuẩn hóa trong từng hàng, qua đó tránh việc một bản chụp tối đều hay mờ
+nhạt làm lệch quyết định. Giai đoạn cuối \emph{Grade Output} xuất ra chuỗi đáp án
+đã giải mã cùng với các cờ hợp lệ và cờ dấu khả nghi, và các bộ đếm thời gian theo
+từng giai đoạn được báo cáo xuyên suốt bài báo này.
 
-Khi hai nhánh đã hội tụ trên một bản cắt đã nắn chung, \emph{Ngưỡng hóa
-thích nghi} thực hiện làm mờ và ngưỡng hóa cục bộ, và \emph{Dò ô tròn theo
-lưới cố định} đọc các đáp án. Vì phiếu giờ đã nằm trong tọa độ khuôn mẫu,
-lưới cố định trước tâm của mọi ô tròn, nên mỗi phương án có thể được chấm
-theo mật độ tiền cảnh trong một cửa sổ lấy mẫu hình tròn và các điểm số
-được chuẩn hóa theo từng hàng, qua đó tránh việc một bản quét tối hoặc mờ
-đều làm thiên lệch quyết định. Giai đoạn cuối \emph{Kết quả chấm} phát ra
-chuỗi đáp án đã giải mã cùng các cờ hợp lệ và cờ đánh dấu khả nghi, và các
-bộ đếm thời gian theo từng giai đoạn được báo cáo xuyên suốt bài báo này.
+Bởi vì bộ nhận dạng có tính tất định, bất kỳ sai số hình học nào trước phép
+homography đều làm dịch toàn bộ lưới. Việc cắt ảnh có dẫn dắt bởi bộ phát hiện là
+một phần không thể tách rời của thuật toán nhận dạng, chứ không phải một bước tiền
+xử lý vô hại.
 
-Sự phụ thuộc tuyến tính này kéo theo một hệ quả mà các kết quả độ chính
-xác ở Mục~\ref{sec:results-recognition} làm rõ. Vì bộ nhận dạng là tất
-định, bất kỳ sai số hình học nào sinh ra trước homography không nằm cục bộ
-mà dịch chuyển toàn bộ lưới, và đó chính là lý do việc cắt theo dẫn hướng
-của bộ phát hiện phải được xem là một phần không thể tách rời của thuật
-toán nhận dạng, chứ không phải một bước tiền xử lý vô hại.
-
-\subsection{Đánh đổi khi triển khai}
-Hai đích triển khai bổ trợ cho nhau về mặt đánh đổi. Web Edge, dựng trên
-OpenCV.js và WebGPU, thực thi xuyên nền tảng và triển khai trực tiếp từ
-một URL không cần cài đặt, dù phải trả giá cho tính khả chuyển này bằng
-sandbox trình duyệt và việc chỉ truy cập gián tiếp các bộ tăng tốc phần
-cứng. Native Android, dựng trên OpenCV Android SDK và ONNX Runtime
-Android, lại chạm thẳng phần cứng qua các provider như NNAPI và nhờ đó đạt
-độ trễ suy luận thấp hơn, với cái giá là đóng gói ứng dụng và bảo trì theo
-từng nền tảng. Tuy nhiên, điều mà hai đích cùng chia sẻ lại quan trọng đối
-với nghiên cứu này hơn là chỗ chúng khác nhau, bởi cả hai đều thực hiện
-mọi tính toán ngay trên thiết bị: không bên nào truyền dữ liệu phiếu trả
-lời, không bên nào cần kết nối mạng tại thời điểm suy luận, và không bên
-nào phụ thuộc hạ tầng máy chủ. Chính tính chất cùng-trên-thiết-bị này làm
-cho một so sánh độ trễ tương đương giữa chúng trở nên có ý nghĩa.
+\subsection{Tối ưu theo nền tảng và triển khai biên}
+Hai đích triển khai có những đánh đổi bổ trợ cho nhau. Bản dựng Web Edge chạy
+không cần chỉnh sửa trong sandbox của trình duyệt với mức cài đặt bằng không,
+nhưng phải chấp nhận chi phí phụ trội do ảo hóa và chỉ có quyền truy cập bộ tăng
+tốc dưới sự quản lý. Bản dựng Native Android thì có quyền truy cập bộ tăng tốc
+trực tiếp và độ trễ suy luận thấp hơn rõ rệt, đổi lại là chi phí đóng gói riêng
+theo nền tảng và bảo trì. Vì cả hai đích đều thực thi mọi giai đoạn nhận dạng cục
+bộ trên thiết bị, ảnh phiếu trả lời không cần rời khỏi thiết bị. Độ trễ chỉ so
+sánh được giữa hai đích tại một ranh giới đo lường tương ứng, điều mà phần tiếp
+theo sẽ định nghĩa.
 
 \section{Thiết lập thực nghiệm}
 
-Tập đánh giá $N{=}185$ gồm mọi phiếu được gán nhãn trong ngữ liệu: 179
-phiếu trả lời của học sinh (các ảnh ``Bài làm'') và sáu phiếu đáp án, rút
-từ năm tập con và mỗi ảnh chụp ở $1{,}145\times2{,}560$\,px trên một Redmi
-Note~13 Pro+. Phiếu bài làm và phiếu đáp án là cùng một mẫu in---đáp án chỉ
-khác ở chỗ đã tô sẵn các câu đúng---nên cả hai được nhận dạng bởi cùng
-pipeline; phiếu đáp án chỉ khác ở chỗ còn đóng vai trò tham chiếu chấm
-điểm. Số 185 phiếu này mang 9.810 nhãn câu hỏi hợp lệ và 49.050 quyết định
-nhị phân A/B/C/D/E đứng sau mọi con số độ chính xác trong bài; một tệp CSV
-do con người rà soát dưới \texttt{runs/accuracy\_eval/} đánh dấu các câu
-cuối không hợp lệ là \texttt{NA}. Bộ phát hiện theo điểm-góc được đánh giá
-như bộ định vị chính được huấn luyện trên chính 185 phiếu này, chia 159
-huấn luyện / 26 kiểm định theo công thức Ultralytics YOLOv8n mặc định và
-xuất ra ONNX để suy luận WebGPU trong trình duyệt.
+\subsection{Tập dữ liệu và nhãn chuẩn}
+Tập đánh giá ($N{=}185$) gồm mọi phiếu đã được gán nhãn trong kho dữ liệu: 179 ảnh
+phiếu trả lời của học sinh và sáu phiếu đáp án, rút từ năm tập con (50, 48, 36, 46
+và 5 phiếu; \texttt{dataset\_3} chứa các ảnh chụp độ tương phản thấp, bị nén lại)
+và được chụp bằng thiết bị di động (danh nghĩa $1{,}145\times2{,}560$\,px đối với
+\texttt{dataset\_1}; các tập con khác có thể khác). \texttt{Dataset~3} là một tập
+con bị bạc màu, nén lại: cả 36 phiếu có dải tông bị nén (trung vị
+$p_{99}-p_{1}\approx129$ mức xám và màu trắng giấy bị giới hạn ở
+$\approx192/255$, so với $\approx225$–$237$ ở các tập con sạch nhất), khiến các
+dấu góc in sẵn nằm sát ngưỡng phát hiện bằng thành phần liên thông. Phiếu trả lời
+và phiếu đáp án là cùng một mẫu in (phiếu đáp án chỉ mang sẵn các dấu đúng), nên
+cả hai đều được nhận dạng bởi cùng một pipeline, phiếu đáp án chỉ khác ở chỗ nó
+còn được dùng làm tham chiếu chấm điểm. Hai người rà soát đã độc lập thiết lập
+nhãn chuẩn, giải quyết các bất đồng bằng kiểm tra thủ công, và đánh dấu các câu
+hỏi đuôi không hợp lệ là không áp dụng, cho ra 9{,}810 nhãn câu hỏi hợp lệ và
+49{,}050 quyết định nhị phân theo từng dấu, làm nền cho mọi con số độ chính xác
+trong bài báo này.
 
-Đích Native Android chạy cùng các giai đoạn thuật toán qua các runtime bản
-địa của nền tảng: OpenCV qua Kotlin/JNI cho lõi CV, và ONNX Runtime
-Android cho suy luận với các provider CPU đơn luồng, CPU bốn luồng và
-NNAPI. Nó xuất các nhãn theo từng câu khớp với chân trị đã rà soát, nên
-được đánh giá cả về độ chính xác lẫn độ trễ; riêng đường điểm-góc được
-chuyển sang Native và đạt ngang bằng nhận dạng với bản Web
-(Mục~\ref{sec:results-recognition}). Web và
-Native chia sẻ các giai đoạn này ở mức mã nguồn nhưng không ở dạng biên
-dịch: phiên bản OpenCV, bố cục bộ nhớ, lập lịch SIMD, thứ tự phép toán dấu
-phẩy động, và cách sắp xếp vùng đệm ảnh đều khác nhau giữa OpenCV.js và
-OpenCV Android, nên cùng một đầu vào không nhất thiết cho ra đầu ra giống
-hệt từng bit. Để giữ cho riêng thành phần suy luận có thể so sánh được, cả
-hai đích nạp cùng một mô hình ONNX và chỉ thay đổi provider thực thi, là
-WebGPU trong trình duyệt và CPU hoặc NNAPI trên Android.
+\subsection{Cấu hình huấn luyện bộ phát hiện}
+Bộ định vị dấu góc là một mô hình YOLOv8 nano đơn lớp (\texttt{marker\_corners})
+được tinh chỉnh (fine-tune) từ \texttt{yolov8n.pt} trên 85 phiếu được gán nhãn,
+chia thành 68 để huấn luyện và 17 để kiểm định. Việc huấn luyện chạy tối đa 100
+epoch (dừng sớm, patience 30) với batch size 8 và đầu vào $960\times960$, dùng bộ
+tối ưu được Ultralytics tự chọn (tốc độ học ban đầu 0.01, momentum 0.937, weight
+decay 0.0005); việc tăng cường dữ liệu (augmentation) được cố ý giữ ở mức tối
+thiểu: chỉ dịch chuyển nhỏ (0.1) và co giãn (0.2), tắt lật ngang/dọc, mosaic và
+mixup, vì bốn dấu góc mang một thứ tự hình học cố định. Sau khi hội tụ, mô hình
+được xuất sang một định dạng ONNX thống nhất dùng chung cho cả triển khai Web và
+Native, qua đó loại bỏ biến thiên do chuyển đổi giữa các framework; chỉ khác nhau
+ở execution provider, là WebGPU trong trình duyệt và CPU hoặc NNAPI trên Android.
+Suy luận dùng đầu vào letterbox $960\times960$ với ngưỡng tin cậy $0.05$ (giữ lại
+bốn hộp có độ tin cậy cao nhất) và NMS IoU $0.45$. Trên tập kiểm định 17 ảnh, bộ
+phát hiện đạt $\mathrm{mAP}@0.5{=}0.995$ và recall $1.0$ (khôi phục đủ bốn dấu góc
+trên mỗi phiếu). Bởi vì bộ phát hiện chỉ định vị các mốc in sẵn cố định và không
+bao giờ định vị nội dung được tô, và vì 101 trong số 179 phiếu trả lời của học
+sinh trong benchmark chưa từng được dùng trong quá trình phát triển bộ phát hiện,
+độ chính xác nhận dạng trên benchmark (Mục~\ref{sec:results-recognition}) đặc tả
+bộ nhận dạng khi đã có các góc được định vị, tách bạch với tập kiểm định của bộ
+phát hiện này. Nhận dạng ở giai đoạn CV có tính tất định và giống hệt nhau qua các
+lần chạy lặp lại và qua các máy Windows.
 
-Sáu thiết bị Web phát lại cùng bộ $N{=}185$ ảnh: một máy desktop tham
-chiếu (i5-14600K / RTX 4070 Ti SUPER), một ASUS Vivobook (i5-13500H), một
-MacBook Air M1, một iPhone~16 (Safari/WebKit), một máy tính bảng Android
-Poco Pad M1 (Chrome/Blink), và chiếc Redmi Note~13 Pro+ (Chrome/Blink); mốc
-Native Android chạy trên hai trong số đó, Poco Pad và Redmi. Các hàng độ
-trễ Web báo cáo \texttt{cpp\_ms} phía
-worker trong khi các hàng Native báo cáo \texttt{e2e\_ms} dựa trên tệp,
-nên các phép kiểm cùng-biên được giới hạn ở \texttt{cpp\_ms} cho cả hai
-phía. Việc lấy mẫu tài nguyên dựa vào công cụ mà mỗi nền tảng phơi bày, cụ
-thể là \texttt{psutil} cho Windows Chrome, một proxy độ trễ bộ định thời
-trong trang nơi không thể lấy mẫu tiến trình trực tiếp, và một bộ lấy mẫu
-trong ứng dụng trên Native.
+\subsection{Các nền tảng và máy chủ benchmark}
+Benchmark phát lại cùng một tập 185 ảnh qua năm cấu hình trình duyệt/thiết bị và
+một baseline Native Android trên hai trong số đó:
+\begin{itemize}[leftmargin=*, itemsep=1pt, topsep=2pt]
+  \item   \textbf{Máy tham chiếu desktop:} Intel Core i5-14600K, NVIDIA
+  RTX~4070 Ti SUPER, 32\,GB RAM.
+  \item \textbf{Laptop:} ASUS Vivobook (i5-13500H, 24\,GB RAM, GPU tích hợp Intel
+  Iris Xe) và Acer Nitro~5 (i5-10300H, 16\,GB RAM).
+  \item \textbf{Android (Chrome/Blink):} máy tính bảng Poco Pad~M1 (Snapdragon~7s
+  Gen~4, 8\,GB LPDDR4X) và Redmi Note~13 Pro+ (Dimensity 7200-Ultra,
+  8\,GB LPDDR5).
 
-\begin{table}[t]
-\caption{Các sản phẩm benchmark và ranh giới của từng độ đo.}
-\label{tab:metrics}
-\centering
-\setlength{\tabcolsep}{3pt}
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{lll}
-\toprule
-\textbf{Tuyên bố} & \textbf{Sản phẩm chính} & \textbf{Ranh giới} \\
-\midrule
-Nhận dạng & \texttt{runs/accuracy\_eval/} & chỉ câu hợp lệ \\
-Độ trễ Web & \texttt{runs/batch\_results/} & \texttt{cpp\_ms} worker \\
-Độ trễ hệ lai Web & \texttt{runs/batch\_results/} & tổng worker + \texttt{yolo\_ms} \\
-Độ trễ Native & các tệp JSON Native & \texttt{e2e\_ms} dựa trên tệp \\
-Quy gán giai đoạn & hồ sơ giai đoạn + log Native & bộ đếm giai đoạn \\
-Tài nguyên & các CSV \texttt{runs/resources/} & theo từng công cụ \\
-\bottomrule
-\end{tabular}}
-\vspace{2pt}
-\parbox{\columnwidth}{\footnotesize
-Bảng tách các so sánh cùng-biên khỏi các so sánh theo biên triển khai.
-Thời gian thực (wall-time) của trình duyệt Web không được xuất ra bởi các
-log batch hiện tại.}
-\end{table}
+  \item \textbf{Baseline native:} Poco Pad và Redmi còn chạy thêm một ứng dụng
+  Android native qua các execution provider CPU đa luồng và NNAPI.
+\end{itemize}
+Web và Native dùng chung các giai đoạn thuật toán ở mức mã nguồn nhưng không ở
+dạng đã biên dịch: bản dựng OpenCV, bố cục bộ nhớ, lập lịch SIMD và thứ tự dấu
+phẩy động đều khác nhau giữa OpenCV.js và OpenCV Android, nên cùng một đầu vào
+không nhất thiết cho ra đầu ra giống hệt từng bit. Đích Native xuất các nhãn theo
+từng câu hỏi được căn theo nhãn chuẩn đã rà soát, nên nó được đánh giá cả về độ
+chính xác lẫn độ trễ. Để tái lập, bản dựng Web chạy ONNX Runtime Web trên WebGPU
+với một lõi OpenCV biên dịch bằng Emscripten dùng SIMD và đa luồng dưới cô lập
+chéo nguồn (cross-origin isolation), còn bản dựng Native chạy ONNX Runtime Android
+với OpenCV~4; mỗi máy đo độ trễ được khởi động (warm up) bằng năm phiếu, và năm
+máy theo giao thức dấu góc được báo cáo theo trung vị của năm lần chạy.
 
-Bảng~\ref{tab:metrics} cố định ranh giới bằng chứng cho từng tuyên bố. Độ
-chính xác là so sánh có giám sát trực tiếp với tệp CSV đã rà soát.
-\texttt{cpp\_ms} của Web bắt đầu khi dữ liệu ảnh đến worker và loại trừ
-phần giải mã ở luồng chính cùng công việc giao diện, còn \texttt{e2e\_ms}
-của Native bao gồm giải mã tệp, xử lý và một lần ghi gỡ lỗi. Do đó chúng
-tôi không trình bày các hàng Web-vs-Native như một cuộc đua đầu-cuối
-nghiêm ngặt: một tỉ số cùng-biên luôn dùng \texttt{cpp\_ms} ở cả hai phía,
-và nơi bàn về độ trễ triển khai thì ranh giới được nêu rõ trong chú thích
-hoặc trong văn bản.
+\subsection{Số đo và ranh giới đo lường}
+Để giữ cho các so sánh công bằng giữa môi trường sandbox và môi trường native,
+các số đo được giới hạn theo tầng trừu tượng runtime, và mỗi tuyên bố được gắn với
+sản phẩm và ranh giới của nó như sau. \emph{Độ trễ Web} là độ trễ \emph{pipeline
+phía worker}: thời gian thực thi C\texttt{++} (và, với bản lai, WebGPU) phía
+worker, được đo sau khi dữ liệu ảnh tới được luồng worker, nên nó loại trừ phần
+giải mã và kết xuất ở luồng chính. \emph{Độ trễ Native} là khoảng thời gian
+đầu-cuối dựa trên tệp, bao gồm giải mã và xử lý ảnh; thao tác ghi JPEG chỉ dùng
+để gỡ lỗi được loại khỏi các số đo báo cáo. Vì hai ranh giới khác nhau (Web loại
+trừ giải mã trong khi Native bao gồm nó), các so sánh độ trễ Web-Native trực tiếp
+chỉ được báo cáo trên các phép đo lõi-giai-đoạn cùng ranh giới. \emph{Mức sử dụng
+tài nguyên} được lấy mẫu bằng bất kỳ công cụ nào mà máy chủ phơi ra: các tiện ích
+tiến trình cho trình duyệt Windows và một bộ lấy mẫu trong-ứng-dụng/adb trên
+Android. Một tỉ số độ trễ cùng ranh giới dùng thời gian lõi-giai-đoạn tương ứng
+(C\texttt{++} phía worker trên Web và lõi C\texttt{++} native trên Android). Các
+tỉ số suy luận so thời gian ORT/WebGPU trên Web với thời gian ORT/NNAPI trên
+Android. Ở những chỗ bàn về độ trễ triển khai, ranh giới được nêu rõ, và thời gian
+tường (wall-time) đầu-cuối đầy đủ của trình duyệt, bao gồm cả giải mã và kết xuất
+ở luồng chính, không được xuất ra bởi các log hiện tại.
 
 \section{Kết quả và Thảo luận}
 
 \subsection{Độ chính xác nhận dạng}
 \label{sec:results-recognition}
 
-Bảng~\ref{tab:accuracy} báo cáo nhận dạng khớp-chính-xác có giám sát trên
-tập $N{=}185$ đã rà soát. CV truyền thống nhận dạng đúng 9.715 trong
-9.810 câu hợp lệ, tức độ chính xác mức câu hỏi là 99,03\%, và tái tạo
-đúng mọi đáp án hợp lệ trên 143 trong 185 phiếu. Việc thay giai đoạn định
-vị phiếu của CV bằng một bộ phát hiện YOLO theo điểm-góc — phát ra bốn
-điểm mốc đăng ký ở góc và đưa thẳng tâm của chúng vào homography — cho
-99,45\% (9.756/9.810) và 155 trong 185 phiếu hoàn toàn đúng. Hai cấu hình
-do đó ngang nhau về độ chính xác: bộ phát hiện góc hoạt động như một bộ
-định vị chính thực thụ chứ không phải một bước tiền xử lý, và làm vậy một
-cách tái lập được, trả về 99,44--99,45\% trên mọi lần chạy lặp lại trên các
-thiết bị di động.
-
-Vì hai bộ định vị đạt cùng độ chính xác, giá trị của công thức điểm-góc nằm
-ở chỗ khác. Đưa bốn điểm góc chính xác vào homography loại bỏ bước dò mốc
-theo thành phần liên thông và lần dò lại thứ hai khỏi lõi C\texttt{++},
-đồng thời dời việc định vị sang GPU; phần độ trễ bên dưới cho thấy chi phí
-mỗi phiếu dịch chuyển ra sao. Ở mức ô tròn, mốc CV đạt Precision 0,992,
-Recall 0,994 và F1 0,993 trên 49.050 quyết định nhị phân, và pipeline theo
-điểm-góc cũng bằng với mốc đó ở mức này.
-
-\begin{table}[t]
-\caption{Độ chính xác nhận dạng mức câu hỏi có giám sát trên tập $N{=}185$
-đã rà soát.}
+\begin{table}[!htb]
+\caption{Độ chính xác nhận dạng theo câu hỏi, có giám sát, trên tập $N{=}185$ đã
+rà soát.}
 \label{tab:accuracy}
 \centering
 \setlength{\tabcolsep}{3pt}
 \resizebox{\columnwidth}{!}{%
 \begin{tabular}{lcccccc}
 \toprule
-\textbf{Phương pháp} & \textbf{ĐCX câu} & \textbf{Đúng/Tổng câu}
-& \textbf{Phiếu đúng} & \textbf{GT trống}
+\textbf{Phương pháp} & \textbf{ĐCX câu} & \textbf{Câu đúng/GT}
+& \textbf{Phiếu đúng hẳn} & \textbf{GT trống}
 & \textbf{Dự đoán trống} & \textbf{Dự đoán đa} \\
 \midrule
-YOLO điểm-góc   & \textbf{99,45\%} & \textbf{9{,}756}/9{,}810 & \textbf{155}/185 & 44 & 24 & 11 \\
-CV truyền thống & 99,03\%          & 9{,}715/9{,}810          & 143/185          & 44 & 42 & 18 \\
+YOLO dấu góc                & \textbf{99.46\%} & \textbf{9{,}757}/9{,}810 & \textbf{155}/185 & 44 & 23 & 13 \\
+CV truyền thống             & 99.03\%          & 9{,}715/9{,}810          & 143/185          & 44 & 42 & 18 \\
 \bottomrule
 \end{tabular}}
+
 \vspace{2pt}
 \parbox{\columnwidth}{\footnotesize
-``YOLO điểm-góc'' là bộ phát hiện 4 góc YOLO trong trình duyệt đưa vào một
-homography trực tiếp; cả hai hàng được đánh giá trên cùng 185 phiếu. Các độ
-đo mức ô tròn của CV là P=0,992, R=0,994, F1=0,993 trên 49.050 quyết định
-nhị phân.}
+Dấu góc là bộ phát hiện 4 góc YOLO trong trình duyệt đưa thẳng vào một phép
+homography; cả hai dòng đều được đánh giá trên cùng 185 phiếu. \emph{GT trống}
+đếm số câu hỏi hợp lệ mà đáp án đã rà soát để trống (các câu đuôi không hợp lệ bị
+loại khỏi 9{,}810); \emph{Dự đoán trống}/\emph{đa} đếm số câu mà phương pháp trả
+về là trống hoặc tô nhiều ô. P/R/F1 ở mức ô tô là 0.992/0.994/0.993 (CV) và
+0.995/0.998/0.997 (dấu góc) trên 49{,}050 quyết định nhị phân.}
 \end{table}
+
+Bảng~\ref{tab:accuracy} báo cáo nhận dạng khớp-chính-xác có giám sát trên tập mẫu
+cố định $N{=}185$ đã rà soát. CV truyền thống nhận dạng đúng 9{,}715 trong số
+9{,}810 câu hỏi, tức độ chính xác theo câu hỏi là 99.03\%, và tái tạo đúng mọi
+đáp án trên 143 trong số 185 phiếu. Thay giai đoạn định vị phiếu bằng CV bằng một
+bộ phát hiện dấu góc YOLO, vốn phát ra bốn dấu góc đăng ký và đưa thẳng tâm của
+chúng vào phép homography, cho ra 99.46\% (9{,}757/9{,}810) và 155 trong số 185
+phiếu đúng hoàn toàn, có thể tái lập qua năm máy theo giao thức dấu góc. Trên toàn
+benchmark 185 phiếu, bộ phát hiện trả về bốn dấu góc hợp lệ trên mọi phiếu, nên
+cấu hình lai không bao giờ phải gọi tới phương án dự phòng cổ điển. Cần tách bạch
+hai đại lượng ở đây. \emph{Độ chính xác định vị} được đo trên tập tách riêng 17
+phiếu, nơi bộ phát hiện đạt $\mathrm{mAP}@0.5{=}0.995$ và khôi phục đủ bốn góc trên
+mỗi phiếu. Còn con số 99.46\% ở trên là một con số \emph{nhận dạng đầu-cuối}: nó
+định lượng việc lõi C\texttt{++} tất định đọc các ô tô tốt ra sao khi đã được cấp
+hình học góc chính xác. Bởi vì các nhãn góc bao phủ một phần các phiếu đánh giá,
+đây là một cận trên tập đóng (closed-set), mẫu cố định cho nhận dạng khi đã có
+định vị tốt, chứ không phải một thước đo khả năng tổng quát hóa tập mở (open-set)
+của bộ phát hiện. Trên 101 phiếu trả lời của học sinh chưa từng xuất hiện trong
+quá trình phát triển bộ phát hiện, nhánh dấu góc đạt $99.3\%$ độ chính xác theo
+câu hỏi ($5{,}503/5{,}540$), nằm trong sai số so với $99.6\%$ trên 78 phiếu có
+chồng lấp với quá trình phát triển bộ phát hiện, cho thấy con số trên toàn tập
+không bị thổi phồng đáng kể bởi phần chồng lấp huấn luyện.
+
+Một khoảng tin cậy 95\% theo bootstrap-theo-phiếu là 98.63--99.37\% cho CV và
+99.20--99.68\% cho nhánh dấu góc. Vì các câu hỏi trong cùng một phiếu có tương
+quan, chúng tôi kiểm định sự khác biệt bằng một bootstrap theo cặp trên 185 phiếu
+(10{,}000 lần lấy lại mẫu): mức tăng trung bình theo từng phiếu là $+0.45$ điểm
+(95\% CI $[+0.20,+0.72]$, không chứa số không), với nhánh dấu góc tốt hơn trên 32
+phiếu và kém hơn trên 15 phiếu. Mức tăng tập trung ở các ảnh \texttt{dataset\_3}
+độ tương phản thấp, nơi việc tìm dấu góc bằng thành phần liên thông kém tin cậy
+nhất (CV 97.2\% so với 99.6\% ở đó). Xét theo số tuyệt đối, mức tăng này sửa đúng
+khoảng 42 câu trong số 9{,}810 (tập trung ở \texttt{dataset\_3} độ tương phản
+thấp), một biên độ không nhỏ khi yêu cầu chấm điểm chính xác ở mức từng phiếu. Do
+đó cải thiện này được hỗ trợ về mặt thống kê nhưng khiêm tốn về độ lớn, và vẫn nên
+được kiểm chứng đầu-cuối dựa trên bộ nhận dạng mẫu cố định thay vì suy ra chỉ từ
+chất lượng định vị.
+
+Ngoài độ chính xác, việc đưa bốn điểm góc do bộ phát hiện cấp vào phép homography
+loại bỏ phần phát hiện dấu bằng thành phần liên thông cùng lượt dò lại thứ hai của
+nó khỏi lõi C\texttt{++} và chuyển việc định vị sang GPU; các kết quả độ trễ phía
+dưới cho thấy sự dịch chuyển kết quả về việc chi phí theo từng phiếu được tiêu tốn
+ở đâu. Chỉ riêng trên 179 phiếu của học sinh, CV đạt 99.00\% và nhánh dấu góc
+99.45\% (cả hai đều $\geq$99.6\% trên sáu phiếu đáp án), nên các số đo không bị
+thổi phồng bởi các mẫu dễ.
 
 \subsection{Độ trễ đa nền tảng}
 \label{sec:latency}
-Hình~\ref{fig:latency} và các Bảng~\ref{tab:stage-mini}--\ref{tab:latency}
-báo cáo benchmark triển khai, khẳng định rằng WebGPU đã hạ suy luận học
-máy xuống vai trò chi phí thứ yếu và rằng khoảng cách Web-vs-Native còn
-lại bắt nguồn từ giai đoạn CV tất định chứ không phải từ bộ phát hiện.
+Hình~\ref{fig:latency} và các Bảng~\ref{tab:stage-mini}--\ref{tab:latency} báo cáo
+benchmark triển khai, cho thấy khoảng cách Web-so-với-Native lớn hơn ở giai đoạn
+CV tất định so với ở suy luận YOLO.
 
-Bằng chứng rõ nhất là một so sánh cùng-thiết-bị, cùng-biên trên Redmi. Đối
-với lõi CV, đo bằng \texttt{cpp\_ms} của giai đoạn OMR C\texttt{++}/OpenCV,
-Native Android chỉ cần $89$\,ms trong khi bản dựng Mobile Web cần
-$503$\,ms, một khoảng cách $5,7\times$ phát sinh thuần túy từ việc thực thi
-cùng thuật toán qua \wasm{}. Giai đoạn học hành xử rất khác: bộ phát hiện
-điểm-góc mất $547$\,ms trên WebGPU so với $335$\,ms của provider Native
-NNAPI, một khoảng cách $1,6\times$ nhỏ hơn nhiều so với mức chậm
-$16,9\times$ trên CPU của suy luận học sâu trên trình duyệt được báo cáo
-trong công trình trước~\cite{wang2024}, cho thấy WebGPU đã là một bộ tăng
-tốc hữu hiệu. Vì khoảng cách CV vượt khoảng cách suy luận và giai đoạn CV
-chạy trên mọi phiếu bất kể bộ phát hiện, đòn bẩy bậc nhất cho độ trễ Web
-Edge là runtime CV trên \wasm{}, chứ không phải backend của bộ phát hiện.
+Bằng chứng rõ nhất là một so sánh cùng-thiết-bị, cùng-ranh-giới trên Redmi. Với
+lõi CV (toàn bộ chuẩn hóa hai giai đoạn, cắt lại, lấy ngưỡng và đọc ô tô, đo phía
+worker), Native Android cần $191$\,ms trong khi bản Mobile Web cần $503$\,ms, một
+khoảng cách $2.6\times$ dưới cùng ranh giới giai đoạn, quy về ngăn xếp thực thi
+trình duyệt/\wasm{} cùng với các khác biệt ở mức bản dựng như bố cục bộ nhớ, lập
+lịch SIMD và cách hiện thực OpenCV. Giai đoạn học máy thì hành xử rất khác: bộ
+phát hiện dấu góc mất $547$\,ms trên WebGPU so với $335$\,ms cho execution
+provider NNAPI của Native, một khoảng cách $1.6\times$ nhỏ hơn nhiều so với mức
+chậm $4.9\times$ phía GPU được báo cáo cho suy luận học sâu trên trình duyệt trong
+công trình trước~\cite{wang2024}, cho thấy WebGPU có thể là một bộ tăng tốc phía
+trình duyệt hiệu quả cho khối lượng công việc này. Vì khoảng cách CV vượt khoảng
+cách suy luận ở cả mức tương đối ($2.6\times$ so với $1.6\times$) lẫn tuyệt đối
+($312$ so với $212$\,ms), và vì một lõi nhận dạng CV tất định vẫn nằm trên mọi
+phiếu ngay cả khi việc định vị được chuyển đi, đòn bẩy bậc nhất cho độ trễ Web
+Edge là runtime CV \wasm{}, dù bộ phát hiện vẫn là một chi phí tuyệt đối đáng kể
+trên điện thoại và còn tăng thêm dưới các execution provider CPU
+(Bảng~\ref{tab:stage-mini}).
 
 \begin{figure}[!b]
   \centering
   \includegraphics[width=\columnwidth]{figures/fig1_latency.pdf}
-  \caption{Độ trễ mỗi phiếu theo nền tảng và cấu hình ($N{=}185$, thang
-  log). Cột Web là thời gian worker đầy đủ (\texttt{worker\_total\_ms}, gồm
-  suy luận corner trên WebGPU); cột Native là \texttt{e2e\_ms} dựa trên tệp.}
+  \caption{Độ trễ trung bình theo từng phiếu theo nền tảng và cấu hình ($N{=}185$,
+thang log). Các cột Web thể hiện thời gian tường phía worker, bao gồm suy luận dấu
+góc trên WebGPU; các cột Native thể hiện thời gian đầu-cuối dựa trên tệp. Các ranh
+giới này không phải là tỉ số tốc độ trực tiếp; các tỉ số cùng ranh giới được báo
+cáo trong Mục~\ref{sec:latency}. Trên Redmi Web, bản lai làm tăng thời gian tường
+phía worker thêm $20\%$ ($680\to817$\,ms).}
+
   \label{fig:latency}
 \end{figure}
 
-Ngân sách thời gian của Native củng cố sự quy gán này và, nhờ chuyển đường
-góc sang, xóa bỏ khoảng cách độ chính xác Native trước đây
-(Bảng~\ref{tab:stage-mini}). Loại bỏ lần ghi JPEG gỡ lỗi, lõi CV Native
-chạy trong $89$\,ms \texttt{cpp}, nhanh hơn $5,7\times$ so với cùng giai
-đoạn biên dịch sang \wasm{} ($503$\,ms trên thiết bị này); nhưng bước dò
-mốc CV thủ công sụp đổ trên các ảnh nền tối \texttt{dataset\_4/5}, nơi các
-dấu góc in mờ bị bỏ sót, giữ nhận dạng CV ở mức $87,2\%$. Chuyển đúng công
-thức điểm-góc sang Native --- cùng mô hình corner một-lớp, cùng cách sắp
-xếp góc hình học, và cùng homography --- khép lại khoảng cách đó: pipeline
-corner Native nhận dạng đúng $99,44\%$ câu trên cả hai thiết bị Native
-(Redmi và Poco Pad), ngang với hệ lai Web ($99,45\%$) và đúng trên cả năm
-tập con kể cả các phiếu tối, với chi phí suy luận $335$\,ms dưới NNAPI và
-$530$\,ms trên bốn luồng CPU trên Redmi. So sánh tương đương,
-bộ phát hiện corner chỉ chậm hơn $1,6\times$ trên WebGPU ($547$\,ms) so với
-NNAPI ($335$\,ms), trong khi lõi CV chậm hơn $5,7\times$ trên \wasm{} so với
-native; khoảng cách web-so-với-native do đó dồn vào runtime CV trên \wasm{},
-chứ không vào bộ phát hiện đã tăng tốc bằng GPU. Native vì vậy giữ độ trễ
-đầu-cuối thấp hơn trong khi nay đã ngang bằng độ chính xác nhận dạng với
-bản Web qua đường điểm-góc chung.
+Ngân sách thời gian phía Native củng cố cho phân bổ này
+(Bảng~\ref{tab:stage-mini}). Khi toàn bộ pipeline CV được chuyển sang (chuẩn hóa
+hai giai đoạn, lượt cắt lại dấu góc Stage-2, lấy ngưỡng và đọc ô tô), lõi CV
+Native chạy trong $191$\,ms và nhận dạng đúng $97.75\%$ số câu. Khoảng cách còn
+lại so với nhánh Web CV ($99.03\%$) không phải là giới hạn của bộ nhận dạng lưới
+cố định mà là của khâu tiền xử lý dấu góc nhạy với bản dựng: nó gói gọn trong ba
+ảnh độ tương phản thấp, bị nén lại, nơi mức xám của dấu nằm sát ngưỡng phát hiện,
+nên việc thu nhỏ và lấy ngưỡng của OpenCV-Android lệch khỏi các kernel tùy chỉnh
+của bản dựng Web vài mức xám và loại bỏ một dấu. Nhánh dấu góc tránh được kiểu
+thất bại theo từng tập con này: khi chuyển sang Native nó đạt $99.44\%$ trên cả
+hai thiết bị (Redmi và Poco Pad), ngang với bản lai Web ($99.46\%$) và bền vững
+qua cả năm tập con, kể cả tập con độ tương phản thấp. Native giữ độ trễ thấp hơn
+trong khi nhánh dấu góc dùng chung mang lại độ chính xác tương đương, bền vững qua
+các nền tảng.
 
-\begin{table}[t]
-\caption{Nhận dạng và độ trễ Native Redmi theo cấu hình ($N{=}185$, trung vị
-ms). Độ chính xác nay đã căn khớp chân trị qua đường điểm-góc chung.}
+\begin{table}[!htb]
+\caption{Nhận dạng và độ trễ trên Redmi Native theo cấu hình ($N{=}185$, trung vị
+ms). Độ chính xác được đánh giá dựa trên nhãn chuẩn đã rà soát.}
 \label{tab:stage-mini}
 \centering
 \setlength{\tabcolsep}{6pt}
 \footnotesize
 \begin{tabular}{lcccc}
 \toprule
-\textbf{Cấu hình} & \textbf{ĐCX câu} & \textbf{ORT} & \textbf{cpp} & \textbf{e2e} \\
+\textbf{Cấu hình} & \textbf{ĐCX câu} & \textbf{ORT} & \textbf{Pipeline} & \textbf{e2e} \\
 \midrule
-CV            & 87,2\%           & --  & 89   & 115  \\
-Corner NNAPI  & \textbf{99,44\%} & 335 & 476  & 496  \\
-Corner CPU-4T & \textbf{99,44\%} & 530 & 713  & 741  \\
-Corner CPU-1T & \textbf{99,44\%} & 956 & 1132 & 1166 \\
+CV              & 97.75\%         & --  & 191  & 227  \\
+Corner NNAPI    & \textbf{99.44\%} & 335 & 476  & 502  \\
+Corner CPU-4T   & \textbf{99.44\%} & 530 & 713  & 750  \\
+Corner CPU-1T   & \textbf{99.44\%} & 956 & 1132 & 1174 \\
 \bottomrule
 \end{tabular}
+
 \vspace{2pt}
 \parbox{\columnwidth}{\footnotesize
-\texttt{cpp} là lõi OMR C\texttt{++} (gồm cả suy luận mô hình corner ở các
-hàng Corner); \texttt{e2e} cộng thêm giải mã JPEG (lần ghi JPEG gỡ lỗi,
-không có trong bản thực tế, đã bị loại); ORT là thời gian suy luận ONNX
-Runtime đo được. CV nhanh nhưng dò mốc thất bại trên các phiếu tối
-\texttt{dataset\_4/5}; đường corner căn khớp chân trị và đúng trên mọi tập con.}
+\texttt{Pipeline} là thời gian xử lý OMR native; với các dòng Corner nó bao gồm
+suy luận ORT cộng phần xử lý OMR sau suy luận. \texttt{e2e} cộng thêm giải mã JPEG
+(thao tác ghi JPEG chỉ để gỡ lỗi, không có trong sản phẩm, bị loại); ORT là thời
+gian suy luận ONNX Runtime đo được. Dòng CV dùng toàn bộ pipeline đã chuyển sang
+gồm cả lượt cắt lại Stage-2 ($97.75\%$); nhánh dấu góc được đánh giá dựa trên cùng
+nhãn chuẩn đã rà soát và bền vững qua mọi tập con.}
 \end{table}
 
-Bên trong trình duyệt, hệ lai theo điểm-góc tái định hình cơ cấu chi phí
-chứ không chỉ cộng thêm vào. Bảng~\ref{tab:latency} liệt kê \texttt{cpp\_ms}
-mỗi phiếu cho cả hai pipeline trên sáu thiết bị; trên ba thiết bị đo theo
-giao thức điểm-góc, mỗi cái là trung vị năm lần chạy, hai hiệu ứng lặp lại.
-Thứ nhất, hai pipeline đạt cùng độ chính
-xác --- CV ở 99,03\% và hệ lai ở 99,45--99,46\% --- nên việc chọn bộ định vị
-là trung tính về độ chính xác và hệ lai có giá trị ở mặt khác. Thứ hai,
-đường theo góc giảm gần một nửa \texttt{cpp\_ms} của C\texttt{++}, vì đưa
-hình học bốn điểm chính xác vào homography cho phép lõi bỏ qua cả bước dò
-blob lẫn bước dò lại mốc lần hai: lõi giảm từ $503$ xuống $249$\,ms trên
-Redmi, từ $343$ xuống $166$\,ms trên Poco Pad, và từ $325$ xuống $138$\,ms
-trên Vivobook. Việc này có cho ra pipeline nhanh hơn hay không thì tùy
-thiết bị: trên Vivobook khoản tiết kiệm C\texttt{++} vượt chi phí suy luận
-WebGPU và thời gian worker giảm từ $379$ xuống $278$\,ms, còn trên điện
-thoại suy luận corner $450$--$550$\,ms chi phối và thời gian worker tăng
-(Redmi $685\to803$\,ms). Như vậy hệ lai dời việc định vị khỏi lõi C\texttt{++}
-tất định sang GPU ở cùng độ chính xác, đánh đổi độ trễ suy luận lấy một giai
-đoạn CV nhẹ hơn.
+Bên trong trình duyệt, bản lai dấu góc tái cấu trúc lại cấu trúc chi phí chứ không
+chỉ cộng thêm vào (Bảng~\ref{tab:latency}, trung vị năm lần chạy). Việc đưa hình
+học bốn điểm do bộ phát hiện cấp vào phép homography cho phép lõi C\texttt{++} bỏ
+qua cả việc phát hiện blob lẫn lượt dò lại dấu góc thứ hai, gần như giảm một nửa
+độ trễ theo từng phiếu: $503\to249$\,ms trên Redmi, $343\to166$ trên Poco Pad, và
+$325\to138$ trên Vivobook. Việc toàn bộ pipeline có nhanh hơn hay không thì tùy
+thiết bị: trên Vivobook phần tiết kiệm ở C\texttt{++} lớn hơn phần suy luận WebGPU
+thêm vào (thời gian worker $414\to284$\,ms), trong khi trên điện thoại phần suy
+luận dấu góc $450$--$550$\,ms chiếm ưu thế và thời gian worker tăng lên (Redmi
+$680\to817$\,ms). Như vậy bản lai chuyển việc định vị ra khỏi lõi tất định và sang
+GPU, đánh đổi độ trễ suy luận lấy một giai đoạn CV nhẹ hơn với một mức tăng độ
+chính xác nhỏ.
 
-\begin{table}[t]
-\caption{Độ trễ lõi C\texttt{++} mỗi phiếu (\texttt{cpp\_ms}), chỉ-CV so với
-hệ lai theo điểm-góc, trên sáu thiết bị Web.}
+\begin{table}[!htb]
+\caption{Độ trễ lõi C\texttt{++} theo từng phiếu (ms), chỉ-CV so với bản lai dấu
+góc, qua năm cấu hình trình duyệt/thiết bị.}
 \label{tab:latency}
 \centering
 \setlength{\tabcolsep}{6pt}
@@ -646,47 +574,41 @@ hệ lai theo điểm-góc, trên sáu thiết bị Web.}
 \toprule
 \textbf{Thiết bị} & \textbf{Ngăn xếp} & \textbf{CV} & \textbf{Lai} \\
 \midrule
+Desktop (t.chiếu) & Win/Blink     & 170 & 49  \\
 Vivobook     & Win/Blink     & 325 & 138 \\
+Nitro~5      & Win/Blink     & 344 & 94  \\
 Poco Pad     & Android/Blink & 343 & 166 \\
 Redmi        & Android/Blink & 503 & 249 \\
-Desktop t.c. & Win/Blink     & 248 & 246 \\
-Mac M1       & macOS/Blink   & 240 & 240 \\
-iPhone~16    & iOS/WebKit    & 160 & 165 \\
 \bottomrule
 \end{tabular}
+
 \vspace{2pt}
 \parbox{\columnwidth}{\footnotesize
-\texttt{cpp\_ms} là lõi OMR C\texttt{++}. Hệ lai chạy thêm bộ phát hiện
-corner trên WebGPU, mà suy luận cộng thêm $\approx140$\,ms (laptop) tới
-$\approx550$\,ms (điện thoại) và được tính vào tổng thời gian worker ở
-Hình~\ref{fig:latency}. Ba thiết bị đầu là trung vị năm lần chạy theo giao
-thức điểm-góc ($N{=}185$); Desktop, Mac và iPhone từ một vòng đo trước. Độ
-chính xác đồng nhất theo thiết bị: CV 99,03\%, hệ lai 99,45\%
-(Bảng~\ref{tab:accuracy}).}
+Thời gian lõi C\texttt{++} phía worker. Bản lai còn chạy thêm bộ phát hiện WebGPU
+(suy luận $\approx90$\,ms ở desktop tới $\approx550$\,ms ở điện thoại, đã gộp vào
+thời gian tường phía worker trong Hình~\ref{fig:latency}). Năm máy theo giao thức
+dấu góc là trung vị năm lần chạy ($N{=}185$). Nhận dạng đồng nhất giữa các thiết
+bị (CV 99.03\%, lai 99.46\%).}
 \end{table}
-
 \FloatBarrier
-
-\subsection{Sử dụng tài nguyên hệ thống}
+\subsection{Mức sử dụng tài nguyên hệ thống}
 \label{sec:resources}
 
-Mức tiêu thụ tài nguyên vẫn bị chặn trong suốt lượt chạy liên tục
-(Bảng~\ref{tab:resources}, Hình~\ref{fig:cross_platform}), dù các con số
-CPU phải đọc thận trọng vì đơn vị phụ thuộc công cụ: các hàng Windows báo
-cáo CPU\% của tiến trình render, các hàng Mac, iOS và Android Web báo cáo
-proxy vòng-lặp-sự-kiện trong trang, còn các hàng Native báo cáo một bộ lấy
-mẫu Android theo thang $800\%$ trên SoC tám nhân. Đỉnh bộ nhớ Web lớn nhất
-quan sát được là khoảng $1,3$\,GB, trên các máy desktop tham chiếu và lớp
-Vivobook chạy Windows Chrome, trong khi bản dựng Native đạt đỉnh $514$\,MB
-cho CV và $622$\,MB cho YOLO. Tuy các giá trị này chứng tỏ pipeline khả
-thi trên phần cứng tầm trung, chúng cố ý không được trình bày như các tỉ
-số hiệu suất CPU trực tiếp, vì không một công cụ đơn lẻ nào trải khắp mọi
-nền tảng.
+Mức sử dụng tài nguyên vẫn trong tầm kiểm soát (Bảng~\ref{tab:resources}), dù các
+giá trị CPU và bộ nhớ là đặc thù theo công cụ. Các dòng Windows báo cáo CPU\% và
+RSS của tiến trình renderer, trong khi Android Web và Native dùng một bộ lấy mẫu
+adb/trong-ứng-dụng trên thang $800\%$. Đỉnh bộ nhớ Web dao động từ khoảng
+$1.0$--$1.3$\,GB trên Chrome Windows tới $2.3$\,GB trên Nitro~5. Trên Redmi, RAM
+Native lấy mẫu được cao hơn RAM Web lấy mẫu được, nhưng điều này phản ánh ranh
+giới đo lường: bộ lấy mẫu native báo cáo PSS toàn tiến trình, trong khi bộ lấy mẫu
+trình duyệt chỉ bắt được tiến trình renderer và có thể bỏ sót các cấp phát ở tiến
+trình GPU dưới WebGPU. Do đó chúng tôi coi các số đo này là bằng chứng khả thi
+mang tính tham khảo chứ không phải các tỉ số hiệu quả.
 
-\begin{table}[!t]
-\caption{Tóm tắt tài nguyên qua lượt chạy liên tục $N{=}185$. Ô CPU là
-trung bình/đỉnh theo đơn vị gốc của công cụ; ô RAM là đỉnh CV/YOLO theo
-MB.}
+\begin{table}[!htb]
+\caption{Tóm tắt tài nguyên trên toàn lần chạy liên tục $N{=}185$. Ô CPU là
+trung bình/đỉnh theo đơn vị gốc của công cụ; ô RAM là đỉnh CV/lai tính bằng MB.
+Chỉ mang tính khả thi tham khảo; các đơn vị không so sánh được giữa các công cụ.}
 \label{tab:resources}
 \centering
 \scriptsize
@@ -694,98 +616,80 @@ MB.}
 \resizebox{\columnwidth}{!}{%
 \begin{tabular}{lcccl}
 \toprule
-\textbf{Máy} & \textbf{CPU CV} & \textbf{CPU YOLO}
+\textbf{Máy} & \textbf{CPU (CV)} & \textbf{CPU (Lai)}
 & \textbf{RAM} & \textbf{Công cụ} \\
 \midrule
-Desktop & $60.5/168.7\%$ & $55.7/76.5\%$ & $1{,}310/984$ & psutil \\
+Desktop & $169/226\%$ & $130/248\%$ & $1{,}139/1{,}343$ & psutil \\
 Vivobook & $156/250\%$ & $248/331\%$ & $1{,}093/1{,}035$ & psutil \\
-M1 Mac & $0.59/0.89$ & $0.67/0.85$ & $1{,}073/248$ & proxy \\
-iPhone~16 & $0.04/0.84$ & $0.21/0.83$ & $147/147$ & proxy \\
+Nitro~5 & $159/219\%$ & $67/117\%$ & $2{,}318/2{,}089$ & psutil \\
 Poco Pad M1 & $126/200\%$ & $94/151\%$ & $223/213$ & sampler \\
-Redmi Web & $177/271\%$ & $144/213\%$ & $254/216$ & sampler \\
-Native & $341/431\%$ & $98/393\%$ & $514/622$ & sampler \\
+Redmi Web & $177/271\%$ & $93/213\%$ & $254/216$ & sampler \\
+Native (Redmi) & $360/538\%$ & $98/393\%$ & $510/622$ & sampler \\
 \bottomrule
 \end{tabular}}
-\vspace{1pt}
+
+\vspace{2pt}
 \parbox{\columnwidth}{\footnotesize
-Các máy Windows dùng CPU\% tiến trình render và RSS-MB của \texttt{psutil};
-Mac/iPhone dùng proxy vòng-lặp-sự-kiện trong trang (Safari giấu telemetry
-heap đầy đủ nên bộ nhớ là cận dưới); Android Web và Native dùng bộ lấy mẫu
-adb/trong-ứng-dụng báo cáo CPU\% trên thang $800$ và PSS-MB. Cột CV/YOLO
-của Android-Web là chỉ-CV so với hệ lai theo điểm-góc; YOLO Native là
-provider NNAPI. Đơn vị không thể so sánh chéo giữa các công cụ.}
+Các máy Windows dùng \texttt{psutil} báo CPU\% renderer và RSS-MB; Android Web và
+Native dùng một bộ lấy mẫu adb/trong-ứng-dụng báo CPU\% trên thang $800$ và PSS-MB.
+Các cột CV/Lai của Android-Web là chỉ-CV so với bản lai dấu góc; Native dùng
+execution provider NNAPI.}
 \end{table}
 
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=\columnwidth]{figures/chart_cross_platform.pdf}
-  \caption{Vết bộ nhớ và CPU kết hợp cho pipeline CV truyền thống. Bộ nhớ
-  Web ổn định sớm, trong khi CPU Native dùng nhiều nhân theo từng đợt.}
-  \label{fig:cross_platform}
-\end{figure}
-
-Các vết này cũng làm rõ vì sao một chỉ số CPU trình duyệt thấp hơn không
-nên bị nhầm là thông lượng cao hơn. Worker Web có xu hướng nằm trong một
-phong bì thực thi hẹp, gần như đơn nhân, chính vì lõi CV tất định được
-biên dịch vào \wasm{} và tuần tự hóa qua mô hình bộ nhớ của nó, trong khi
-OpenCV bản địa rút nhiều CPU lấy mẫu hơn nhưng biến những đợt bùng đó
-thành độ trễ thấp hơn nhờ đa luồng bản địa và truy cập bộ nhớ trực tiếp.
-Hàm ý nhất quán với phân tích độ trễ: mức tài nguyên bị chặn khẳng định
-khả năng triển khai, nhưng tính cạnh tranh về độ trễ vẫn phụ thuộc vào
-việc giảm chính chi phí CV trên \wasm{}.
+Một mức đọc CPU trình duyệt thấp hơn không hàm ý thông lượng cao hơn: worker
+\wasm{} ở gần mức một lõi, trong khi OpenCV Native chuyển mức CPU lấy mẫu cao hơn
+thành độ trễ thấp hơn nhờ đa luồng native.
 
 \subsection{Các mối đe dọa đến tính hợp lệ}
 \label{sec:threats}
 \begin{enumerate}[label=(\roman*), leftmargin=*, itemsep=1pt, topsep=2pt]
-  \item Các công cụ đo CPU/RAM khác nhau giữa các nền tảng, nên các giá
-  trị tài nguyên được báo cáo theo đơn vị gốc của chúng và dùng để diễn
-  giải xu hướng chứ không phải các tỉ số trực tiếp giữa các công cụ.
-  \item Sản phẩm độ chính xác có giám sát phủ một bộ sưu tập 179 phiếu
-  khuôn mẫu cố định. Đây là phạm vi khối lượng công việc dự kiến chứ không
-  phải một tuyên bố về OMR bố cục tùy ý; dữ liệu tách biệt theo người viết
-  và điều kiện chụp rộng hơn là phần kiểm định trong tương lai.
-  \item Web và Native dùng các giai đoạn thuật toán khớp ở mức mã nguồn,
-  nhưng bản dựng OpenCV, thứ tự dấu phẩy động và bố cục bộ nhớ vẫn khác, nên
-  đầu ra không giống hệt từng bit. Đường điểm-góc chung đạt ngang bằng trên
-  Native ($99,44\%$ so với $99,45\%$); ngược lại, đường chỉ-CV của Native
-  vẫn mất các phiếu tối \texttt{dataset\_4/5} ($87\%$) vì bước dò mốc thủ
-  công của nó kém bền hơn so với bản Web.
-  \item Bộ phát hiện theo điểm-góc được huấn luyện trên 185 phiếu
-  (mAP$@0.5\approx 0.99$ trên tập kiểm định) rút từ một bộ sưu tập khuôn mẫu
-  cố định; do các nhãn góc này bao gồm cả các phiếu đánh giá, con số 99,45\%
-  phản ánh độ khớp định-vị-mốc trên khuôn mẫu này chứ không phải khả năng
-  tổng quát hóa trên người viết tách biệt.
-  \item Độ trễ Web trên các laptop bị giới hạn nhiệt nhạy cảm với chế độ
-  nguồn và trạng thái nhiệt của máy. Trên Vivobook (i5-13500H) chúng tôi
-  quan sát được độ phân tán \texttt{cpp\_ms} mỗi phiếu lên tới
-  $\approx 2\times$ qua các lần chạy High-Performance lặp lại, do điều
-  tiết xung nhịp CPU/GPU chứ không phải thay đổi thuật toán (đầu ra nhận
-  dạng giống hệt từng bit qua các lần chạy). Do đó mọi thiết bị trong
-  Bảng~\ref{tab:latency} được báo cáo dưới dạng trung vị năm lần chạy, và so
-  sánh Web-vs-Native được thực hiện trên cùng thiết bị Redmi để tránh yếu
-  tố gây nhiễu này.
+  \item Các công cụ đo CPU/RAM khác nhau giữa các nền tảng, nên các giá trị tài
+nguyên mang tính tham khảo chứ không phải các tỉ số hiệu quả so sánh được. Các
+bảng độ trễ cấp giai đoạn báo cáo trung vị ở trạng thái ổn định sau khi khởi
+động, trong khi các cột trong hình cấp triển khai báo cáo giá trị trung bình theo
+từng phiếu; việc tải tài nguyên/mô hình lúc khởi động nguội bị loại trừ.
+  \item Sản phẩm độ chính xác có giám sát bao phủ một bộ sưu tập mẫu cố định 185
+  phiếu. Đây là phạm vi khối lượng công việc dự kiến chứ không phải một tuyên bố
+  về OMR bố cục tùy ý; các điều kiện chụp rộng hơn vẫn còn là phần kiểm chứng
+  tương lai.
+  \item Web và Native dùng chung các giai đoạn ở mức mã nguồn nhưng khác nhau ở
+  bản dựng OpenCV, thứ tự dấu phẩy động và bố cục bộ nhớ, nên đầu ra không giống
+  hệt từng bit. Tuy vậy nhánh dấu góc chuyển sang với độ ngang bằng ($99.44\%$ so
+  với $99.46\%$); khoảng cách còn lại của riêng nhánh CV truy về khâu tiền xử lý
+  dấu góc nhạy với bản dựng (Mục~\ref{sec:latency}).
+  \item Bộ phát hiện huấn luyện trên 85 phiếu ($68/17$); nhánh dấu góc giữ mức
+  $99.3\%$ trên 101 phiếu trả lời của học sinh chưa từng thấy trong benchmark, nên
+  con số $99.46\%$ trên toàn tập là một kết quả tập đóng, mẫu cố định. Đánh giá
+  tách rời theo người viết và đa mẫu vẫn còn là phần việc tương lai; chúng tôi
+  không tuyên bố khả năng tổng quát hóa ngoài bố cục này.
+  \item Độ trễ Web trên các laptop bị giới hạn nhiệt nhạy cảm với trạng thái nguồn
+  và nhiệt: trên Vivobook chúng tôi thấy độ trễ C\texttt{++} theo từng phiếu chênh
+  tới khoảng $\approx 2\times$ giữa các lần chạy (đầu ra giống hệt từng bit). Do
+  đó các máy theo giao thức dấu góc được lấy trung vị năm lần chạy, và so sánh
+  Web-so-với-Native dùng cùng một thiết bị Redmi.
 \end{enumerate}
 
 \section{Kết luận}
 
-OMR Web Edge cho thấy vừa chính xác vừa khả triển khai, song độ trễ của nó
-được quyết định bởi cách các giai đoạn cân bằng chứ không phải bởi riêng
-suy luận. Đường CV Web đã rà soát đạt độ chính xác câu hỏi 99,03\%, và một
-bộ phát hiện YOLO theo điểm-góc đưa thẳng bốn điểm mốc dự đoán vào
-homography ngang bằng con số đó ở 99,45\% trên ba thiết bị và, khi chuyển
-sang Native, đạt cùng $99,44\%$, đồng thời dời việc định vị lên GPU và loại
-bỏ bước dò mốc thủ công. Về độ trễ, số hạng web-so-với-native chủ đạo là
-giai đoạn CV trên \wasm{}: trên cùng thiết bị Redmi, $503$\,ms của nó gấp
-$5,7\times$ lõi bản địa $89$\,ms, một khoảng cách lớn hơn nhiều so với
-$1,6\times$ giữa WebGPU và NNAPI cho cùng bộ phát hiện. Native Android do
-đó vẫn là phương án nhanh hơn --- nay ở cùng độ chính xác --- trong khi Web
-Edge đánh đổi độ trễ ấy lấy quyền riêng tư và khả năng tiếp cận không cần
-cài đặt.
-Thu hẹp khoảng cách còn lại rốt cuộc là vấn đề của việc tăng tốc CV qua
-trình duyệt và một runtime \wasm{} tinh gọn hơn, chứ không phải một bộ
-phát hiện nhanh hơn.
+Benchmark này cho thấy Web Edge OMR có thể vừa chính xác vừa khả thi để triển khai
+cho chấm điểm mẫu cố định, nhưng độ trễ của nó được quyết định bởi cách các giai
+đoạn cân bằng với nhau chứ không phải chỉ bởi suy luận. Nhánh Web CV đạt 99.03\%
+độ chính xác theo câu hỏi và bản lai dấu góc đạt 99.46\% qua năm thiết bị, ngang
+mức $99.44\%$ khi chuyển sang Native. Bộ phát hiện học máy chỉ thêm một mức tăng
+độ chính xác nhỏ nhưng được hỗ trợ về mặt thống kê, tập trung ở các ảnh chụp độ
+tương phản thấp. Về độ trễ, số hạng web-so-với-native chủ đạo là giai đoạn CV
+\wasm{}: trên cùng máy Redmi, $503$\,ms của nó gấp $2.6\times$ lõi native $191$\,ms,
+một khoảng cách lớn hơn so với $1.6\times$ giữa WebGPU và NNAPI cho cùng bộ phát
+hiện. Do đó Native vẫn là phương án triển khai nhanh hơn ở mức độ chính xác tương
+đương, trong khi Web Edge đổi độ trễ đó lấy quyền riêng tư và khả năng tiếp cận
+không cần cài đặt. Việc thu hẹp khoảng cách chủ yếu đòi hỏi một runtime CV \wasm{}
+gọn nhẹ hơn với khả năng truy cập tốt hơn của trình duyệt tới tăng tốc CV, trong
+khi các triển khai lai trên di động cũng sẽ hưởng lợi từ suy luận bộ phát hiện nhẹ
+hơn.
 
-\begin{thebibliography}{11}
+
+\begin{thebibliography}{12}
+\setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}\scriptsize
 
 \bibitem{patel2015}
 R.~Patel, S.~Sanghavi, D.~Gupta, and M.~S.~Raval,
@@ -827,9 +731,8 @@ doi: 10.1109/ACCESS.2025.3600106.
 
 \bibitem{microsoft2021}
 Microsoft,
-``ONNX Runtime Web,'' Sep.~2021.
-[Online]. Available:
-\url{https://opensource.microsoft.com/blog/2021/09/02/onnx-runtime-web-running-your-machine-learning-model-in-browser/}
+``ONNX Runtime Web,'' 2021.
+[Online]. Available: \url{https://onnxruntime.ai/}
 
 \bibitem{jangda2019}
 A.~Jangda, B.~Powers, E.~Berger, and A.~Guha,
@@ -842,11 +745,15 @@ Q.~Wang \textit{et al.},
 \textit{ACM Trans. Softw. Eng. Methodol.}, vol.~34, no.~2,
 Art.~no.~47, 2024, doi: 10.1145/3688843.
 
-\bibitem{webnn2024}
-W3C Machine Learning Working Group,
-``Web Neural Network API,'' W3C Candidate Recommendation,
-22~Jan.~2026.
-[Online]. Available: \url{https://www.w3.org/TR/webnn/}
+\bibitem{webnn2026}
+W3C,
+``Web Neural Network API,'' Candidate Recommendation, 2026.
+\url{https://www.w3.org/TR/webnn/}
+
+\bibitem{webgpu2025}
+W3C GPU for the Web Working Group,
+``WebGPU,'' Candidate Recommendation, 2025.
+\url{https://www.w3.org/TR/webgpu/}
 
 \end{thebibliography}
 
