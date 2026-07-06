@@ -832,8 +832,9 @@
         display: block;
       }
 
+      /* Let each pane hug its content — no leftover blank space at the bottom. */
       .pane {
-        min-height: 360px;
+        min-height: 0;
         border-right: 0;
         border-bottom: 1px solid var(--line);
         overflow: hidden;
@@ -841,11 +842,6 @@
 
       .pane-body {
         overflow-x: hidden;
-      }
-
-      /* Size the preview to the scanned image so there is no dead space below it. */
-      .pane.preview {
-        min-height: 0;
       }
 
       .preview-frame {
