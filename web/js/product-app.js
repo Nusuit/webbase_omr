@@ -1278,7 +1278,8 @@ function renderRecordPreview(record, type) {
   if (!record || !record.previewImage) {
     canvas.width = 850;
     canvas.height = 1200;
-    wrap.style.setProperty("--preview-ar", "850 / 1200");
+    // Short placeholder on mobile — no point reserving a full-page blank box.
+    wrap.style.setProperty("--preview-ar", "2 / 1");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     return;
   }

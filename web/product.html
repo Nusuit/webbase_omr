@@ -751,6 +751,17 @@
       white-space: nowrap;
     }
 
+    /* Empty state inside the results table: plain centered text, no box. */
+    td.empty {
+      display: table-cell;
+      border: 0;
+      border-radius: 0;
+      min-height: 0;
+      padding: 30px 12px;
+      text-align: center;
+      vertical-align: middle;
+    }
+
     @media (max-width: 1100px) {
       .workspace {
         grid-template-columns: 280px minmax(320px, 1fr);
@@ -851,7 +862,8 @@
 
       .canvas-wrap {
         min-height: 0;
-        aspect-ratio: var(--preview-ar, 850 / 1200);
+        /* Default is a short placeholder; JS sets the real image ratio on select. */
+        aspect-ratio: var(--preview-ar, 2 / 1);
       }
 
       .answer-grid {

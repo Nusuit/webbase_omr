@@ -12,7 +12,7 @@
  *
  * Bump CACHE_VERSION whenever any cached asset changes.
  */
-const CACHE_VERSION = "gradesnap-v4";
+const CACHE_VERSION = "gradesnap-v5";
 const CACHE_NAME = `${CACHE_VERSION}-app`;
 
 const SHELL_ASSETS = [
