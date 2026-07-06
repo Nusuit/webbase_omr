@@ -1,6 +1,7 @@
 const state = {
   worker: null,
   ready: false,
+  // Fixed engine: hybrid AI corner (YOLO corner detection + C++/WASM grading).
   engine: "corner",
   keyFiles: [],
   sheetFiles: [],
@@ -27,12 +28,12 @@ const els = {
   status: document.getElementById("status"),
   keyInput: document.getElementById("keyInput"),
   sheetInput: document.getElementById("sheetInput"),
-  engineSelect: document.getElementById("engineSelect"),
   questionCountInput: document.getElementById("questionCountInput"),
   scanKeysBtn: document.getElementById("scanKeysBtn"),
   scanSheetsBtn: document.getElementById("scanSheetsBtn"),
   exportCsvBtn: document.getElementById("exportCsvBtn"),
   exportJsonBtn: document.getElementById("exportJsonBtn"),
+  clearSessionBtn: document.getElementById("clearSessionBtn"),
   keyCount: document.getElementById("keyCount"),
   sheetCount: document.getElementById("sheetCount"),
   progressFill: document.getElementById("progressFill"),
@@ -52,6 +53,123 @@ const els = {
   answerReviewPanel: document.getElementById("answerReviewPanel")
 };
 
+// ── Session persistence (IndexedDB) ─────────────────────────────────────────
+// Scanned keys/results survive a reload or a killed mobile tab. Records are
+// plain data (answers, masks, previewImage dataUrl), so they clone directly.
+const SESSION_DB = "gradesnap-session";
+const SESSION_STORE = "session";
+
+function openSessionDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(SESSION_DB, 1);
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains(SESSION_STORE)) {
+        req.result.createObjectStore(SESSION_STORE);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function sessionTx(db, mode, run) {
+  const tx = db.transaction(SESSION_STORE, mode);
+  const result = run(tx.objectStore(SESSION_STORE));
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve(result);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+let persistTimer = null;
+function persistState() {
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    persistStateNow().catch((error) => console.warn("Session save failed:", error));
+  }, 600);
+}
+
+async function persistStateNow() {
+  const db = await openSessionDb();
+  try {
+    await sessionTx(db, "readwrite", (store) => {
+      store.put({
+        savedAt: Date.now(),
+        questionCount: state.questionCount,
+        keys: state.keys,
+        results: state.results
+      }, "current");
+    });
+  } finally {
+    db.close();
+  }
+}
+
+async function restoreSession() {
+  try {
+    const db = await openSessionDb();
+    let saved = null;
+    try {
+      await sessionTx(db, "readonly", (store) => {
+        const req = store.get("current");
+        req.onsuccess = () => { saved = req.result; };
+      });
+    } finally {
+      db.close();
+    }
+    if (!saved || ((saved.keys || []).length === 0 && (saved.results || []).length === 0)) {
+      return false;
+    }
+    state.questionCount = saved.questionCount || 60;
+    els.questionCountInput.value = String(state.questionCount);
+    state.keys = saved.keys || [];
+    state.results = saved.results || [];
+    recomputeScores();
+    renderKeys();
+    renderResults();
+    renderReviewList();
+    updateActions();
+    if (state.results.length) selectRecord(state.results[0], "result");
+    else if (state.keys.length) selectRecord(state.keys[0], "key");
+    return true;
+  } catch (error) {
+    console.warn("Session restore failed:", error);
+    return false;
+  }
+}
+
+async function clearSession() {
+  state.keys = [];
+  state.results = [];
+  state.selected = null;
+  state.answerEditor = null;
+  renderKeys();
+  renderResults();
+  renderReviewList();
+  renderRecordPreview(null, null);
+  els.previewLabel.textContent = "No scan selected";
+  els.detailPanel.innerHTML = `
+    <div class="detail-title">
+      <span>No result</span>
+      <span class="badge">Idle</span>
+    </div>
+    <div class="empty">Processed sheets will appear here.</div>
+  `;
+  updateActions();
+  try {
+    const db = await openSessionDb();
+    try {
+      await sessionTx(db, "readwrite", (store) => store.delete("current"));
+    } finally {
+      db.close();
+    }
+    setStatus("Session cleared", "ok");
+  } catch (error) {
+    setStatus(`Session cleared (storage: ${error.message})`, "warn");
+  }
+}
+
 function setStatus(text, kind = "neutral") {
   els.status.textContent = text;
   els.status.style.color = kind === "ok" ? "var(--success)"
@@ -66,7 +184,6 @@ function setProgress(done, total) {
 }
 
 function workerUrl() {
-  if (state.engine === "cv") return "./js/worker-cv.js";
   return "./js/worker-yolo.js?det=corner";
 }
 
@@ -128,7 +245,7 @@ function initWorker() {
 }
 
 function engineLabel() {
-  return state.engine === "cv" ? "CV engine" : "AI corner engine";
+  return "AI corner engine";
 }
 
 function updateActions() {
@@ -267,6 +384,7 @@ function renderKeys() {
       recomputeScores();
       renderResults();
       updateActions();
+      persistState();
     });
     item.querySelector("[data-key-code]").addEventListener("change", () => renderKeys());
     bindManualFix(item, key);
@@ -290,6 +408,9 @@ function keyWarningHtml(key, analysis) {
   const alerts = [];
   if (key.manualError) {
     alerts.push(key.manualError);
+  }
+  if (!key.examCode.trim()) {
+    alerts.push("Exam code was not detected. Enter it in this key's Code field (General Information section) to activate the key.");
   }
   if (analysis.holes.length > 0) {
     const firstHole = analysis.holes[0];
@@ -373,6 +494,7 @@ function syncQuestionCountFromInput(announce = false) {
   updateActions();
   if (state.selected) renderDetail(state.selected.record, state.selected.type);
   if (announce) setStatus(`Questions set to ${count}`, "ok");
+  persistState();
   return true;
 }
 
@@ -399,6 +521,7 @@ function applyManualAnswers(key, text) {
     key.manualDraft = manualDraftForKey(key);
     key.manualError = null;
     setStatus(`Updated manual answers for ${key.fileName}`, "ok");
+    persistState();
   } catch (error) {
     key.manualError = error.message;
     setStatus(error.message, "bad");
@@ -470,6 +593,7 @@ function restoreDetectedAnswers(key) {
   key.manualDraft = manualDraftForKey(key);
   key.manualError = null;
   setStatus(`Restored detected answers for ${key.fileName}`, "ok");
+  persistState();
 }
 
 function renderResults() {
@@ -491,14 +615,14 @@ function renderResults() {
     tr.className = "result-row";
     tr.innerHTML = `
       <td class="file" title="${escapeHtml(row.fileName)}">${escapeHtml(row.fileName)}</td>
-      <td>${escapeHtml(row.mssv || "-")}</td>
+      <td class="col-mssv">${escapeHtml(row.mssv || "-")}</td>
       <td>${escapeHtml(row.examCode || "-")}</td>
-      <td>${stats.answered}/${stats.questionCount || "-"}</td>
-      <td>${row.reviewCount}</td>
+      <td class="col-answered">${stats.answered}/${stats.questionCount || "-"}</td>
+      <td class="col-review" title="${stats.suspicious} low-confidence answer(s)">${row.reviewCount}${stats.suspicious ? ` <span class="sus-note">+${stats.suspicious}?</span>` : ""}</td>
       <td class="score">${row.score === null ? "-" : row.score.toFixed(2)}</td>
       <td>${statusBadge(row.status)}</td>
     `;
-    tr.addEventListener("click", () => selectRecord(row, "result"));
+    tr.addEventListener("click", () => selectRecord(row, "result", { scroll: true }));
     els.resultRows.appendChild(tr);
   });
   renderReviewList();
@@ -507,10 +631,11 @@ function renderResults() {
 function statusBadge(status) {
   if (status === "OK") return `<span class="badge ok">OK</span>`;
   if (status === "No key") return `<span class="badge bad">No key</span>`;
+  if (status === "Check image") return `<span class="badge bad">Check image</span>`;
   return `<span class="badge warn">Review</span>`;
 }
 
-function selectRecord(record, type) {
+function selectRecord(record, type, opts = {}) {
   if (!state.selected || state.selected.record !== record || state.selected.type !== type) {
     state.answerEditor = null;
   }
@@ -519,6 +644,15 @@ function selectRecord(record, type) {
   renderRecordPreview(record, type);
   renderDetail(record, type);
   renderReviewList();
+  // On narrow screens the detail panel sits far above the results table, so an
+  // explicit user tap must bring it into view or the tap looks like a no-op.
+  if (opts.scroll && window.matchMedia("(max-width: 720px)").matches) {
+    if (els.answerReviewPanel.classList.contains("collapsed")) {
+      els.answerReviewPanel.classList.remove("collapsed");
+      els.answerReviewToggle.classList.remove("collapsed");
+    }
+    els.detailPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
 function renderDetail(record, type) {
@@ -538,7 +672,7 @@ function renderDetail(record, type) {
       ${badge}
     </div>
     <div style="color:var(--muted); font-size:13px; margin-bottom:10px;">${escapeHtml(subtitle)}</div>
-    ${type === "key" ? keyWarningHtml(record, keyAnalysis) : ""}
+    ${type === "key" ? keyWarningHtml(record, keyAnalysis) : resultFieldsHtml(record) + qualityAlertHtml(record)}
     <div class="answer-grid">
       ${record.answers.map((answer, idx) => {
         const label = answer.selected.length ? answer.selected.join("+") : "";
@@ -551,7 +685,51 @@ function renderDetail(record, type) {
     </div>
     ${answerEditorHtml(record, type)}
   `;
+  if (type === "result") bindResultFields(record);
   bindAnswerGrid(record, type);
+}
+
+// Editable MSSV / exam code for a processed sheet, so a misread code can be
+// fixed in place instead of leaving the sheet stuck at "No key".
+function resultFieldsHtml(record) {
+  return `
+    <div class="key-fields" style="margin-bottom:10px;">
+      <label for="result-mssv">MSSV</label>
+      <input id="result-mssv" data-result-mssv value="${escapeHtml(record.mssv || "")}" inputmode="numeric" placeholder="not detected" />
+      <label for="result-code">Code</label>
+      <input id="result-code" data-result-code value="${escapeHtml(record.examCode || "")}" inputmode="numeric" placeholder="not detected" />
+    </div>
+  `;
+}
+
+function qualityAlertHtml(record) {
+  if (!lowQualityScan(record)) return "";
+  const stats = countedAnswerStats(record);
+  return `<div class="key-alert">Low-confidence scan: ${stats.suspicious}/${stats.questionCount} answers are unclear and ${stats.questionCount - stats.answered} are blank. The photo may be misaligned or poorly lit — check the preview and consider retaking it.</div>`;
+}
+
+function bindResultFields(record) {
+  const mssvInput = els.detailPanel.querySelector("[data-result-mssv]");
+  const codeInput = els.detailPanel.querySelector("[data-result-code]");
+  if (!mssvInput || !codeInput) return;
+  const apply = () => {
+    record.mssv = mssvInput.value.trim() || null;
+    record.examCode = codeInput.value.trim();
+    applyScore(record);
+    renderResults();
+    renderReviewList();
+    updateActions();
+    persistState();
+  };
+  mssvInput.addEventListener("input", apply);
+  codeInput.addEventListener("input", apply);
+  // Re-render the detail (badge, subtitle, overlay) once editing is done.
+  const refresh = () => {
+    renderRecordPreview(record, "result");
+    renderDetail(record, "result");
+  };
+  mssvInput.addEventListener("change", refresh);
+  codeInput.addEventListener("change", refresh);
 }
 
 function answerCellClass(record, type, idx, answer) {
@@ -642,13 +820,14 @@ function editAnswer(record, type, idx, mask) {
   renderRecordPreview(record, type);
   renderDetail(record, type);
   updateActions();
+  persistState();
 }
 
 function renderReviewList() {
   if (!els.reviewList) return;
   const reviewRows = state.results.filter((row) => row.status !== "OK");
   if (reviewRows.length === 0) {
-    els.reviewList.innerHTML = `<div class="empty compact">No suspicious sheets.</div>`;
+    els.reviewList.innerHTML = `<div class="empty compact">No sheets need attention.</div>`;
     return;
   }
   els.reviewList.innerHTML = reviewRows.map((row, idx) => `
@@ -658,7 +837,7 @@ function renderReviewList() {
     </button>
   `).join("");
   Array.from(els.reviewList.querySelectorAll(".review-item")).forEach((button, idx) => {
-    button.addEventListener("click", () => selectRecord(reviewRows[idx], "result"));
+    button.addEventListener("click", () => selectRecord(reviewRows[idx], "result", { scroll: true }));
   });
 }
 
@@ -686,13 +865,15 @@ async function scanKeys() {
     const analysis = analyzeKey(key);
     return analysis.holes.length > 0 || analysis.recovered.length > 0;
   }).length;
-  setStatus(
-    `Scanned ${state.keys.length} answer key${state.keys.length === 1 ? "" : "s"}${needsReview ? `, ${needsReview} need review` : ""}`,
-    needsReview ? "warn" : "ok"
-  );
+  const needsCode = state.keys.filter((key) => !key.examCode.trim()).length;
+  const parts = [`Scanned ${state.keys.length} answer key${state.keys.length === 1 ? "" : "s"}`];
+  if (needsCode) parts.push(`${needsCode} need${needsCode === 1 ? "s" : ""} an exam code`);
+  if (needsReview) parts.push(`${needsReview} need review`);
+  setStatus(parts.join(", "), needsCode || needsReview ? "warn" : "ok");
   recomputeScores();
   renderResults();
   updateActions();
+  persistState();
 }
 
 async function scanSheets() {
@@ -716,11 +897,13 @@ async function scanSheets() {
     selectRecord(result, "result");
     renderResults();
     setProgress(i + 1, state.sheetFiles.length);
+    persistState();
   }
 
   const review = state.results.filter((r) => r.status !== "OK").length;
   setStatus(`Processed ${state.results.length} sheets${review ? `, ${review} need review` : ""}`, review ? "warn" : "ok");
   updateActions();
+  persistState();
 }
 
 function processFile(file, groundTruth) {
@@ -967,14 +1150,32 @@ function recomputeScores() {
   state.results.forEach(applyScore);
 }
 
+// Heuristic for a warp/photo failure: an unusually large share of unclear
+// bubbles combined with unread answers. Tuned so clean batches (dataset_1)
+// stay unflagged while misaligned dark-background shots (dataset_4) trip it.
+function lowQualityScan(record) {
+  const stats = countedAnswerStats(record);
+  if (!stats.questionCount) return false;
+  return stats.suspicious >= stats.questionCount * 0.45
+    && stats.answered <= stats.questionCount * 0.93;
+}
+
 function applyScore(result) {
   const key = keyForRecord(result);
+  const stats = countedAnswerStats(result);
+  // "Review" is reserved for hard problems the teacher must resolve:
+  // multi-marked answers or unreadable MSSV / exam code. Low-confidence
+  // (suspicious) reads stay visible in the detail grid but do not flag
+  // the sheet, otherwise every sheet ends up in review.
+  result.reviewCount = stats.multi
+    + (result.mssv ? 0 : 1)
+    + (result.examCode ? 0 : 1);
+
   if (!key) {
     result.score = null;
     result.rawScore = null;
     result.totalQuestions = null;
     result.status = "No key";
-    result.reviewCount = 1 + result.suspiciousCount + result.multiMarkCount;
     return;
   }
 
@@ -991,10 +1192,9 @@ function applyScore(result) {
   result.rawScore = correct;
   result.totalQuestions = total;
   result.score = total > 0 ? Math.round((correct / total) * 1000) / 100 : null;
-  const stats = countedAnswerStats(result);
-  result.reviewCount = stats.suspicious + stats.multi;
-  if (!result.mssv || !result.examCode) result.reviewCount += 1;
-  result.status = result.reviewCount > 0 ? "Review" : "OK";
+  result.status = lowQualityScan(result) ? "Check image"
+    : result.reviewCount > 0 ? "Review"
+    : "OK";
 }
 
 function keyForRecord(record) {
@@ -1074,12 +1274,15 @@ function detectPreviewCrop(buffer, width, height) {
 function renderRecordPreview(record, type) {
   const canvas = els.previewCanvas;
   const ctx = canvas.getContext("2d");
+  const wrap = canvas.parentElement;
   if (!record || !record.previewImage) {
     canvas.width = 850;
     canvas.height = 1200;
+    wrap.style.setProperty("--preview-ar", "850 / 1200");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     return;
   }
+  wrap.style.setProperty("--preview-ar", `${record.previewImage.width} / ${record.previewImage.height}`);
 
   const image = new Image();
   image.onload = () => {
@@ -1296,21 +1499,16 @@ els.sheetInput.addEventListener("change", (event) => {
   setStatus(state.sheetFiles.length && state.ready ? "Student sheets selected" : readyStatusText(), readyStatusKind());
 });
 
-els.engineSelect.addEventListener("change", async (event) => {
-  state.engine = event.target.value;
-  state.keys = [];
-  state.results = [];
-  renderKeys();
-  renderResults();
-  renderDetail({ fileName: "No result", answers: normalizeAnswers([]), status: "Idle", answeredCount: 0 }, "result");
-  renderReviewList();
-  await initWorker();
-});
-
 els.scanKeysBtn.addEventListener("click", () => scanKeys());
 els.scanSheetsBtn.addEventListener("click", () => scanSheets());
 els.exportCsvBtn.addEventListener("click", () => exportCsv());
 els.exportJsonBtn.addEventListener("click", () => exportJson());
+els.clearSessionBtn.addEventListener("click", () => {
+  if (state.keys.length === 0 && state.results.length === 0) return;
+  if (window.confirm("Clear all scanned keys and results? This cannot be undone.")) {
+    clearSession();
+  }
+});
 function bindToggle(button, panel) {
   button.addEventListener("click", () => {
     panel.classList.toggle("collapsed");
@@ -1326,4 +1524,13 @@ renderKeys();
 renderResults();
 renderReviewList();
 setProgress(0, 0);
-initWorker();
+(async () => {
+  const restored = await restoreSession();
+  const ok = await initWorker();
+  if (ok && restored) {
+    setStatus(
+      `${engineLabel()} ready — restored ${state.keys.length} key(s), ${state.results.length} sheet(s)`,
+      "ok"
+    );
+  }
+})();
