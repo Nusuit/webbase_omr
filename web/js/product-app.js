@@ -245,7 +245,7 @@ function initWorker() {
 }
 
 function engineLabel() {
-  return "AI corner engine";
+  return "AI engine";
 }
 
 function updateActions() {
