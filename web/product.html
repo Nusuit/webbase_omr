@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="GradeSnap" />
-  <title>GradeSnap Web</title>
+  <title>Scanner</title>
   <style>
     :root {
       --bg: #f5f7fb;
@@ -280,38 +280,9 @@
       padding: 14px 16px;
     }
 
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-
-    .metric {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 10px;
-      background: var(--surface);
-      min-width: 0;
-    }
-
-    .metric .value {
-      display: block;
-      font-size: 20px;
-      font-weight: 700;
-      line-height: 1.1;
-    }
-
-    .metric .label {
-      display: block;
-      margin-top: 4px;
-      font-size: 12px;
-      color: var(--muted);
-    }
-
     .key-list {
-      display: grid;
-      gap: 8px;
+      display: flex;
+      flex-direction: column;
     }
 
     .section-toggle {
@@ -356,21 +327,62 @@
       display: none;
     }
 
+    /* Dense one-line rows, not cards — each key sits on a single row. */
     .key-item {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 10px;
-      background: #fbfcfe;
+      padding: 9px 2px;
+      border-bottom: 1px solid var(--line);
+      cursor: pointer;
+    }
+
+    .key-item:last-child { border-bottom: 0; }
+    .key-item:hover { background: #f2f6fb; }
+
+    .key-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .key-name {
-      font-size: 13px;
+      flex: 1 1 auto;
+      min-width: 44px;
+      font-size: 13.5px;
+      font-weight: 600;
       color: var(--ink);
       overflow: hidden;
       white-space: nowrap;
       text-overflow: ellipsis;
-      margin-bottom: 8px;
     }
+
+    /* Detail is secondary: it shrinks/truncates before the filename does. */
+    .key-meta {
+      flex: 0 6 auto;
+      min-width: 0;
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .key-meta .k { color: var(--ink); font-weight: 600; }
+
+    .key-meta input.key-code {
+      width: 3.2em;
+      min-height: 0;
+      border: 0;
+      background: transparent;
+      padding: 0;
+      font: inherit;
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .key-meta input.key-code::placeholder { color: var(--warn); font-weight: 600; }
+    .key-meta input.key-code:focus { outline: 1px solid var(--focus); border-radius: 4px; }
+
+    .key-row .badge { flex: 0 0 auto; margin-left: auto; }
 
     .key-fields {
       display: grid;
@@ -557,6 +569,8 @@
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 6px;
+      max-width: 340px;
+      margin: 0 auto;
     }
 
     .answer-cell {
@@ -577,12 +591,7 @@
       border-color: #9fbaf1;
     }
 
-    .answer-cell.filled {
-      color: var(--ink);
-      border-color: #a9bfdd;
-      background: #eef5ff;
-    }
-
+    /* Two states only: green = correct, yellow = suspend. Everything else stays neutral. */
     .answer-cell.correct {
       color: #075c3b;
       border-color: #57bf87;
@@ -590,26 +599,7 @@
       box-shadow: inset 0 0 0 1px rgba(19, 138, 91, 0.2);
     }
 
-    .answer-cell.review {
-      color: var(--warn);
-      border-color: #e7c37d;
-      background: #fff7e6;
-    }
-
-    .answer-cell.recovered {
-      color: #7a4b00;
-      border-color: #e7c37d;
-      background: #fff3cf;
-    }
-
-    .answer-cell.manual {
-      color: #334155;
-      border-color: #7aa7ff;
-      background: #edf5ff;
-      box-shadow: inset 0 0 0 1px #7aa7ff;
-    }
-
-    .answer-cell.missing {
+    .answer-cell.suspend {
       color: var(--warn);
       border-color: #e7c37d;
       background: #fff7e6;
@@ -620,6 +610,27 @@
       border-style: dashed;
       background: #f3f5f8;
     }
+
+    .answer-legend {
+      display: flex;
+      justify-content: center;
+      gap: 18px;
+      margin: 4px 0 12px;
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+
+    .answer-legend i {
+      width: 11px;
+      height: 11px;
+      border-radius: 3px;
+      display: inline-block;
+      margin-right: 5px;
+      vertical-align: -1px;
+    }
+
+    .answer-legend .g { background: #d8f3e5; border: 1px solid #57bf87; }
+    .answer-legend .y { background: #fff7e6; border: 1px solid #e7c37d; }
 
     .answer-editor {
       margin-top: 10px;
@@ -762,6 +773,52 @@
       vertical-align: middle;
     }
 
+    .export-wrap { position: relative; }
+
+    .action.export {
+      border-color: #b9cbec;
+      background: #eef5ff;
+      color: var(--primary);
+    }
+
+    .action.export .caret { font-size: 10px; opacity: 0.8; margin-left: 2px; }
+    .action.export:disabled { border-color: #d7e1f0; background: #eef2f8; color: #8b96a8; }
+
+    .export-menu {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 6px);
+      z-index: 20;
+      min-width: 150px;
+      padding: 5px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: 0 12px 28px rgba(24, 33, 47, 0.16);
+    }
+
+    .export-menu[hidden] { display: none; }
+
+    .export-menu button {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px 10px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+      font-size: 13px;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .export-menu button:hover:not(:disabled) { background: var(--surface-2); }
+    .export-menu button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .export-menu .ext { color: var(--muted); font-size: 11px; }
+
     @media (max-width: 1100px) {
       .workspace {
         grid-template-columns: 280px minmax(320px, 1fr);
@@ -793,21 +850,32 @@
       }
 
       .topbar {
-        align-items: flex-start;
-        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        gap: 10px 12px;
       }
 
-      .topbar-right {
-        width: 100%;
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
+      /* Promote the buttons + status to direct topbar children so the brand,
+         Export and Clear share the first row and status wraps below full-width. */
+      .topbar-right { display: contents; }
+
+      /* Brand, Export and Clear stay together on row 1 (left-packed); the
+         status line wraps to a full-width row below. Growing the brand or
+         auto-margining the buttons pushes Export to the edge and wraps Clear. */
+      .brand { flex: 0 1 auto; min-width: 0; }
+      .export-wrap { flex: 0 0 auto; }
+      /* The toolbar's `.action { width:100% }` rule below also targets these two
+         topbar buttons; keep them content-width so they sit on one row. */
+      .export-wrap > .action { width: auto; }
+      #clearSessionBtn { flex: 0 0 auto; width: auto; padding: 0 14px; }
 
       .status {
-        max-width: 100%;
+        order: 3;
+        flex: 1 1 100%;
         width: 100%;
-        grid-column: 1 / -1;
-        order: 2;
+        max-width: 100%;
+        min-width: 0;
       }
 
       .toolbar {
@@ -891,12 +959,16 @@
   <div class="app-shell">
     <header class="topbar">
       <div class="brand">
-        <h1>GradeSnap Web</h1>
-        <span>OMR scanner</span>
+        <h1>Scanner</h1>
       </div>
       <div class="topbar-right">
-        <button id="exportCsvBtn" class="action secondary" disabled>Export CSV</button>
-        <button id="exportJsonBtn" class="action secondary" disabled>Export JSON</button>
+        <div class="export-wrap">
+          <button id="exportBtn" class="action export" disabled aria-haspopup="true" aria-expanded="false">Export <span class="caret" aria-hidden="true">▾</span></button>
+          <div id="exportMenu" class="export-menu" hidden>
+            <button id="exportCsvBtn" type="button">CSV <span class="ext">.csv</span></button>
+            <button id="exportJsonBtn" type="button">JSON <span class="ext">.json</span></button>
+          </div>
+        </div>
         <button id="clearSessionBtn" class="action secondary">Clear</button>
         <div id="status" class="status">Starting engine...</div>
       </div>
@@ -934,24 +1006,8 @@
           <span id="keySummary" class="sub">No key</span>
         </div>
         <div class="pane-body">
-          <div class="summary-grid">
-            <div class="metric">
-              <span id="metricKeys" class="value">0</span>
-              <span class="label">keys</span>
-            </div>
-            <div class="metric">
-              <span id="metricReadyKeys" class="value">0</span>
-              <span class="label">ready</span>
-            </div>
-          </div>
-          <button id="inputStatusToggle" class="section-toggle" type="button">
-            <span>General Information</span>
-            <span class="chevron" aria-hidden="true"></span>
-          </button>
-          <div id="inputStatusPanel" class="section-body">
-            <div id="keyList" class="key-list">
-              <div class="empty">Select answer key images and scan them.</div>
-            </div>
+          <div id="keyList" class="key-list">
+            <div class="empty">Select answer key images and scan them.</div>
           </div>
           <button id="answerReviewToggle" class="section-toggle" type="button">
             <span>Answers / review</span>

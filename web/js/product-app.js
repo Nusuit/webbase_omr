@@ -31,6 +31,8 @@ const els = {
   questionCountInput: document.getElementById("questionCountInput"),
   scanKeysBtn: document.getElementById("scanKeysBtn"),
   scanSheetsBtn: document.getElementById("scanSheetsBtn"),
+  exportBtn: document.getElementById("exportBtn"),
+  exportMenu: document.getElementById("exportMenu"),
   exportCsvBtn: document.getElementById("exportCsvBtn"),
   exportJsonBtn: document.getElementById("exportJsonBtn"),
   clearSessionBtn: document.getElementById("clearSessionBtn"),
@@ -38,8 +40,6 @@ const els = {
   sheetCount: document.getElementById("sheetCount"),
   progressFill: document.getElementById("progressFill"),
   keySummary: document.getElementById("keySummary"),
-  metricKeys: document.getElementById("metricKeys"),
-  metricReadyKeys: document.getElementById("metricReadyKeys"),
   keyList: document.getElementById("keyList"),
   resultSummary: document.getElementById("resultSummary"),
   resultRows: document.getElementById("resultRows"),
@@ -47,11 +47,13 @@ const els = {
   previewLabel: document.getElementById("previewLabel"),
   detailPanel: document.getElementById("detailPanel"),
   reviewList: document.getElementById("reviewList"),
-  inputStatusToggle: document.getElementById("inputStatusToggle"),
-  inputStatusPanel: document.getElementById("inputStatusPanel"),
   answerReviewToggle: document.getElementById("answerReviewToggle"),
   answerReviewPanel: document.getElementById("answerReviewPanel")
 };
+
+// Also removed from the DOM in the redesign: the "General Information" toggle
+// (inputStatusToggle/Panel) and the keys/ready metric cards. Key details now
+// live inline on each one-line key row instead.
 
 // ── Session persistence (IndexedDB) ─────────────────────────────────────────
 // Scanned keys/results survive a reload or a killed mobile tab. Records are
@@ -255,8 +257,11 @@ function updateActions() {
   const hasQuestionCount = state.questionCount >= 1 && state.questionCount <= 60;
   els.scanKeysBtn.disabled = !state.ready || !hasKeys || !hasQuestionCount;
   els.scanSheetsBtn.disabled = !state.ready || !hasReadyKeys || !hasSheets;
-  els.exportCsvBtn.disabled = state.results.length === 0;
-  els.exportJsonBtn.disabled = state.results.length === 0;
+  const noResults = state.results.length === 0;
+  els.exportBtn.disabled = noResults;
+  els.exportCsvBtn.disabled = noResults;
+  els.exportJsonBtn.disabled = noResults;
+  if (noResults) closeExportMenu();
 }
 
 function readyStatusText() {
@@ -345,9 +350,12 @@ function updateCounts() {
   els.sheetCount.textContent = fileCountText(state.sheetFiles);
 }
 
+function keyStatusBadge(text) {
+  const cls = text === "Ready" ? "ok" : "warn";
+  return `<span class="badge ${cls}">${escapeHtml(text)}</span>`;
+}
+
 function renderKeys() {
-  els.metricKeys.textContent = state.keys.length;
-  els.metricReadyKeys.textContent = getReadyKeys().length;
   els.keySummary.textContent = state.keys.length ? `${getReadyKeys().length}/${state.keys.length} ready` : "No key";
 
   if (state.keys.length === 0) {
@@ -362,19 +370,13 @@ function renderKeys() {
     const manualText = key.manualDraft ?? manualDraftForKey(key);
     const item = document.createElement("div");
     item.className = "key-item";
+    // One-line row: filename · editable code · questions/detected · status pill.
+    // Warnings and the manual-fix editor only render for keys that need attention.
     item.innerHTML = `
-      <div class="key-name" title="${escapeHtml(key.fileName)}">${escapeHtml(key.fileName)}</div>
-      <div class="key-fields">
-        <label for="key-code-${idx}">Code</label>
-        <input id="key-code-${idx}" data-key-code value="${escapeHtml(key.examCode)}" inputmode="numeric" />
-        <span>Questions</span>
-        <span>${analysis.questionCount || "-"}</span>
-        <span>Detected</span>
-        <span>${analysis.detectedCount}/60</span>
-        <span>Used</span>
-        <span>${analysis.answeredWithin}/${analysis.questionCount || 0}</span>
-        <span>Status</span>
-        <span>${escapeHtml(statusText)}</span>
+      <div class="key-row">
+        <span class="key-name" title="${escapeHtml(key.fileName)}">${escapeHtml(key.fileName)}</span>
+        <span class="key-meta">Code <input class="key-code" data-key-code value="${escapeHtml(key.examCode)}" placeholder="set code" inputmode="numeric" aria-label="Exam code for ${escapeHtml(key.fileName)}" /> · ${analysis.questionCount || "-"}Q · <span class="k" title="detected bubbles">${analysis.detectedCount}/60</span></span>
+        ${keyStatusBadge(statusText)}
       </div>
       ${keyWarningHtml(key, analysis)}
       ${manualFixHtml(key, analysis, manualText)}
@@ -410,7 +412,7 @@ function keyWarningHtml(key, analysis) {
     alerts.push(key.manualError);
   }
   if (!key.examCode.trim()) {
-    alerts.push("Exam code was not detected. Enter it in this key's Code field (General Information section) to activate the key.");
+    alerts.push("Exam code was not detected. Enter it in this key's Code field to activate the key.");
   }
   if (analysis.holes.length > 0) {
     const firstHole = analysis.holes[0];
@@ -673,6 +675,7 @@ function renderDetail(record, type) {
     </div>
     <div style="color:var(--muted); font-size:13px; margin-bottom:10px;">${escapeHtml(subtitle)}</div>
     ${type === "key" ? keyWarningHtml(record, keyAnalysis) : resultFieldsHtml(record) + qualityAlertHtml(record)}
+    ${type === "result" ? `<div class="answer-legend"><span><i class="g"></i>correct</span><span><i class="y"></i>suspend</span></div>` : ""}
     <div class="answer-grid">
       ${record.answers.map((answer, idx) => {
         const label = answer.selected.length ? answer.selected.join("+") : "";
@@ -732,24 +735,25 @@ function bindResultFields(record) {
   codeInput.addEventListener("change", refresh);
 }
 
+// Two visible states only: "correct" (green) and "suspend" (yellow).
+// Everything else — normal answered, blank, manual — stays neutral.
+// "ignored" (dashed) marks cells outside the active Questions range.
 function answerCellClass(record, type, idx, answer) {
   if (type === "key") {
     const analysis = analyzeKey(record);
     if (idx + 1 > analysis.questionCount) return "ignored";
-    if (!answer.selected.length) return "missing";
-    if (answer.manual) return "manual";
-    if (answer.recovered) return "recovered";
-    return "filled";
+    // A blank or auto-recovered key answer needs the grader's eyes.
+    if (!answer.selected.length || answer.recovered) return "suspend";
+    return "";
   }
   if (idx + 1 > getQuestionCount(record)) return "ignored";
   if (!answer.selected.length) return "";
   if (type === "result") {
-    if (answer.manual) return "manual";
     const key = keyForRecord(record);
     if (key && key.masks[idx] !== 0 && record.masks[idx] === key.masks[idx]) return "correct";
-    if (answer.suspicious || answer.selected.length > 1) return "review";
+    if (answer.suspicious || answer.selected.length > 1) return "suspend";
   }
-  return "filled";
+  return "";
 }
 
 function answerEditorHtml(record, type) {
@@ -1502,8 +1506,26 @@ els.sheetInput.addEventListener("change", (event) => {
 
 els.scanKeysBtn.addEventListener("click", () => scanKeys());
 els.scanSheetsBtn.addEventListener("click", () => scanSheets());
-els.exportCsvBtn.addEventListener("click", () => exportCsv());
-els.exportJsonBtn.addEventListener("click", () => exportJson());
+
+// Export is a split button: the main button toggles a small CSV/JSON menu.
+function closeExportMenu() {
+  els.exportMenu.hidden = true;
+  els.exportBtn.setAttribute("aria-expanded", "false");
+}
+els.exportBtn.addEventListener("click", (event) => {
+  event.stopPropagation();
+  if (els.exportBtn.disabled) return;
+  const willOpen = els.exportMenu.hidden;
+  els.exportMenu.hidden = !willOpen;
+  els.exportBtn.setAttribute("aria-expanded", String(willOpen));
+});
+els.exportMenu.addEventListener("click", (event) => event.stopPropagation());
+document.addEventListener("click", () => closeExportMenu());
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeExportMenu();
+});
+els.exportCsvBtn.addEventListener("click", () => { exportCsv(); closeExportMenu(); });
+els.exportJsonBtn.addEventListener("click", () => { exportJson(); closeExportMenu(); });
 els.clearSessionBtn.addEventListener("click", () => {
   if (state.keys.length === 0 && state.results.length === 0) return;
   if (window.confirm("Clear all scanned keys and results? This cannot be undone.")) {
@@ -1517,7 +1539,6 @@ function bindToggle(button, panel) {
   });
 }
 
-bindToggle(els.inputStatusToggle, els.inputStatusPanel);
 bindToggle(els.answerReviewToggle, els.answerReviewPanel);
 
 updateCounts();

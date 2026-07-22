@@ -356,7 +356,7 @@ def main() -> int:
     parser.add_argument("--cdp-port", type=int, default=CDP_PORT)
     parser.add_argument("--out-dir", default=None)
     parser.add_argument("--yolo-pad", type=float, default=0.12, help="YOLO bbox expansion fraction")
-    parser.add_argument("--yolo-mask", choices=["mask", "raw"], default="mask", help="YOLO preprocessing mode")
+    parser.add_argument("--yolo-mask", choices=["mask", "raw", "hint"], default="mask", help="YOLO preprocessing mode")
     parser.add_argument("--yolo-fallback", choices=["none", "bestdiag"], default="none", help="Optional diagnostic fallback")
     args = parser.parse_args()
 

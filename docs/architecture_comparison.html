@@ -3,170 +3,1114 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OMR Pipeline — Web vs Mobile Web vs Native (architecture &amp; latency)</title>
+<title>OMR Image Pipeline Deep Dive - CV-only and Hybrid</title>
 <style>
   :root{
-    --web:#2563eb; --weblite:#dbeafe;
-    --mob:#7c3aed; --moblite:#ede9fe;
-    --nat:#059669; --natlite:#d1fae5;
-    --ink:#111827; --mut:#6b7280; --line:#e5e7eb; --bg:#f9fafb;
+    --bg:#f6f7f9;
+    --paper:#ffffff;
+    --ink:#17202a;
+    --muted:#667085;
+    --line:#d9dee7;
+    --soft:#eef1f5;
+    --web:#2563eb;
+    --yolo:#b45309;
+    --native:#047857;
+    --cv:#4f46e5;
+    --hot:#dc2626;
+    --ok:#0f766e;
+    --code:#f3f5f8;
+    --shadow:0 10px 28px rgba(23,32,42,.08);
   }
   *{box-sizing:border-box}
-  body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:var(--bg);color:var(--ink);line-height:1.45}
-  header{padding:24px 28px;background:#fff;border-bottom:1px solid var(--line)}
-  h1{margin:0 0 4px;font-size:21px}
-  .sub{color:var(--mut);font-size:13px}
-  .wrap{max-width:1240px;margin:0 auto;padding:24px 16px}
-  .cols{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-  @media(max-width:880px){.cols{grid-template-columns:1fr}}
-  .card{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
-  .chead{padding:14px 16px;color:#fff}
-  .chead.w{background:var(--web)} .chead.m{background:var(--mob)} .chead.n{background:var(--nat)}
-  .chead h2{margin:0;font-size:16px} .chead .dev{font-size:12px;opacity:.9;margin-top:2px}
-  .chead .dep{display:inline-block;margin-top:8px;font-size:11px;background:rgba(255,255,255,.22);padding:2px 8px;border-radius:20px}
-  .stages{padding:12px;flex:1}
-  .stage{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;margin-bottom:6px;background:var(--bg);font-size:12.5px}
-  .stage .nm{flex:1}
-  .stage .be{color:var(--mut);font-size:11px}
-  .stage .ms{font-variant-numeric:tabular-nums;font-weight:600;min-width:54px;text-align:right}
-  .bar{height:8px;border-radius:6px;margin-top:3px}
-  .w .bar{background:var(--web)} .m .bar{background:var(--mob)} .n .bar{background:var(--nat)}
-  .stagewrap{margin-bottom:6px}
-  .arrow{text-align:center;color:var(--mut);font-size:12px;margin:1px 0}
-  .foot{padding:12px 16px;border-top:1px dashed var(--line);font-size:12.5px}
-  .foot b{font-size:15px}
-  .e2e{display:flex;justify-content:space-between;align-items:baseline}
-  .pill{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--bg);color:var(--mut)}
-  .acc{margin-top:6px;color:var(--mut)}
-  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:13px;margin-top:8px}
-  th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
-  th{background:var(--bg);font-weight:600}
-  td.dim{font-weight:600;background:#fcfcfd;width:190px}
-  .cw{color:var(--web)} .cm{color:var(--mob)} .cn{color:var(--nat)}
-  h3{margin:28px 0 8px;font-size:16px}
-  .notes{background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px 18px}
-  .notes li{margin:8px 0;font-size:13px}
-  .warn{color:#b45309;font-weight:600}
-  .ok{color:var(--nat);font-weight:600}
-  .legend{font-size:12px;color:var(--mut);margin:6px 2px 0}
-  code{background:#f3f4f6;padding:1px 5px;border-radius:5px;font-size:12px}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.48;
+  }
+  header{
+    background:
+      linear-gradient(120deg,rgba(37,99,235,.12),transparent 36%),
+      linear-gradient(300deg,rgba(4,120,87,.14),transparent 42%),
+      #fff;
+    border-bottom:1px solid var(--line);
+  }
+  .hero{max-width:1280px;margin:0 auto;padding:30px 18px 24px}
+  .eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
+  h1{font-size:30px;line-height:1.15;margin:8px 0 10px;letter-spacing:0}
+  .subtitle{max-width:920px;color:#475467;font-size:15px;margin:0}
+  .hero-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:20px}
+  .metric{background:rgba(255,255,255,.78);border:1px solid var(--line);border-radius:8px;padding:13px 14px;box-shadow:var(--shadow)}
+  .metric .k{font-size:12px;color:var(--muted);margin-bottom:4px}
+  .metric .v{font-size:24px;font-weight:800}
+  .metric .d{font-size:12px;color:var(--muted);margin-top:2px}
+  .wrap{max-width:1280px;margin:0 auto;padding:22px 18px 42px}
+  .section{margin-top:22px}
+  .section h2{font-size:19px;margin:0 0 10px;letter-spacing:0}
+  .section p.lead{font-size:14px;color:#475467;margin:0 0 14px;max-width:980px}
+  .toc{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+  .toc a{color:#344054;text-decoration:none;background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px}
+  .toc a:hover{border-color:#98a2b3}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  @media(max-width:1050px){.hero-grid,.grid-4{grid-template-columns:repeat(2,1fr)}.grid-3{grid-template-columns:1fr 1fr}}
+  @media(max-width:760px){.hero-grid,.grid-2,.grid-3,.grid-4{grid-template-columns:1fr}h1{font-size:25px}}
+
+  .panel{background:var(--paper);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);overflow:hidden}
+  .panel-head{padding:13px 15px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .panel-head h3{font-size:15px;margin:0}
+  .panel-body{padding:14px 15px}
+  .tag{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 9px;font-size:11px;font-weight:700;border:1px solid var(--line);background:#fff;color:#475467;white-space:nowrap}
+  .tag.web{color:var(--web);border-color:#bfdbfe;background:#eff6ff}
+  .tag.cv{color:var(--cv);border-color:#c7d2fe;background:#eef2ff}
+  .tag.yolo{color:var(--yolo);border-color:#fed7aa;background:#fff7ed}
+  .tag.native{color:var(--native);border-color:#a7f3d0;background:#ecfdf5}
+  .tag.hot{color:var(--hot);border-color:#fecaca;background:#fff1f2}
+  code{background:var(--code);border:1px solid #e4e7ec;border-radius:5px;padding:1px 5px;font-size:12px;color:#344054}
+
+  .pipeline{display:grid;gap:9px}
+  .step{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:start;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+  .step .num{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--soft);font-size:12px;font-weight:800;color:#344054}
+  .step .title{font-weight:750;font-size:13.5px}
+  .step .text{font-size:12.5px;color:#5f6c7b;margin-top:2px}
+  .step .time{font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;color:#344054;white-space:nowrap}
+  .step.webline{border-left:4px solid var(--web)}
+  .step.cvline{border-left:4px solid var(--cv)}
+  .step.yololine{border-left:4px solid var(--yolo)}
+  .step.nativeline{border-left:4px solid var(--native)}
+  .note{font-size:12.5px;color:#5f6c7b;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:10px;margin-top:10px}
+
+  .split-flow{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:900px){.split-flow{grid-template-columns:1fr}}
+  .flow-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px}
+  .flow-title h3{margin:0;font-size:15px}
+  .flow-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .flow-node{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 9px;min-height:54px;flex:1 1 130px}
+  .flow-node b{display:block;font-size:12.5px}
+  .flow-node span{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+  .arrow{font-size:18px;color:#98a2b3;font-weight:800}
+  .shared-band{margin-top:14px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+  .shared-band h3{font-size:15px;margin:0 0 8px}
+  .shared-list{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+  .shared-list div{background:#f8fafc;border:1px solid #e4e7ec;border-radius:8px;padding:9px;font-size:12.5px}
+  .shared-list b{display:block;margin-bottom:3px}
+  @media(max-width:960px){.shared-list{grid-template-columns:1fr 1fr}}
+  @media(max-width:620px){.shared-list{grid-template-columns:1fr}}
+
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:13px}
+  th,td{padding:10px 11px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#f2f4f7;font-weight:800;color:#344054}
+  tr:last-child td{border-bottom:0}
+  td.dim{font-weight:800;background:#fbfcfe;color:#344054;min-width:170px}
+  .numcell{font-variant-numeric:tabular-nums;font-weight:750}
+  .muted{color:var(--muted)}
+  .warn{color:var(--hot);font-weight:800}
+  .ok{color:var(--ok);font-weight:800}
+
+  .bar-table td{vertical-align:middle}
+  .barwrap{height:9px;background:#eef2f6;border-radius:999px;overflow:hidden;min-width:130px}
+  .barfill{height:100%;border-radius:999px;background:var(--web)}
+  .barfill.native{background:var(--native)}
+  .barfill.yolo{background:var(--yolo)}
+  .barfill.cv{background:var(--cv)}
+
+  .source-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  @media(max-width:760px){.source-grid{grid-template-columns:1fr}}
+  .source{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px}
+  .source h3{font-size:14px;margin:0 0 8px}
+  .source ul{margin:0;padding-left:18px}
+  .source li{font-size:12.5px;margin:5px 0;color:#475467}
+
+  .callouts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:900px){.callouts{grid-template-columns:1fr}}
+  .callout{border-radius:8px;border:1px solid var(--line);background:#fff;padding:13px}
+  .callout b{display:block;font-size:14px;margin-bottom:4px}
+  .callout p{font-size:12.5px;color:#5f6c7b;margin:0}
+  .visual{margin-top:14px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px}
+  .visual img{width:100%;height:auto;border-radius:6px;border:1px solid #e4e7ec;background:#fff}
+  .preview-grid{display:grid;grid-template-columns:1.05fr 1.45fr;gap:14px;align-items:start}
+  @media(max-width:980px){.preview-grid{grid-template-columns:1fr}}
+  .preview-card{background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden;box-shadow:var(--shadow)}
+  .preview-card img{width:100%;display:block;background:#f8fafc}
+  .preview-caption{padding:10px 12px;border-top:1px solid var(--line)}
+  .preview-caption b{display:block;font-size:13.5px;margin-bottom:3px}
+  .preview-caption p{font-size:12.5px;color:#5f6c7b;margin:0}
+  .lens-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:12px}
+  @media(max-width:760px){.lens-grid{grid-template-columns:1fr 1fr}}
+  .lens{background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px}
+  .lens b{font-size:13px;display:block;margin-bottom:4px}
+  .lens p{margin:0;color:#5f6c7b;font-size:12.5px}
+  .swatch{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+  .green{background:#22c55e}.yellow{background:#facc15}.red{background:#ef4444}.blue{background:#3b82f6}
+  .stage-atlas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+  @media(max-width:1120px){.stage-atlas{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:720px){.stage-atlas{grid-template-columns:1fr}}
+  .stage-card{background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column}
+  .stage-card img{width:100%;height:auto;display:block;background:#f8fafc;object-fit:contain;object-position:center;cursor:zoom-in}
+  .stage-card img:hover{filter:saturate(1.04) contrast(1.02)}
+  .stage-card.wide img{aspect-ratio:auto}
+  .stage-card .cap{padding:11px 12px;display:grid;gap:8px}
+  .stage-card h3{font-size:14px;margin:0;line-height:1.25}
+  .stage-card p{font-size:12.5px;color:#5f6c7b;margin:0}
+  .time-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .time-chip{display:inline-flex;gap:5px;align-items:center;border:1px solid #d0d5dd;background:#f8fafc;border-radius:999px;padding:3px 8px;font-size:11.5px;color:#344054;font-variant-numeric:tabular-nums}
+  .time-chip b{font-weight:800;color:#111827}
+  .time-chip.webc{border-color:#bfdbfe;background:#eff6ff}
+  .time-chip.natc{border-color:#a7f3d0;background:#ecfdf5}
+  .time-chip.yoloc{border-color:#fed7aa;background:#fff7ed}
+  .budget{display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff;margin-top:14px}
+  .budget div{padding:9px 10px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);font-size:12.5px}
+  .budget div:nth-child(4n){border-right:0}
+  .budget .head{background:#f2f4f7;font-weight:800;color:#344054}
+  .budget .stage-name{font-weight:800}
+  @media(max-width:800px){.budget{grid-template-columns:1fr}.budget div{border-right:0}.budget .head{display:none}}
+  .method-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:980px){.method-grid{grid-template-columns:1fr}}
+  .method-card{background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);overflow:hidden}
+  .method-card .method-head{padding:13px 15px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .method-card h3{font-size:15px;margin:0}
+  .method-body{padding:14px 15px}
+  .stage-note{background:#fff;border:1px solid var(--line);border-left:4px solid var(--hot);border-radius:8px;padding:11px 12px;margin:12px 0;font-size:12.5px;color:#475467}
+  .stage-note b{color:#111827}
+  .stage-atlas.pipeline-cv,.stage-atlas.pipeline-hybrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .stage-atlas.pipeline-cv .stage-card img,.stage-atlas.pipeline-hybrid .stage-card img{aspect-ratio:auto}
+  @media(max-width:1180px){.stage-atlas.pipeline-cv,.stage-atlas.pipeline-hybrid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:850px){.stage-atlas.pipeline-cv,.stage-atlas.pipeline-hybrid{grid-template-columns:1fr}}
+  @media(max-width:600px){.stage-atlas.pipeline-cv,.stage-atlas.pipeline-hybrid{grid-template-columns:1fr}}
+  .budget.pipeline-budget{grid-template-columns:1.15fr .9fr .9fr 1.35fr}
+  .budget.pipeline-budget div:nth-child(4n){border-right:0}
+  .budget.pipeline-budget .muted-cell{color:var(--muted)}
+  .pipeline-caption{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 14px}
+  .pipeline-caption .tag{border-radius:8px}
+  .image-lightbox{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;background:rgba(9,14,24,.88);padding:54px 20px 20px}
+  .image-lightbox.open{display:flex}
+  .image-lightbox img{max-width:96vw;max-height:88vh;object-fit:contain;background:#fff;border-radius:8px;box-shadow:0 22px 60px rgba(0,0,0,.42);cursor:zoom-out}
+  .lightbox-close,.lightbox-open{position:fixed;top:14px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;border-radius:8px;padding:8px 11px;font-size:13px;text-decoration:none}
+  .lightbox-close{right:14px;cursor:pointer}
+  .lightbox-open{right:82px}
+  .lightbox-close:hover,.lightbox-open:hover{background:rgba(255,255,255,.18)}
 </style>
 </head>
 <body>
 <header>
-  <h1>OMR Pipeline — Web vs Mobile Web vs Native Android</h1>
-  <div class="sub">Kiến trúc &amp; latency same-boundary (per sheet, N=179, dataset OMR). Số đo 2026-05-31 · Native = debug build (release nhanh hơn).</div>
+  <div class="hero">
+    <div class="eyebrow">Codebase deep dive - image analysis pipeline</div>
+    <h1>OMR Pipeline: CV-only và Hybrid YOLO + CV</h1>
+    <p class="subtitle">
+      Trang này chỉ tách hai pipeline thực tế trong codebase: CV-only và Hybrid YOLO + CV.
+      Mỗi pipeline đi từ ảnh gốc đến JSON kết quả, có preview từng stage và timing Web/Native theo đúng boundary đang đo được.
+    </p>
+    <div class="hero-grid">
+      <div class="metric">
+        <div class="k">Redmi Web CV E2E</div>
+        <div class="v">708.7 ms</div>
+        <div class="d">decode + RGBA + C++ WASM, N=179</div>
+      </div>
+      <div class="metric">
+        <div class="k">Redmi Native CV E2E</div>
+        <div class="v">117.6 ms</div>
+        <div class="d">Bitmap + Mat + OpenCV ARM, N=179</div>
+      </div>
+      <div class="metric">
+        <div class="k">Same-device CV gap</div>
+        <div class="v">6.0x</div>
+        <div class="d">708.7 / 117.6, debug Native</div>
+      </div>
+      <div class="metric">
+        <div class="k">YOLO Native NNAPI</div>
+        <div class="v">264.5 ms</div>
+        <div class="d">decode + Mat + YOLO + OMR, N=179</div>
+      </div>
+    </div>
+    <nav class="toc">
+      <a href="#map">Hai pipeline</a>
+      <a href="#cv-pipeline">CV-only</a>
+      <a href="#hybrid-pipeline">Hybrid</a>
+      <a href="#web">Web runtime</a>
+      <a href="#native">Native runtime</a>
+      <a href="#perf">Performance</a>
+      <a href="#inside">Code paths</a>
+    </nav>
+  </div>
 </header>
 
-<div class="wrap">
+<main class="wrap">
+  <section class="section" id="map">
+    <h2>1. Hai pipeline từ ảnh đến kết quả</h2>
+    <p class="lead">
+      Không dùng một flow "CV hoặc YOLO" chung nữa. Codebase hiện có hai pipeline cần phân tích riêng:
+      CV-only dùng xử lý ảnh truyền thống để localize sheet; Hybrid dùng YOLO để localize trước, sau đó vẫn dùng CV/OMR core để đọc bubble.
+      Web và Native đều được đặt lên cùng stage để thấy stage nào đang lệch thời gian.
+    </p>
+    <div class="method-grid">
+      <article class="method-card">
+        <div class="method-head">
+          <h3>Pipeline A: CV-only</h3>
+          <span class="tag cv">không chạy model</span>
+        </div>
+        <div class="method-body">
+          <p class="lead">
+            Dùng cho <code>worker-cv.js</code> trên Web và Native CV. Tất cả localization, warp, threshold và đọc bubble đều do OpenCV/C++/WASM hoặc OpenCV ARM xử lý.
+          </p>
+          <div class="pipeline">
+            <div class="step webline">
+              <div class="num">1</div>
+              <div>
+                <div class="title">User input: ảnh gốc</div>
+                <div class="text">Web nhận <code>File</code> JPEG; Native nhận đường dẫn/Bitmap từ batch hoặc camera.</div>
+              </div>
+              <div class="time">I/O</div>
+            </div>
+            <div class="step webline">
+              <div class="num">2</div>
+              <div>
+                <div class="title">Decode + buffer</div>
+                <div class="text">Web decode bitmap rồi extract RGBA qua canvas. Native decode JPEG rồi đổi Bitmap sang Mat.</div>
+              </div>
+              <div class="time">184.3 vs 35.8 ms</div>
+            </div>
+            <div class="step cvline">
+              <div class="num">3</div>
+              <div>
+                <div class="title">CV localization</div>
+                <div class="text">Downscale, grayscale, threshold marker, lọc blob, gán 4 góc và tính homography.</div>
+              </div>
+              <div class="time">inside core</div>
+            </div>
+            <div class="step cvline">
+              <div class="num">4</div>
+              <div>
+                <div class="title">Normalize sheet</div>
+                <div class="text">Warp ảnh về canvas chuẩn 1700x2400, rồi Stage 2 tìm lại 4 marker góc để refine crop.</div>
+              </div>
+              <div class="time">warp/crop</div>
+            </div>
+            <div class="step nativeline">
+              <div class="num">5</div>
+              <div>
+                <div class="title">Read bubbles</div>
+                <div class="text">Adaptive threshold, circular density ở grid cố định, decode MSSV/mã đề/60 câu bằng threshold + z-score.</div>
+              </div>
+              <div class="time">threshold + OMR</div>
+            </div>
+            <div class="step nativeline">
+              <div class="num">6</div>
+              <div>
+                <div class="title">Result JSON + review overlay</div>
+                <div class="text">Xuất <code>mssv</code>, <code>examCode</code>, <code>auto_q01..auto_q60</code>, suspicious/multi và ảnh review.</div>
+              </div>
+              <div class="time">708.7 vs 117.6 ms</div>
+            </div>
+          </div>
+        </div>
+      </article>
 
-  <div class="cols">
+      <article class="method-card">
+        <div class="method-head">
+          <h3>Pipeline B: Hybrid YOLO + CV</h3>
+          <span class="tag yolo">YOLO chỉ localize</span>
+        </div>
+        <div class="method-body">
+          <p class="lead">
+            Dùng cho <code>worker-yolo.js</code> trên Web và Native YOLO. YOLO không đọc đáp án; nó chỉ tìm vùng giấy/marker trước khi OMR core đọc bubble.
+          </p>
+          <div class="pipeline">
+            <div class="step webline">
+              <div class="num">1</div>
+              <div>
+                <div class="title">User input: ảnh gốc</div>
+                <div class="text">Cùng nguồn ảnh như CV-only. Boundary Web YOLO raw hiện chưa export decode/RGBA.</div>
+              </div>
+              <div class="time">I/O</div>
+            </div>
+            <div class="step yololine">
+              <div class="num">2</div>
+              <div>
+                <div class="title">YOLO preprocess</div>
+                <div class="text">Letterbox 640x640, chuẩn hóa tensor, đổi layout sang CHW/Float32.</div>
+              </div>
+              <div class="time">prep</div>
+            </div>
+            <div class="step yololine">
+              <div class="num">3</div>
+              <div>
+                <div class="title">YOLO inference + NMS</div>
+                <div class="text">Detect <code>marker_corners</code>/paper region, lọc bbox bằng confidence và IOU.</div>
+              </div>
+              <div class="time">328.6 vs 158.2 ms</div>
+            </div>
+            <div class="step yololine">
+              <div class="num">4</div>
+              <div>
+                <div class="title">Handoff sang OMR core</div>
+                <div class="text">Có thể crop/mask theo bbox; artifact Web YOLO raw hiện đo YOLO nhưng vẫn chuyển ảnh raw vào C++.</div>
+              </div>
+              <div class="time">raw/mask/crop</div>
+            </div>
+            <div class="step cvline">
+              <div class="num">5</div>
+              <div>
+                <div class="title">Shared CV/OMR recognition</div>
+                <div class="text">Stage 2 marker crop, adaptive threshold, density sampling và decode đáp án vẫn là CV/OMR.</div>
+              </div>
+              <div class="time">OMR core</div>
+            </div>
+            <div class="step nativeline">
+              <div class="num">6</div>
+              <div>
+                <div class="title">Result JSON + review overlay</div>
+                <div class="text">Output cùng schema với CV-only, để so sánh accuracy/performance theo pipeline.</div>
+              </div>
+              <div class="time">997.8 worker vs 264.5 E2E</div>
+            </div>
+          </div>
+        </div>
+      </article>
+    </div>
+    <div class="stage-note">
+      <b>Cách đọc timing:</b> Web CV có breakdown decode/RGBA và một cục <code>cpp_ms</code> cho toàn bộ OMR core.
+      Native CV có breakdown sâu hơn: decode, Bitmap->Mat, normalize, threshold, OMR detect.
+      Web Hybrid raw không có decode/RGBA trong artifact hiện tại; Native Hybrid NNAPI có E2E đầy đủ.
+    </div>
+  </section>
 
-    <!-- WEB LAPTOP -->
-    <div class="card">
-      <div class="chead w">
-        <h2>Web — Laptop</h2>
-        <div class="dev">ASUS Vivobook · Chrome · OpenCV.js (WASM)</div>
-        <span class="dep">Deploy: URL, không cài đặt</span>
+  <section class="section" id="cv-pipeline">
+    <h2>2. Pipeline CV-only: user input -> CV -> OMR result</h2>
+    <p class="lead">
+      Pipeline này áp dụng cho Web CV và Native CV. Không có YOLO ở bất kỳ stage nào.
+      Preview dùng cùng một raw sheet để minh họa từng bước xử lý ảnh; timing là mean/p95 từ batch N=179.
+      Với Web, các stage bên trong OMR core hiện chưa export riêng nên được ghi rõ là nằm trong <code>cpp_ms</code>.
+      Click trực tiếp vào ảnh để mở full-size; trong lightbox có link mở ảnh gốc để zoom sâu hơn trong Chrome.
+    </p>
+    <div class="pipeline-caption">
+      <span class="tag cv">Pipeline: CV-only</span>
+      <span class="tag web">Web: worker-cv.js + WASM</span>
+      <span class="tag native">Native: OpenCV ARM</span>
+      <span class="tag">Output: JSON + review overlay</span>
+    </div>
+    <div class="stage-atlas pipeline-cv">
+      <article class="stage-card">
+        <img src="assets/architecture_pipeline/00_raw_input.jpg" alt="Raw camera input">
+        <div class="cap">
+          <h3>00. Raw input</h3>
+          <p>Ảnh camera còn nền bàn và phối cảnh. Đây là input trước mọi xử lý của pipeline CV-only.</p>
+          <div class="time-chips">
+            <span class="time-chip">source image</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="stage-card">
+        <img src="assets/architecture_pipeline/01_decoded_rgb.jpg" alt="Decoded RGB buffer">
+        <div class="cap">
+          <h3>01. Decode + buffer</h3>
+          <p>Web tạo bitmap rồi lấy RGBA qua canvas; Native decode bitmap rồi chuyển sang Mat.</p>
+          <div class="time-chips">
+            <span class="time-chip webc"><b>Web</b> 91.3 + 93.0 ms</span>
+            <span class="time-chip natc"><b>Native</b> 23.3 + 12.5 ms</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="stage-card">
+        <img src="assets/architecture_pipeline/02_analysis_gray.jpg" alt="Downscaled grayscale analysis">
+        <div class="cap">
+          <h3>02. CV analysis grayscale</h3>
+          <p><code>NormalizeSheet</code> giảm ảnh về analysis width 800 rồi chuyển grayscale để tìm marker nhanh hơn.</p>
+          <div class="time-chips">
+            <span class="time-chip webc"><b>Web</b> trong cpp_ms</span>
+            <span class="time-chip natc"><b>Native normalize</b> 44.7 ms</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="stage-card">
+        <img src="assets/architecture_pipeline/03_marker_threshold.jpg" alt="Marker threshold blobs">
+        <div class="cap">
+          <h3>03. CV marker threshold</h3>
+          <p>Dark-pixel threshold/binary inverse/morphology lọc các ô marker vuông. Đây là bước dễ fail khi nền hoặc ánh sáng gây nhiễu.</p>
+          <div class="time-chips">
+            <span class="time-chip webc"><b>Web</b> trong 524.2 ms cpp</span>
+            <span class="time-chip natc"><b>Native</b> p95 normalize 52 ms</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="stage-card">
+        <img src="assets/architecture_pipeline/04_corners_homography.jpg" alt="Corner homography source">
+        <div class="cap">
+          <h3>04. CV corners + homography</h3>
+          <p>4 marker ngoài cùng được gán TL/TR/BR/BL rồi tính perspective transform sang canvas chuẩn.</p>
+          <div class="time-chips">
+            <span class="time-chip webc"><b>Web</b> WASM warp</span>
+            <span class="time-chip natc"><b>Native</b> OpenCV ARM</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="stage-card">
+        <img src="assets/architecture_pipeline/05_warp_1700x2400.jpg" alt="Stage one warped sheet">
+        <div class="cap">
+          <h3>05. CV Stage 1 warp</h3>
+          <p>Ảnh được đưa về hệ tọa độ chuẩn. Các anchor grid sau đó mới có ý nghĩa cố định.</p>
+          <div class="time-chips">
+            <span class="time-chip webc"><b>Web</b> compute-bound</span>
+            <span class="time-chip natc"><b>Native</b> part of 44.7 ms</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="stage-card">
+        <img src="assets/architecture_pipeline/06_stage2_marker_crop.jpg" alt="Stage two marker crop diagnostics">
+        <div class="cap">
+          <h3>06. Stage 2 marker crop</h3>
+          <p>Trên ảnh 1700x2400, pipeline tìm lại marker trong 4 corner zones để re-warp và giảm sai lệch anchor.</p>
+          <div class="time-chips">
+            <span class="time-chip webc"><b>Web</b> trong cpp_ms</span>
+            <span class="time-chip natc"><b>Native derived</b> ~17 ms</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="stage-card">
+        <img src="assets/architecture_pipeline/07_adaptive_binary.jpg" alt="Adaptive threshold binary image">
+        <div class="cap">
+          <h3>07. Adaptive threshold</h3>
+          <p>Blur + <code>adaptiveThreshold</code> biến nét tô thành foreground để density sampling đếm pixel ổn định hơn.</p>
+          <div class="time-chips">
+            <span class="time-chip webc"><b>Web</b> trong cpp_ms</span>
+            <span class="time-chip natc"><b>Native</b> 21.0 ms</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="stage-card">
+        <img src="assets/architecture_pipeline/08_grid_density_overlay.jpg" alt="Grid density overlay">
+        <div class="cap">
+          <h3>08. Grid + density decisions</h3>
+          <p>Fixed block anchors đặt 300 bubble centers; R=18 circular density; row z-score chọn đáp án.</p>
+          <div class="time-chips">
+            <span class="time-chip webc"><b>Web</b> trong cpp_ms</span>
+            <span class="time-chip natc"><b>Native OMR</b> 4.9 ms</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="stage-card wide">
+        <img src="assets/architecture_pipeline/09_final_review_export.jpg" alt="Final review export with metadata and answers">
+        <div class="cap">
+          <h3>09. Final review export</h3>
+          <p>Kết quả cuối gồm overlay, MSSV, mã đề, số câu answered/suspicious/multi và danh sách auto answers.</p>
+          <div class="time-chips">
+            <span class="time-chip webc"><b>Web CV</b> 708.7 / 784 ms</span>
+            <span class="time-chip natc"><b>Native CV</b> 117.6 / 137 ms</span>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <div class="budget pipeline-budget">
+      <div class="head">Stage CV-only</div><div class="head">Web CV mean / p95</div><div class="head">Native CV mean / p95</div><div class="head">Ý nghĩa khi tối ưu</div>
+      <div class="stage-name">01. JPEG decode</div><div>91.3 / 117 ms</div><div>23.3 / 32 ms</div><div>Native nhanh hơn rõ ngay ở bước đọc ảnh; Web còn phụ thuộc browser image decoder.</div>
+      <div class="stage-name">02. Buffer handoff</div><div>RGBA canvas extract 93.0 / 132 ms</div><div>Bitmap->Mat 12.5 / 15 ms</div><div>Đây là chi phí copy/format trước khi thuật toán OMR chạy.</div>
+      <div class="stage-name">03-05. CV localization + Stage 1 warp</div><div>Trong <code>cpp_ms</code>; chưa export substage</div><div>Normalize 44.7 / 52 ms</div><div>Native cho thấy normalize là substage lớn nhất trong CV core.</div>
+      <div class="stage-name">06. Stage 2 marker crop</div><div>Trong <code>cpp_ms</code>; chưa export substage</div><div>Derived khoảng 17 ms</div><div>Đây là phần refine sau khi đã có canvas 1700x2400.</div>
+      <div class="stage-name">07. Adaptive threshold</div><div>Trong <code>cpp_ms</code>; chưa export substage</div><div>21.0 / 31 ms</div><div>Pixel-heavy; phụ thuộc trực tiếp kích thước canonical canvas.</div>
+      <div class="stage-name">08. Grid density + decode</div><div>Trong <code>cpp_ms</code>; chưa export substage</div><div>4.9 / 7 ms</div><div>Nhỏ so với normalize/threshold; không phải bottleneck chính.</div>
+      <div class="stage-name">OMR core total</div><div>524.2 / 559 ms</div><div>87.6 / 104 ms</div><div>Chênh chính của CV-only nằm ở core xử lý ảnh, khoảng 6.0x.</div>
+      <div class="stage-name">End-to-end</div><div>708.7 / 784 ms</div><div>117.6 / 137 ms</div><div>Web chậm hơn khoảng 6.0x trên cùng thiết bị Redmi.</div>
+    </div>
+
+    <div class="lens-grid">
+      <div class="lens">
+        <b><span class="swatch blue"></span>Khung xanh</b>
+        <p>Vùng MSSV và KEY CODE sau khi anchor grid được map vào canvas 1700x2400.</p>
       </div>
-      <div class="stages w">
-        <div class="stagewrap stage"><span class="nm">JPEG decode<br><span class="be">createImageBitmap (browser)</span></span><span class="ms">31 ms</span></div>
-        <div class="arrow">▼</div>
-        <div class="stagewrap stage"><span class="nm">RGBA extract<br><span class="be">OffscreenCanvas getImageData</span></span><span class="ms">23 ms</span></div>
-        <div class="arrow">▼</div>
-        <div class="stagewrap stage" style="background:var(--weblite)"><span class="nm">CV compute<br><span class="be">WASM C++ · omr.wasm <b class="warn">BASELINE</b><br>warp + adaptiveThresh + density + z-score</span></span><span class="ms">559 ms</span></div>
-        <div class="bar" style="width:100%"></div>
+      <div class="lens">
+        <b><span class="swatch green"></span>Chấm xanh</b>
+        <p>Bubble được hệ thống nhận là đã tô; đây là output chính của density sampling.</p>
       </div>
-      <div class="foot">
-        <div class="e2e"><span>E2E / sheet</span><b>612 ms</b></div>
-        <div class="acc">Recognition vs GT: <span class="ok">~99%</span> (CV) · 1k sheets ≈ 10 phút</div>
+      <div class="lens">
+        <b><span class="swatch yellow"></span>Vòng vàng</b>
+        <p>Câu hoặc bubble nằm vùng nghi ngờ, thường do mật độ ở grey zone hoặc tín hiệu không đủ rõ.</p>
+      </div>
+      <div class="lens">
+        <b><span class="swatch red"></span>Text đỏ</b>
+        <p>Multi-mark hoặc case cần review; pipeline vẫn xuất kết quả nhưng đánh dấu để người dùng kiểm tra.</p>
+      </div>
+    </div>
+    <div class="note">
+      Mapping CV-only với code: ảnh raw đi vào <code>createImageBitmap</code>/<code>BitmapFactory</code>, sau đó <code>NormalizeSheet</code> warp về 1700x2400,
+      <code>cropByMarkers</code> refine lại 4 góc, rồi <code>adaptiveThreshold</code> + circular density tạo overlay xanh/vàng/đỏ như preview.
+    </div>
+  </section>
+
+  <section class="section" id="hybrid-pipeline">
+    <h2>3. Pipeline Hybrid: user input -> YOLO localization -> CV/OMR result</h2>
+    <p class="lead">
+      Pipeline này áp dụng cho Web YOLO raw và Native YOLO NNAPI. Điểm quan trọng: YOLO chỉ làm localization/handoff.
+      Phần đọc MSSV, mã đề và đáp án vẫn là CV/OMR core phía sau, nên preview sau YOLO sẽ quay lại các stage marker crop, threshold và density.
+      Click trực tiếp vào ảnh để mở full-size; trong lightbox có link mở ảnh gốc để zoom sâu hơn trong Chrome.
+    </p>
+    <div class="pipeline-caption">
+      <span class="tag yolo">Pipeline: Hybrid YOLO + CV</span>
+      <span class="tag web">Web: worker-yolo.js + ORT Web</span>
+      <span class="tag native">Native: ORT Android NNAPI</span>
+      <span class="tag">Recognition: CV/OMR core</span>
+    </div>
+    <div class="stage-note">
+      <b>Boundary cần nhớ:</b> Web YOLO raw hiện có <code>yolo_ms</code>, <code>cpp_ms</code>, <code>worker_total_ms</code> nhưng không có decode/RGBA.
+      Native YOLO NNAPI có E2E đầy đủ gồm decode, Bitmap->Mat, YOLO prep/ORT/post, normalize, threshold và OMR detect.
+    </div>
+
+    <div class="stage-atlas pipeline-hybrid">
+      <article class="stage-card">
+        <img src="assets/architecture_pipeline/00_raw_input.jpg" alt="Hybrid raw camera input">
+        <div class="cap">
+          <h3>00. Raw input</h3>
+          <p>Cùng ảnh gốc như CV-only. Hybrid không thay đổi input; chỉ thay stage localization đầu.</p>
+          <div class="time-chips">
+            <span class="time-chip">source image</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="stage-card">
+        <img src="assets/architecture_pipeline/01_decoded_rgb.jpg" alt="Hybrid decoded buffer">
+        <div class="cap">
+          <h3>01. Decode + buffer</h3>
+          <p>Web YOLO raw chưa export bước này; Native vẫn decode JPEG và đổi Bitmap sang Mat trước detector.</p>
+          <div class="time-chips">
+            <span class="time-chip webc"><b>Web</b> not exported</span>
+            <span class="time-chip natc"><b>Native</b> 22.8 + 11.9 ms</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="stage-card">
+        <img src="assets/architecture_pipeline/05b_yolo_bbox.jpg" alt="YOLO bbox localization">
+        <div class="cap">
+          <h3>02. YOLO bbox localization</h3>
+          <p>Letterbox 640, chạy ONNX/ORT, NMS và chọn bbox marker/paper. Stage này chưa đọc bubble.</p>
+          <div class="time-chips">
+            <span class="time-chip yoloc"><b>Web yolo_ms</b> 328.6 / 410</span>
+            <span class="time-chip yoloc"><b>NNAPI ORT</b> 158.2 / 178</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="stage-card">
+        <img src="assets/architecture_pipeline/05c_yolo_mask.jpg" alt="YOLO handoff option">
+        <div class="cap">
+          <h3>03. Handoff: raw / mask / crop</h3>
+          <p>Preview minh họa mask handoff. Artifact Web đang dùng <code>mask=raw</code>, nên YOLO được đo nhưng ảnh raw vẫn vào C++.</p>
+          <div class="time-chips">
+            <span class="time-chip yoloc"><b>Native prep</b> 23.4 / 27</span>
+            <span class="time-chip yoloc"><b>post</b> 0.3 / 1</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="stage-card">
+        <img src="assets/architecture_pipeline/05_warp_1700x2400.jpg" alt="Hybrid normalized sheet">
+        <div class="cap">
+          <h3>04. CV/OMR normalize</h3>
+          <p>Sau handoff, pipeline vẫn cần canvas chuẩn 1700x2400 để dùng anchor grid cố định.</p>
+          <div class="time-chips">
+            <span class="time-chip webc"><b>Web cpp</b> 668.7 / 706</span>
+            <span class="time-chip natc"><b>Native normalize</b> 197.6 / 221</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="stage-card">
+        <img src="assets/architecture_pipeline/06_stage2_marker_crop.jpg" alt="Hybrid stage two marker crop">
+        <div class="cap">
+          <h3>05. Stage 2 marker crop</h3>
+          <p>YOLO không bỏ qua bước này. OMR core vẫn refine 4 góc marker trên sheet đã normalize.</p>
+          <div class="time-chips">
+            <span class="time-chip webc"><b>Web</b> trong cpp_ms</span>
+            <span class="time-chip natc"><b>Native</b> trong cpp_ms</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="stage-card">
+        <img src="assets/architecture_pipeline/07_adaptive_binary.jpg" alt="Hybrid adaptive threshold">
+        <div class="cap">
+          <h3>06. Adaptive threshold</h3>
+          <p>Giống CV-only: blur + adaptive threshold tạo foreground cho nét tô.</p>
+          <div class="time-chips">
+            <span class="time-chip webc"><b>Web</b> trong cpp_ms</span>
+            <span class="time-chip natc"><b>Native</b> 20.1 / 27</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="stage-card">
+        <img src="assets/architecture_pipeline/08_grid_density_overlay.jpg" alt="Hybrid grid density decisions">
+        <div class="cap">
+          <h3>07. Grid density + decode</h3>
+          <p>YOLO đã kết thúc trước đó. Quyết định đáp án vẫn dựa trên density/z-score ở grid cố định.</p>
+          <div class="time-chips">
+            <span class="time-chip webc"><b>Web</b> trong cpp_ms</span>
+            <span class="time-chip natc"><b>Native OMR</b> 3.2 / 4</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="stage-card wide">
+        <img src="assets/architecture_pipeline/09_final_review_export.jpg" alt="Hybrid final review output">
+        <div class="cap">
+          <h3>08. Final result</h3>
+          <p>Output schema giống CV-only; khác nhau nằm ở stage localization/handoff trước khi đọc bubble.</p>
+          <div class="time-chips">
+            <span class="time-chip webc"><b>Web worker</b> 997.8 / 1104</span>
+            <span class="time-chip natc"><b>Native E2E</b> 264.5 / 294</span>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <div class="budget pipeline-budget">
+      <div class="head">Stage Hybrid</div><div class="head">Web YOLO raw mean / p95</div><div class="head">Native YOLO NNAPI mean / p95</div><div class="head">Ý nghĩa khi tối ưu</div>
+      <div class="stage-name">01. Decode + buffer</div><div class="muted-cell">Không export trong Web YOLO raw</div><div>JPEG 22.8 / 34 ms; Mat 11.9 / 15 ms</div><div>Không so sánh E2E công bằng được nếu thiếu decode/RGBA ở Web.</div>
+      <div class="stage-name">02. YOLO preprocess</div><div>Trong <code>yolo_ms</code>; chưa tách riêng</div><div>23.4 / 27 ms</div><div>Native cho thấy prep nhỏ hơn inference nhưng vẫn đáng đo riêng.</div>
+      <div class="stage-name">03. ORT inference + NMS</div><div><code>yolo_ms</code> 328.6 / 410 ms</div><div>ORT 158.2 / 178 ms; post 0.3 / 1 ms</div><div>Đây là phần Hybrid thêm vào so với CV-only.</div>
+      <div class="stage-name">04. Handoff sang OMR</div><div>Artifact hiện tại chọn <code>raw</code></div><div>Trong normalize/core</div><div>Nếu muốn Hybrid cải thiện accuracy, cần so sánh raw/mask/crop handoff bằng cùng metric.</div>
+      <div class="stage-name">05. CV/OMR core sau YOLO</div><div><code>cpp_ms</code> 668.7 / 706 ms</div><div><code>cpp_ms</code> 235.9 / 262 ms</div><div>YOLO không thay thế OMR core; vẫn còn chi phí threshold/density phía sau.</div>
+      <div class="stage-name">06. Threshold</div><div>Trong <code>cpp_ms</code></div><div>20.1 / 27 ms</div><div>Gần tương tự CV-only sau khi đã có canonical sheet.</div>
+      <div class="stage-name">07. Grid density + decode</div><div>Trong <code>cpp_ms</code></div><div>3.2 / 4 ms</div><div>Không phải bottleneck của Hybrid.</div>
+      <div class="stage-name">Measured total</div><div>Worker boundary 997.8 / 1104 ms</div><div>E2E 264.5 / 294 ms</div><div>Web số này chưa gồm decode/RGBA; Native là E2E đầy đủ.</div>
+    </div>
+  </section>
+
+  <section class="section" id="web">
+    <h2>4. Web runtime: worker boundaries</h2>
+    <p class="lead">
+      Web chạy trong Worker để tách UI khỏi compute. Cả hai worker đều load <code>ort.min.js</code>, <code>wasm-bridge.js</code> và một biến thể OMR WASM.
+      Điểm khác nhau là <code>worker-cv.js</code> bỏ qua YOLO khi xử lý sheet, còn <code>worker-yolo.js</code> chạy ONNX trước rồi mới gọi C++.
+    </p>
+    <div class="split-flow">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Web CV</h3>
+          <span class="tag cv">worker-cv.js</span>
+        </div>
+        <div class="panel-body">
+          <div class="pipeline">
+            <div class="step webline">
+              <div class="num">1</div>
+              <div><div class="title">Browser decode</div><div class="text"><code>createImageBitmap(file)</code> tạo bitmap trong Worker.</div></div>
+              <div class="time">91.3 ms</div>
+            </div>
+            <div class="step webline">
+              <div class="num">2</div>
+              <div><div class="title">RGBA extract</div><div class="text">Vẽ lên <code>OffscreenCanvas</code>, lấy <code>ImageData.data</code> để chuyển qua WASM.</div></div>
+              <div class="time">93.0 ms</div>
+            </div>
+            <div class="step cvline">
+              <div class="num">3</div>
+              <div><div class="title">Raw handoff to C++</div><div class="text">Không mask, không crop bằng YOLO. Gọi <code>bridge.processSheet(rgba,w,h)</code>.</div></div>
+              <div class="time">0 ms YOLO</div>
+            </div>
+            <div class="step cvline">
+              <div class="num">4</div>
+              <div><div class="title">C++ OMR core</div><div class="text"><code>omr_core.cpp</code> + <code>omr_warp.cpp</code>: normalize, marker crop, threshold, density, z-score.</div></div>
+              <div class="time">524.2 ms</div>
+            </div>
+          </div>
+          <div class="note">Redmi CV E2E artifact: <code>runs/batch_results/redmi_note13_pro_plus_cv_e2e_n179.json</code>.</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Web YOLO</h3>
+          <span class="tag yolo">worker-yolo.js</span>
+        </div>
+        <div class="panel-body">
+          <div class="pipeline">
+            <div class="step webline">
+              <div class="num">1</div>
+              <div><div class="title">Browser decode + RGBA</div><div class="text">Tương tự Web CV, nhưng artifact YOLO raw hiện chỉ lưu worker boundary sau bước này.</div></div>
+              <div class="time">not exported</div>
+            </div>
+            <div class="step yololine">
+              <div class="num">2</div>
+              <div><div class="title">YOLO preprocess</div><div class="text">Letterbox 640x640, RGBA -> Float32 CHW, normalize 0-1.</div></div>
+              <div class="time">incl.</div>
+            </div>
+            <div class="step yololine">
+              <div class="num">3</div>
+              <div><div class="title">ONNX Runtime inference</div><div class="text">Ưu tiên WebGPU, fallback WASM; detect class <code>marker_corners</code>, threshold 0.50, NMS 0.45.</div></div>
+              <div class="time">328.6 ms</div>
+            </div>
+            <div class="step yololine">
+              <div class="num">4</div>
+              <div><div class="title">Mask/raw handoff</div><div class="text">Có thể mask ngoài bbox; artifact <code>yolo_raw</code> dùng <code>mask=raw</code>, YOLO đo localization nhưng C++ vẫn nhận ảnh raw.</div></div>
+              <div class="time">raw</div>
+            </div>
+            <div class="step cvline">
+              <div class="num">5</div>
+              <div><div class="title">Shared C++ OMR core</div><div class="text">Sau YOLO, recognition vẫn do cùng C++ pipeline quyết định.</div></div>
+              <div class="time">668.7 ms</div>
+            </div>
+          </div>
+          <div class="note">YOLO Web raw boundary: <code>worker_total_ms = yolo_ms + cpp_ms</code>, chưa gồm decode/RGBA trong file hiện tại.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="native">
+    <h2>5. Native Android runtime: OpenCV ARM và ONNX Runtime Android</h2>
+    <p class="lead">
+      Native đi qua <code>OmrProcessor.process()</code>. Stage 1 được cấp bởi interface <code>PaperDetector</code>:
+      flavor CV dùng detector truyền thống trong project Android đầy đủ; flavor YOLO dùng <code>YoloPaperDetector</code>.
+      Sau Stage 1, <code>cropByMarkers</code>, threshold và bubble reading chạy trong Kotlin/OpenCV native.
+    </p>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Native CV</h3>
+          <span class="tag native">OpenCV ARM</span>
+        </div>
+        <div class="panel-body">
+          <div class="pipeline">
+            <div class="step nativeline">
+              <div class="num">1</div>
+              <div><div class="title">Bitmap -> Mat</div><div class="text"><code>BitmapFactory</code>, <code>Utils.bitmapToMat</code>, <code>BGRA2BGR</code>.</div></div>
+              <div class="time">35.8 ms</div>
+            </div>
+            <div class="step nativeline">
+              <div class="num">2</div>
+              <div><div class="title">Stage 1 normalize</div><div class="text"><code>PaperDetector.normalize(img)</code> trả BGR 1700x2400.</div></div>
+              <div class="time">44.7 ms</div>
+            </div>
+            <div class="step nativeline">
+              <div class="num">3</div>
+              <div><div class="title">Stage 2 marker crop</div><div class="text">Otsu + morph open + contour filter trong vùng góc 25%, homography, resize 1700x2400.</div></div>
+              <div class="time">part of cpp</div>
+            </div>
+            <div class="step nativeline">
+              <div class="num">4</div>
+              <div><div class="title">Threshold + OMR read</div><div class="text"><code>BubbleDetector.preprocess</code>, circular density, adaptive thresholds, recent history.</div></div>
+              <div class="time">87.6 ms total CV</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Native YOLO</h3>
+          <span class="tag yolo">ORT Android</span>
+        </div>
+        <div class="panel-body">
+          <div class="pipeline">
+            <div class="step yololine">
+              <div class="num">1</div>
+              <div><div class="title">Provider chọn trước run</div><div class="text"><code>CPU</code>, <code>CPU4T</code>, hoặc <code>NNAPI</code> với FP16 nếu driver nhận.</div></div>
+              <div class="time">3 modes</div>
+            </div>
+            <div class="step yololine">
+              <div class="num">2</div>
+              <div><div class="title">Letterbox + CHW</div><div class="text">Resize 640x640, canvas 114, BGR->RGB, FloatBuffer CHW.</div></div>
+              <div class="time">prep</div>
+            </div>
+            <div class="step yololine">
+              <div class="num">3</div>
+              <div><div class="title">ORT run + NMS</div><div class="text">Class <code>marker_corners</code>, conf 0.50, IOU 0.45, expand bbox 20%.</div></div>
+              <div class="time">158.2 ms NNAPI</div>
+            </div>
+            <div class="step nativeline">
+              <div class="num">4</div>
+              <div><div class="title">Crop -> resize -> Stage 2</div><div class="text">Crop bbox nếu có; nếu miss, fallback resize full image; Stage 2 tiếp tục refine bằng marker.</div></div>
+              <div class="time">264.5 ms E2E</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="compare">
+    <h2>6. CV-only vs Hybrid: khác nhau ở đâu?</h2>
+    <div class="shared-band">
+      <h3>Phần dùng chung sau localization</h3>
+      <div class="shared-list">
+        <div><b>Canonical canvas</b>1700x2400 là hệ tọa độ cố định cho mọi block.</div>
+        <div><b>Stage 2 marker crop</b>Luôn tìm lại registration squares để sửa residual perspective.</div>
+        <div><b>Bubble sampling</b>300 bubble centers, radius R=18, circular density.</div>
+        <div><b>Decision rule</b>Per-row z-score + floor 0.15 cho answers; density threshold cho MSSV/KEY.</div>
+      </div>
+    </div>
+    <table style="margin-top:14px">
+      <tr>
+        <th class="dim">Khía cạnh</th>
+        <th><span class="tag cv">CV</span></th>
+        <th><span class="tag yolo">YOLO</span></th>
+      </tr>
+      <tr>
+        <td class="dim">Vai trò</td>
+        <td>Localization bằng xử lý ảnh truyền thống: marker corners trước, paper boundary fallback.</td>
+        <td>Localization bằng detector học máy; nhận vùng marker/paper để mask hoặc crop trước khi vào OMR core.</td>
+      </tr>
+      <tr>
+        <td class="dim">Recognition</td>
+        <td colspan="2">Không phải YOLO. Câu trả lời vẫn được đọc bằng threshold + density + z-score trong OMR core.</td>
+      </tr>
+      <tr>
+        <td class="dim">Khi nào lợi</td>
+        <td>Ảnh đủ rõ marker, nền không gây nhiễu mạnh; không tốn model inference.</td>
+        <td>Ảnh có nền phức tạp hoặc cần loại bỏ background trước khi corner detection.</td>
+      </tr>
+      <tr>
+        <td class="dim">Rủi ro hiện tại</td>
+        <td>Corner detection có thể chọn nhầm marker khi nền tối hoặc marker yếu.</td>
+        <td>Nếu mask/crop sai, Stage 2 và grid anchor lệch; artifact raw dùng YOLO để đo nhưng không cho YOLO can thiệp recognition.</td>
+      </tr>
+      <tr>
+        <td class="dim">Runtime cost</td>
+        <td>Không có model inference; bottleneck là WASM/OpenCV/C++ hoặc OpenCV ARM.</td>
+        <td>Thêm 158-329 ms inference tùy provider, cộng thêm C++/OpenCV OMR phía sau.</td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="section" id="perf">
+    <h2>7. Performance chi tiết</h2>
+    <p class="lead">
+      Các số dưới đây được tính từ JSON trong <code>runs/batch_results</code>. Với Web CV E2E dùng file có đủ decode/RGBA.
+      Với Web YOLO raw, file hiện tại chỉ có worker boundary sau decode/RGBA, nên không cộng chung như E2E thật.
+    </p>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Same-device CV, Redmi Note 13 Pro+</h3>
+          <span class="tag hot">main gap</span>
+        </div>
+        <div class="panel-body">
+          <table class="bar-table">
+            <tr><th>Boundary</th><th>Web Mobile</th><th>Native Android</th><th>Ratio</th></tr>
+            <tr>
+              <td>Decode / buffer</td>
+              <td class="numcell">184.3 ms</td>
+              <td class="numcell">35.8 ms</td>
+              <td class="numcell">5.1x</td>
+            </tr>
+            <tr>
+              <td>C++ / CV compute</td>
+              <td class="numcell">524.2 ms</td>
+              <td class="numcell">87.6 ms</td>
+              <td class="numcell">6.0x</td>
+            </tr>
+            <tr>
+              <td>End-to-end measured</td>
+              <td class="numcell">708.7 ms</td>
+              <td class="numcell">117.6 ms</td>
+              <td class="numcell">6.0x</td>
+            </tr>
+          </table>
+          <div class="note">Native đang là debug/run artifact; release build có thể làm gap tăng thêm.</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h3>YOLO provider comparison, Redmi</h3>
+          <span class="tag yolo">inference + OMR</span>
+        </div>
+        <div class="panel-body">
+          <table>
+            <tr><th>Run</th><th>YOLO/ORT</th><th>OMR compute</th><th>Total boundary</th></tr>
+            <tr><td>Web YOLO raw</td><td class="numcell">328.6 ms</td><td class="numcell">668.7 ms</td><td class="numcell">997.8 ms worker</td></tr>
+            <tr><td>Native CPU 1T</td><td class="numcell">356.5 ms</td><td class="numcell">472.0 ms</td><td class="numcell">509.4 ms E2E</td></tr>
+            <tr><td>Native CPU 4T</td><td class="numcell">217.7 ms</td><td class="numcell">332.6 ms</td><td class="numcell">374.5 ms E2E</td></tr>
+            <tr><td>Native NNAPI</td><td class="numcell">158.2 ms</td><td class="numcell">235.9 ms</td><td class="numcell">264.5 ms E2E</td></tr>
+          </table>
+          <div class="note">Native <code>cpp_ms</code> ở YOLO bao gồm YOLO stage + phần OMR sau đó; <code>ort_ms</code> là inference thuần.</div>
+        </div>
       </div>
     </div>
 
-    <!-- WEB MOBILE -->
-    <div class="card">
-      <div class="chead m">
-        <h2>Web — Mobile</h2>
-        <div class="dev">Redmi Note 13 Pro+ · Android Chrome · OpenCV.js (WASM)</div>
-        <span class="dep">Deploy: URL, không cài đặt</span>
+    <div class="panel" style="margin-top:14px">
+      <div class="panel-head">
+        <h3>Latency distribution, N=179</h3>
+        <span class="tag">mean / SD / p50 / p95</span>
       </div>
-      <div class="stages m">
-        <div class="stagewrap stage"><span class="nm">JPEG decode<br><span class="be">createImageBitmap (browser)</span></span><span class="ms">91 ms</span></div>
-        <div class="arrow">▼</div>
-        <div class="stagewrap stage"><span class="nm">RGBA extract<br><span class="be">OffscreenCanvas getImageData</span></span><span class="ms">93 ms</span></div>
-        <div class="arrow">▼</div>
-        <div class="stagewrap stage" style="background:var(--moblite)"><span class="nm">CV compute<br><span class="be">WASM C++ · omr.wasm <b class="warn">BASELINE</b><br>đơn luồng, (gần như) không SIMD</span></span><span class="ms">524 ms</span></div>
-        <div class="bar" style="width:100%"></div>
-      </div>
-      <div class="foot">
-        <div class="e2e"><span>E2E / sheet</span><b>708 ms</b></div>
-        <div class="acc">Recognition vs GT: <span class="ok">99.27%</span> (CV) · 1k sheets ≈ 12 phút</div>
+      <div class="panel-body">
+        <table>
+          <tr>
+            <th>Platform / method</th>
+            <th>Boundary</th>
+            <th>Mean</th>
+            <th>SD</th>
+            <th>p50</th>
+            <th>p95</th>
+            <th>Ghi chú</th>
+          </tr>
+          <tr>
+            <td><span class="tag web">Web Laptop CV</span></td>
+            <td>decode + RGBA + cpp</td>
+            <td class="numcell">612.3</td>
+            <td class="numcell">94.7</td>
+            <td class="numcell">586</td>
+            <td class="numcell">759</td>
+            <td>ASUS Vivobook, Chrome, WASM baseline artifact E2E.</td>
+          </tr>
+          <tr>
+            <td><span class="tag web">Web Redmi CV</span></td>
+            <td>decode + RGBA + cpp</td>
+            <td class="numcell">708.7</td>
+            <td class="numcell">58.2</td>
+            <td class="numcell">721</td>
+            <td class="numcell">783</td>
+            <td>Same-boundary file <code>redmi_note13_pro_plus_cv_e2e_n179.json</code>.</td>
+          </tr>
+          <tr>
+            <td><span class="tag yolo">Web Redmi YOLO raw</span></td>
+            <td>YOLO + cpp worker</td>
+            <td class="numcell">997.8</td>
+            <td class="numcell">75.3</td>
+            <td class="numcell">1013</td>
+            <td class="numcell">1100</td>
+            <td>Không gồm decode/RGBA; <code>mask=raw</code>, chosen path raw.</td>
+          </tr>
+          <tr>
+            <td><span class="tag native">Native Redmi CV</span></td>
+            <td>decode + Mat + cpp</td>
+            <td class="numcell">117.6</td>
+            <td class="numcell">14.1</td>
+            <td class="numcell">117</td>
+            <td class="numcell">136</td>
+            <td>OpenCV ARM native; <code>cpp_ms</code> mean 87.6 ms.</td>
+          </tr>
+          <tr>
+            <td><span class="tag native">Native Redmi YOLO NNAPI</span></td>
+            <td>decode + Mat + YOLO + OMR</td>
+            <td class="numcell">264.5</td>
+            <td class="numcell">17.5</td>
+            <td class="numcell">263</td>
+            <td class="numcell">293</td>
+            <td>ORT inference mean 158.2 ms; fastest YOLO provider.</td>
+          </tr>
+        </table>
       </div>
     </div>
 
-    <!-- NATIVE -->
-    <div class="card">
-      <div class="chead n">
-        <h2>Native — Android</h2>
-        <div class="dev">Redmi Note 13 Pro+ · Kotlin app · OpenCV ARM (JNI)</div>
-        <span class="dep">Deploy: cài APK</span>
+    <div class="callouts" style="margin-top:14px">
+      <div class="callout">
+        <b>Bottleneck chính là OMR compute trên Web</b>
+        <p>Redmi Web CV dùng 524.2 ms cho C++/WASM, trong khi Native CV dùng 87.6 ms cho phần tương ứng. Đây là nguồn gap lớn nhất.</p>
       </div>
-      <div class="stages n">
-        <div class="stagewrap stage"><span class="nm">JPEG decode<br><span class="be">BitmapFactory (Android)</span></span><span class="ms">24 ms</span></div>
-        <div class="arrow">▼</div>
-        <div class="stagewrap stage"><span class="nm">Bitmap → Mat<br><span class="be">OpenCV Utils</span></span><span class="ms">12 ms</span></div>
-        <div class="arrow">▼</div>
-        <div class="stagewrap stage" style="background:var(--natlite)"><span class="nm">Normalize (warp)<br><span class="be">OpenCV ARM native (NEON)</span></span><span class="ms">43 ms</span></div>
-        <div class="bar" style="width:52%"></div>
-        <div class="arrow">▼</div>
-        <div class="stagewrap stage" style="background:var(--natlite)"><span class="nm">Threshold + OMR read<br><span class="be">adaptiveThresh + density + z-score</span></span><span class="ms">24 ms</span></div>
-        <div class="bar" style="width:29%"></div>
+      <div class="callout">
+        <b>YOLO không thay thế bubble reading</b>
+        <p>YOLO chỉ định vị vùng giấy/marker. Nếu muốn YOLO cải thiện accuracy, phải chứng minh output localization làm thay đổi kết quả sau C++.</p>
       </div>
-      <div class="foot">
-        <div class="e2e"><span>E2E / sheet <span class="pill">debug build</span></span><b>106 ms</b></div>
-        <div class="acc">Recognition vs GT: <span class="ok">99.6%</span> (ảnh sáng) · 87% tổng (corner nền tối)</div>
+      <div class="callout">
+        <b>SIMD/threads là hướng tối ưu Web</b>
+        <p>Worker có logic chọn <code>omr_threads</code>/<code>omr_simd</code>, nhưng nếu file chưa build thì fallback <code>omr.wasm</code>. Đây là optimization target rõ nhất.</p>
       </div>
     </div>
 
-  </div>
-  <div class="legend">Bar tỉ lệ theo ms của riêng stage CV trong mỗi cột. CV compute (cpp) là phần chênh chính: Web ~524-559 ms vs Native ~82 ms.</div>
+    <div class="visual">
+      <img src="../figures/chart_cross_platform.png" alt="Cross-platform resource and latency comparison chart">
+    </div>
+  </section>
 
-  <h3>So sánh same-boundary (cùng Redmi, cùng N=179)</h3>
-  <table>
-    <tr><th class="dim">Boundary</th><th>Web Mobile (Redmi)</th><th>Native (Redmi, debug)</th><th>Tỉ lệ Web / Native</th></tr>
-    <tr><td class="dim">CV compute (cpp)</td><td class="cm">524 ms</td><td class="cn">82 ms</td><td><b>6.35×</b></td></tr>
-    <tr><td class="dim">E2E (decode→answers, không tính debug-write)</td><td class="cm">708 ms</td><td class="cn">106 ms</td><td><b>6.66×</b></td></tr>
-  </table>
-  <div class="legend">6.66× là <b>lower bound</b>: Native là debug build (release nhanh hơn → tỉ lệ tăng). Bottleneck = WASM CV stage chạy baseline (không SIMD/threads).</div>
-
-  <h3>Ma trận khác biệt kỹ thuật</h3>
-  <table>
-    <tr><th class="dim">Chiều</th><th class="cw">Web Laptop</th><th class="cm">Web Mobile</th><th class="cn">Native Android</th></tr>
-    <tr><td class="dim">Thiết bị</td><td>ASUS Vivobook</td><td>Redmi Note 13 Pro+</td><td>Redmi Note 13 Pro+</td></tr>
-    <tr><td class="dim">Triển khai</td><td>Mở URL</td><td>Mở URL</td><td>Cài APK</td></tr>
-    <tr><td class="dim">Decode ảnh</td><td colspan="2">Browser <code>createImageBitmap</code> + canvas <code>getImageData</code></td><td>Android <code>BitmapFactory</code> + <code>bitmapToMat</code></td></tr>
-    <tr><td class="dim">CV runtime</td><td colspan="2">OpenCV.js <b>WASM</b> (omr.wasm baseline)</td><td>OpenCV <b>ARM native</b> qua JNI (NEON)</td></tr>
-    <tr><td class="dim">SIMD / đa luồng</td><td colspan="2"><span class="warn">Baseline: không threads, (gần như) không SIMD</span> — bản omr_simd/omr_threads chưa build</td><td>Native ARM + NEON; đơn luồng (CV)</td></tr>
-    <tr><td class="dim">YOLO runtime</td><td colspan="2">ONNX Runtime Web (WASM / WebGPU); ORT SIMD-threaded build <span class="ok">có sẵn</span></td><td>ONNX Runtime Android (CPU-1T/4T / NNAPI)</td></tr>
-    <tr><td class="dim">Pipeline</td><td colspan="2">Main thread → Web Worker → WASM; UI tách worker</td><td>Coroutine Dispatchers.Default; gọi JNI</td></tr>
-    <tr><td class="dim">CV compute / sheet</td><td class="cw">559 ms</td><td class="cm">524 ms</td><td class="cn">82 ms (debug)</td></tr>
-    <tr><td class="dim">E2E / sheet</td><td class="cw">612 ms</td><td class="cm">708 ms</td><td class="cn">106 ms (debug)</td></tr>
-    <tr><td class="dim">Recognition vs GT</td><td class="cw">~99%</td><td class="cm">99.27%</td><td class="cn">99.6% sáng / 87% tổng</td></tr>
-    <tr><td class="dim">Resource instrument</td><td class="cw">psutil (renderer)</td><td class="cm">in-page proxy</td><td class="cn">adb / Android sampler</td></tr>
-    <tr><td class="dim">Ưu điểm</td><td colspan="2">URL, không cài, cùng code path đa thiết bị, privacy on-device</td><td>Latency thấp, truy cập NNAPI/OpenCV native</td></tr>
-    <tr><td class="dim">Nhược điểm</td><td colspan="2">Browser sandbox, WASM chậm, hạn chế GPU/CV backend</td><td>Phải cài đặt, maintain theo platform</td></tr>
-  </table>
-
-  <h3>Phát hiện chính &amp; hướng tối ưu</h3>
-  <ul class="notes">
-    <li><span class="warn">Web CV đang chạy WASM baseline.</span> Worker chọn <code>omr_threads</code> (SIMD+đa luồng, server đã bật COOP/COEP) nhưng <code>omr_simd.wasm</code>/<code>omr_threads.wasm</code> <b>chưa build</b> → <code>importScripts</code> 404 → fallback <code>omr.wasm</code>. Tức 524 ms cpp đơn luồng, phí 8 nhân Redmi.</li>
-    <li><b>Lever lớn nhất:</b> build <code>omr_threads</code> (SIMD128 + pthreads). Kỳ vọng cpp <b>2-6×</b> nhanh hơn → E2E 708 → ~250-400 ms → tỉ lệ Web/Native 6.66× xuống <b>~2-3×</b>. Infra build đã có (<code>scripts/build_opencv_variants.sh</code>), cần Emscripten.</li>
-    <li><b>Lever phụ:</b> giảm canonical resolution (warp 1700×2400 = 4M px → nhỏ hơn) — tuyến tính theo pixel, nhưng phải test accuracy.</li>
-    <li><b>Boundary đã sửa:</b> trước đây Web đo <code>cpp_ms</code> (worker compute) còn Native đo <code>e2e_ms</code> (file-based) — lệch. Nay cả hai đo cùng boundary decode→answers, ratio 6.66× là so sánh công bằng same-device.</li>
-    <li><span class="ok">Recognition đã parity</span> trên ảnh đủ sáng (Web ~99%, Native 99.6%). Native 87% tổng bị kéo bởi 25 ảnh nền tối (corner detection chọn nhầm marker) — vấn đề localization riêng, không phải đọc bubble.</li>
-    <li><b>Caveat đo:</b> Native = debug build (release nhanh hơn). YOLO E2E chưa đo (Native YOLO pipeline còn cần fix raw-handoff trước).</li>
-  </ul>
-
+  <section class="section" id="inside">
+    <h2>8. Code paths và artifact dùng cho trang này</h2>
+    <div class="source-grid">
+      <div class="source">
+        <h3>Web runtime</h3>
+        <ul>
+          <li><code>web/js/worker-cv.js</code>: decode, RGBA extraction, raw handoff, perf fields.</li>
+          <li><code>web/js/worker-yolo.js</code>: WebGPU/WASM ORT, 640 letterbox, marker_corners detection, mask/raw handoff.</li>
+          <li><code>web/js/wasm-bridge.js</code>: JS bridge into exported C++ OMR functions.</li>
+        </ul>
+      </div>
+      <div class="source">
+        <h3>C++ OMR core</h3>
+        <ul>
+          <li><code>src/core/omr_warp.cpp</code>: downscale, grayscale, marker corners, paper fallback, homography, warp.</li>
+          <li><code>src/core/omr_core.cpp</code>: Stage 2 crop, adaptive threshold, fixed grid, density sampling, z-score decode.</li>
+          <li><code>scripts/build_opencv_variants.sh</code>: intended path for SIMD/threaded WASM variants.</li>
+        </ul>
+      </div>
+      <div class="source">
+        <h3>Native Android</h3>
+        <ul>
+          <li><code>android/app/src/main/java/.../OmrProcessor.kt</code>: orchestration, cropByMarkers, threshold, bubble reading.</li>
+          <li><code>android/app/src/main/java/.../PaperDetector.kt</code>: Stage 1 detector contract.</li>
+          <li><code>android/app/src/yolo/java/.../YoloPaperDetector.kt</code>: ORT Android CPU/CPU4T/NNAPI provider logic.</li>
+        </ul>
+      </div>
+      <div class="source">
+        <h3>Benchmark artifacts</h3>
+        <ul>
+          <li><code>runs/batch_results/redmi_note13_pro_plus_cv_e2e_n179.json</code>: Web CV E2E stage timings.</li>
+          <li><code>runs/batch_results/redmi_note13_pro_plus_native_cv_n179.json</code>: Native CV same-device baseline.</li>
+          <li><code>runs/batch_results/redmi_note13_pro_plus_yolo_raw_n179.json</code> và native YOLO provider JSONs.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="note">
+      Đọc số liệu: Web CV E2E có đủ <code>jpeg_decode_ms</code>, <code>rgba_extract_ms</code>, <code>cpp_ms</code>.
+      Web YOLO raw hiện thiếu decode/RGBA trong JSON nên chỉ so sánh như worker-boundary. Native Android source build đầy đủ nằm ở sibling project theo <code>android/README.md</code>; thư mục này có snapshot đủ để trace pipeline chính.
+    </div>
+  </section>
+</main>
+<div class="image-lightbox" id="imageLightbox" aria-hidden="true">
+  <a class="lightbox-open" id="lightboxOpen" href="#" target="_blank" rel="noopener">Mở ảnh gốc</a>
+  <button class="lightbox-close" id="lightboxClose" type="button">Đóng</button>
+  <img id="lightboxImage" src="" alt="">
 </div>
+<script>
+  (() => {
+    const lightbox = document.getElementById('imageLightbox');
+    const lightboxImage = document.getElementById('lightboxImage');
+    const lightboxOpen = document.getElementById('lightboxOpen');
+    const closeButton = document.getElementById('lightboxClose');
+
+    function openImage(img) {
+      lightboxImage.src = img.currentSrc || img.src;
+      lightboxImage.alt = img.alt || 'Pipeline preview';
+      lightboxOpen.href = img.currentSrc || img.src;
+      lightbox.classList.add('open');
+      lightbox.setAttribute('aria-hidden', 'false');
+      closeButton.focus();
+    }
+
+    function closeImage() {
+      lightbox.classList.remove('open');
+      lightbox.setAttribute('aria-hidden', 'true');
+      lightboxImage.src = '';
+    }
+
+    document.querySelectorAll('.stage-card img').forEach((img) => {
+      img.tabIndex = 0;
+      img.title = 'Click để xem ảnh full-size';
+      img.addEventListener('click', () => openImage(img));
+      img.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openImage(img);
+        }
+      });
+    });
+
+    closeButton.addEventListener('click', closeImage);
+    lightboxImage.addEventListener('click', closeImage);
+    lightbox.addEventListener('click', (event) => {
+      if (event.target === lightbox) closeImage();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeImage();
+    });
+  })();
+</script>
 </body>
 </html>
